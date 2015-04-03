@@ -1,0 +1,55 @@
+###########################
+# Automatic List Collection
+###########################
+
+# Yahoo Groups
+# (e.g. Mailing-List: list mt-dev@yahoogroups.com)
+:0
+* ^Mailing-List: list \/[^@]+
+${LISTBASE}${MATCH}/
+
+# Mail2News
+# (e.g. List-Id: comp.lang.c <comp.lang.c.tiger>
+:0
+* ^List-Id: \/[^@ ]+
+* ^List-post: .*news2mail.com
+${LISTBASE}${MATCH}/
+
+# Mailman and other intelligent software lists
+# (e.g. List-Post: <mailto:Pluginmanager-l@rayners.org>)
+:0
+* ^List-Post: \<mailto:\/[^@]+
+${LISTBASE}${MATCH}/
+
+# Other list software?
+# (e.g. X-Mailing-List: <ftjava-test@firedrake.org>)
+:0
+* ^X-Mailing-List: \<\/[^@]+
+${LISTBASE}${MATCH}/
+
+# Mojo Lists
+# (e.g. List: lug)
+:0
+* ^List-Software: Mojo Mail
+* ^List: \/[^@]+
+${LISTBASE}${MATCH}/
+
+# ListProc (all those UMBC lists)
+# (e.g. Sender: owner-umbclinux@listproc.umbc.edu)
+:0
+* ^Sender: owner-\/[^@]+
+${LISTBASE}${MATCH}/
+
+# More lists (realms-l)
+# (e.g. From owner-realms-l@ORACLE.WIZARDS.COM)
+#:0
+#* ^From owner-\/[^@]+
+#${LISTBASE}${MATCH}/
+
+# croquet
+# (e.g. List-Owner: <mailto:owner-croquet@lists.wisc.edu>)
+:0
+* ^List-Owner: <mailto:owner-\/[^@]+
+${LISTBASE}${MATCH}/
+
+

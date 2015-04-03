@@ -1,0 +1,17 @@
+# zshenv -> [login? zprofile] -> [interactive? zshrc] -> [login? zlogin] -> [exiting? zlogout]
+# Run when a login shell exits
+$DOTFILES_NOISY_STARTUP && echo "== Running $HOME/.zlogout"
+
+source $ZPREZTODIR/runcoms/zlogout
+
+if [ "$SHLVL" = 1 ]; then
+    [ -x /usr/bin/clear_console ] && /usr/bin/clear_console -q
+fi
+
+# TODO: do this only on last logout
+# clear keychain
+#which keychain 2>/dev/null && keychain --clear
+
+# TODO: do this only on last logout
+# clear ssh-agent
+#[ -x /usr/bin/ssh-agent ] && /usr/bin/ssh-agent -k 2>/dev/null

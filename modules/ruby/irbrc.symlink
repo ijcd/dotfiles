@@ -1,0 +1,155 @@
+#!/usr/bin/ruby
+
+begin
+  # use Pry if it exists
+  require 'pry'
+  Pry.start || exit
+rescue LoadError
+end
+
+require 'irb/completion'
+require 'irb/ext/save-history'
+require 'rubygems'
+require 'pp'
+
+# IRB.conf[:LOAD_MODULES] = []  unless IRB.conf.key?(:LOAD_MODULES) 
+# unless IRB.conf[:LOAD_MODULES].include?('irb/completion')
+#   IRB.conf[:LOAD_MODULES] << 'irb/completion'
+# end 
+
+# history
+IRB.conf[:EVAL_HISTORY] = 1000
+IRB.conf[:SAVE_HISTORY] = 1000
+IRB.conf[:HISTORY_FILE] = "#{ENV['HOME']}/.irb_history"
+
+IRB.conf[:PROMPT_MODE] = :SIMPLE
+#IRB.conf[:USE_READLINE] = true
+
+IRB.conf[:AUTO_INDENT] = true
+
+# Wirble is a plugin to colorize your irb, it's installed from a gem
+begin
+  require 'wirble'
+  Wirble.init
+  Wirble.colorize
+rescue LoadError => err
+  warn "Couldn't load Wirble: #{err}"
+end
+
+# IRB.conf[:IRB_RC] = proc do |conf|
+#   leader = " " * conf.irb_name.length
+#   conf.prompt_i = "#{conf.irb_name} --> "
+#   conf.prompt_s = leader + ' \-" '
+#   conf.prompt_c = leader + ' \-+ '
+#   conf.return_format = leader + " ==> %s\n\n"
+#   puts "Welcome!"
+# end
+
+# # http://blog.nicksieger.com/articles/2006/04/23/tweaking-irb
+# ARGV.concat ["--readline", "--prompt-mode", "simple"]
+
+# reload this .irbrc
+def IRB.reload
+  load __FILE__
+end
+
+# http://ozmm.org/posts/time_in_irb.html
+def time(times = 1)
+  require 'benchmark'
+  ret = nil
+  Benchmark.bm { |x| x.report { times.times { ret = yield } } }
+  ret
+end
+
+class Object
+  # list methods which aren't in superclass
+  def local_methods(obj = self)
+    (obj.methods - obj.class.superclass.instance_methods).sort
+  end
+
+  def ls(obj=self)
+    width = `stty size 2>/dev/null`.split(/\s+/, 2).last.to_i
+    width = 80 if width == 0
+    local_methods(obj).each_slice(3) do |meths|
+      pattern = "%-#{width / 3}s" * meths.length
+      puts pattern % meths
+    end
+  end
+
+  # print documentation
+  #
+  #   ri 'Array#pop'
+  #   Array.ri
+  #   Array.ri :pop
+  #   arr.ri :pop
+  def ri(method = nil)
+    unless method && method =~ /^[A-Z]/ # if class isn't specified
+      klass = self.kind_of?(Class) ? name : self.class.name
+      method = [klass, method].compact.join('#')
+    end
+    puts `ri '#{method}'`
+  end
+end
+
+def me
+  User.find_by_login(ENV['USER'].strip)
+end
+
+def r
+  reload!
+end
+
+def pbcopy(str)
+  IO.popen('pbcopy', 'w') { |f| f << str.to_s }
+end
+
+def pbpaste
+  `pbpaste`
+end
+
+def pbcopy_history
+  history = Readline::HISTORY.entries
+  index = history.rindex("exit") || -1
+  content = history[(index+1)..-2].join("\n")
+  puts content
+  copy content
+end
+
+def ri(*names)
+  system(%{ri #{names.map {|name| name.to_s}.join(" ")}})
+end
+
+def fri(*names)
+  system(%{fri #{names.map {|name| name.to_s}.join(" ")}})
+end
+
+if $0 == 'irb' && ENV['RAILS_ENV']
+  def sql(query)
+    ActiveRecord::Base.connection.select_all(query)
+  end
+
+  def use_blueprints
+    require 'spec/support/blueprints'
+  end
+
+  def use_routes
+    include ActionController::UrlWriter
+    default_url_options[:host] = 'whatever'
+  end
+  
+  # Log to STDOUT if in Rails && use HIRB if available
+  #if ENV.include?('RAILS_ENV') && !Object.const_defined?('RAILS_DEFAULT_LOGGER')
+  #  begin
+  #    require 'hirb'
+  #    Hirb.enable
+  #  rescue LoadError => err
+  #    warn "No Hirb: #{err}"
+  #  end
+  #  require 'logger'
+  #  RAILS_DEFAULT_LOGGER = Logger.new(STDOUT)
+  #end
+end
+
+if defined?(Rails) && Rails.env
+  load File.dirname(__FILE__) + "/.railsrc"
+end

@@ -1,0 +1,6 @@
+gitize() {
+        git init \
+        && git add . \
+        && git commit -a -m"initial commit" \
+        && git gc
+}

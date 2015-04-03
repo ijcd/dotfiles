@@ -1,0 +1,4 @@
+function gemmate {
+    mate $(bundle show $1)
+    #mate $(rvm gemdir)/gems/$1*(N) $(rvm gemdir | sed 's/@.*/@global/')/gems/$1*(N)
+}

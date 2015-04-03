@@ -1,0 +1,17 @@
+#!/usr/bin/ruby
+
+md5hash = {}
+
+# TODO: Use ruby's Find method
+%x{find #{ARGV.join(' ')} -type f -print0 | xargs -0 md5sum}.each do |line|
+  md5 = line[/^\w+/]
+  file = line[/ +(.*)$/, 1]
+
+  # test if hash has been found already, print results if it has
+  if md5hash.include?(md5)
+    puts [md5hash[md5], file].join(' ')
+  else
+    md5hash[md5] = file
+  end
+
+end

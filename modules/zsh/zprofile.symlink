@@ -1,0 +1,9 @@
+# zshenv -> [login? zprofile] -> [interactive? zshrc] -> [login? zlogin] -> [exiting? zlogout]
+# After the zshenv files, for a login shell, commands are run from /etc/zprofile, then $ZDOTDIR/.zprofile
+$DOTFILES_NOISY_STARTUP && echo "== Running $HOME/.zprofile"
+
+source ${ZPREZTODIR:-~/.zprezto}/runcoms/zprofile
+
+export EDITOR='vim'
+export VISUAL='vim'
+export PAGER='less'

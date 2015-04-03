@@ -1,0 +1,38 @@
+#!/bin/bash
+#https://help.ubuntu.com/community/SSH_VPN
+
+#example
+#sudo ssh -NTCf -w 0:0 1.2.3.4
+# -N Do not execute a remote command. This is useful for just forwarding ports (or in this case tunnels).
+# -T Disable pseudo-tty allocation.
+# -C Requests compression of all data (including stdin, stdout, stderr, and data for forwarded X11 and TCP connections). Compress can speed up or potentially slow down your speed, so try with and without.
+# -f Requests ssh to go to background just before command execution.
+
+lnum=$1
+rnum=$2
+remote=$3
+net=10.0.201
+
+# current
+echo "CURRENT DEFAULT ROUTE:"
+route get default
+
+# remote
+sudo ssh -Cf -w $lnum:$rnum root@$remote "ifconfig tun$rnum ; ifconfig tun$rnum ${net}.100 pointopoint ${net}.200 ; arp -sD ${net}.200 eth0 pub"
+ps aux | grep "[s]sh -NTCf -w"
+
+# local
+sleep 1
+ifconfig tun$lnum
+case $(uname -s) in
+  Darwin)
+   sudo ifconfig tun$lnum ${net}.200 ${net}.100
+   ;;
+  *)
+   sudo ifconfig tun$lnum ${net}.200 pointtopoint ${net}.100
+   ;;
+esac
+
+echo "YOU ARE NOT DONE YET"
+echo "You now need something like this to route local traffic to the remote:"
+echo "sudo route add -net 1.2.3.4 ${net}.100 tun$lnum"

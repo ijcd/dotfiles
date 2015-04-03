@@ -1,0 +1,5 @@
+brew install daemontools
+brew install fasd
+brew install fortune
+brew install cowsay
+gem install lolcat

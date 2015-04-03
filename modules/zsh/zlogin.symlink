@@ -1,0 +1,16 @@
+# zshenv -> [login? zprofile] -> [interactive? zshrc] -> [login? zlogin] -> [exiting? zlogout]
+# For a login shell, /etc/zlogin and $ZDOTDIR/.zlogin are read
+$DOTFILES_NOISY_STARTUP && echo "== Running $HOME/.zlogin"
+
+alias fortune=true
+source $ZPREZTODIR/runcoms/zlogin
+unalias fortune
+
+fortune -s -n 300 | cowsay | lolcat
+
+test -n "$INTERACTIVE" -a -n "$LOGIN" && {
+    uname -npsr
+    uptime
+}
+
+echo "Dotfiles evaluated in $(tai_time_elapsed) seconds"

@@ -1,0 +1,3 @@
+function bundleit {
+    [ -s Gemfile ] && bundle check || bundle install
+}

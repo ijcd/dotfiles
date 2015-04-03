@@ -1,0 +1,47 @@
+:0
+* ^TO_burningman.com
+$MAILDIR/
+
+:0
+* ^TO_mywellnet.com
+$MAILDIR/
+
+:0
+* ^TO_lists.mywellnet.com
+$MAILDIR/
+
+:0
+* ^TO_wellsphere.com
+$MAILDIR/
+
+:0
+* ^TO_almamatcher.com
+$MAILDIR/
+
+:0
+* ^TO_monkeyisland@googlegroups.com
+$MAILDIR/
+
+:0
+* ^TO_955-959leavenworth@googlegroups.com
+$MAILDIR/
+
+:0
+* ^Subject:.*\[SpaceCowboys.*
+$MAILDIR/
+
+:0
+* ^Subject:.*wellnot
+$MAILDIR/
+
+:0
+* ^TO_(securityfocus.com|ngsec.com)
+$MAILDIR/.lists.securityfocus/
+
+:0
+* ^TO_lists.debian.org
+$MAILDIR/.lists.debian/
+
+:0
+* ^From:.*dictionary.com
+$MAILDIR/

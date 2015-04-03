@@ -1,0 +1,6 @@
+# added by twitch devenv setup
+export CC=/usr/local/bin/gcc-4.2
+export CXX=/usr/local/bin/g++-4.2
+# added by twitch devenv setup
+if which rbenv > /dev/null; then eval "$(rbenv init -)"; fi
+[[ -s "/Users/iduggan/.gvm/scripts/gvm" ]] && source "/Users/iduggan/.gvm/scripts/gvm"

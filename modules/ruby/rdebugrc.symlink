@@ -1,0 +1,5 @@
+# http://duckpunching.com/passenger-mod_rails-for-development-now-with-debugger
+set autoeval on
+set autolist on
+set autoreload on
+set listsize 30

@@ -1,0 +1,5 @@
+function cd-ijcd {
+    pushd . > /dev/null
+    builtin cd $*
+    pwd
+}

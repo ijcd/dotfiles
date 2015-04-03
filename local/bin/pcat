@@ -1,0 +1,15 @@
+#!/bin/bash
+
+postfix_cat() {
+  hash=$1
+  file=`find /var/spool/postfix/deferred | grep $hash`
+  if [ -n "$file" ] ; then
+     postcat $file
+  else
+     echo "Can't find file."
+  fi
+}
+
+for x in $* ; do
+  postfix_cat $x
+done

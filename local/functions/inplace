@@ -1,0 +1,15 @@
+# http://www.commandlinefu.com/commands/view/5317/generic-shell-function-for-modifying-files-in-place
+
+# edit files in place
+# This is sample output - yours may be different.
+# $ inplace nl textfile
+# (number lines of textfile in-place)
+# $ inplace awk '{print NF,$0}' somefile
+# (adds field counter to a file)
+# $ inplace nroff -man page.1
+# (convert manpage source to readable "catpage")
+# $ inplace sort textfile
+# (sort the lines of a file in-place)
+# $ inplace sed s/foo/bar/g myfile
+
+inplace() { eval F=\"\$$#\"; "$@" > "$F".new && mv -f "$F".new "$F"; }

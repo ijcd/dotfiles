@@ -1,0 +1,12 @@
+function gemx {
+    gemdir=$(gem environment | grep 'INSTALLATION DIRECTORY' | awk '{print $4}')/gems
+    case $1 in
+        cd)
+            $*
+            ;;
+        *) 
+            echo "(cd $gemdir ; $*)"
+            (cd $gemdir ; $*)
+            ;;
+    esac
+}

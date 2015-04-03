@@ -1,0 +1,11 @@
+function gemdev {
+  if [[ -z "$1" ]] ; then
+    dir=$(pwd)
+  else
+    dir=$1
+  fi
+
+  echo "Adding $dir to RUBYLIB and $dir/bin to PATH"
+  export PATH=$dir/bin:$PATH
+  export RUBYLIB=$(pwd)/lib:$RUBYLIB
+}

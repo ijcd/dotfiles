@@ -1,0 +1,20 @@
+#!/bin/bash
+
+case $(basename $0) in
+    lconns)
+      exec $(dirname $0)/conns -l "$@"
+      ;;
+    conns)
+      ;;
+    *)
+      echo "Unknown invocation." 1>&2
+      exit 1
+      ;;
+esac
+
+if [ "$1" == "-l" ] ; then
+  shift
+  sudo lsof -P -iTCP -sTCP:LISTEN "$@"
+else
+  sudo lsof -Pi "$@"
+fi

@@ -1,0 +1,7 @@
+#!/usr/bin/perl
+
+while (<>) {
+  y/A-Za-z/N-ZA-Mn-za-m/;
+  print;
+}
+

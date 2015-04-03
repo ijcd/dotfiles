@@ -1,0 +1,6 @@
+#!/bin/bash
+if [ -r .zeus.sock ] ; then
+  exec zeus "$@"
+else
+  exec "$@"
+fi

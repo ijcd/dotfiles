@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>JAVA_HOME</key>
+	<string>/System/Library/Frameworks/JavaVM.framework/Versions/CurrentJDK/Home</string>
+	<key>PATH</key>
+	<string>/Users/ijcd/bin:/usr/local/bin:/usr/local/mysql/bin:/usr/local/sbin:/sw/bin:/sw/sbin:/opt/local/bin:/sw/bin:/sw/sbin:/usr/bin:/bin:/usr/sbin:/sbin:/usr/local/bin:/usr/X11/bin:/usr/X11R6/bin</string>
+</dict>
+</plist>

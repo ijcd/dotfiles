@@ -1,0 +1,20 @@
+#!/bin/bash
+if !(echo $1 | grep :) ; then
+  echo "Need a file and a line number." 2>&1 
+  exit 1
+fi
+file=$(echo $1 |cut -d: -f1)
+line=$(echo $1 |cut -d: -f2)
+
+if [ x$file = x ] || [ x$line = x ] ; then
+  echo "Need a file and line number." 2>&1
+  exit 1
+fi
+
+# Look for the file if this isn't a path
+#if [ $(basename $file) != "$file"  ] && [ ! -f $file ] ; then
+if [ ! -f $file ] ; then
+  file=$(find . -name `basename $file`)
+fi
+
+exec vi $file -c :$line

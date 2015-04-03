@@ -1,0 +1,16 @@
+#!/bin/bash
+
+# pull off flags to pass to vi
+while expr "$1" : "-.*" >/dev/null; do                                                                                                                                                                                                                                            
+  vi_args="$vi_args $1"
+  shift
+done
+
+# find file to edit
+if [ -z $1 ] ; then
+  file=
+else
+  file=$(find . -name $1 | egrep -v '\.(hg|svn)\/')
+fi
+
+exec vi $vi_args $file

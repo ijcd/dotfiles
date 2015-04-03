@@ -1,0 +1,9 @@
+#!/bin/bash
+
+i=$(basename $0 | sed 's/^awk//')
+
+if [ $i == i ] ; then
+  i=$1
+fi
+
+awk "{print \$$i}"

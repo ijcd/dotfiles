@@ -1,0 +1,70 @@
+# ~/.bashrc: executed by bash(1) for non-login shells.
+# see /usr/share/doc/bash/examples/startup-files (in the package bash-doc)
+# for examples
+
+# If not running interactively, don't do anything:
+[ -z "$PS1" ] && return
+
+# don't put duplicate lines in the history. See bash(1) for more options
+#export HISTCONTROL=ignoredups
+
+# check the window size after each command and, if necessary,
+# update the values of LINES and COLUMNS.
+shopt -s checkwinsize
+
+# set variable identifying the chroot you work in (used in the prompt below)
+if [ -z "$debian_chroot" -a -r /etc/debian_chroot ]; then
+    debian_chroot=$(cat /etc/debian_chroot)
+fi
+
+# set a fancy prompt (non-color, unless we know we "want" color)
+case "$TERM" in
+xterm-color)
+    PS1='${debian_chroot:+($debian_chroot)}\[\033[01;32m\]\u@\h\[\033[00m\]:\[\033[01;34m\]\w\[\033[00m\]\$ '
+    ;;
+*)
+    PS1='${debian_chroot:+($debian_chroot)}\u@\h:\w\$ '
+    ;;
+esac
+
+# Comment in the above and uncomment this below for a color prompt
+#PS1='${debian_chroot:+($debian_chroot)}\[\033[01;32m\]\u@\h\[\033[00m\]:\[\033[01;34m\]\w\[\033[00m\]\$ '
+
+# If this is an xterm set the title to user@host:dir
+case "$TERM" in
+xterm*|rxvt*)
+    PROMPT_COMMAND='echo -ne "\033]0;${USER}@${HOSTNAME}: ${PWD}\007"'
+    ;;
+*)
+    ;;
+esac
+
+# enable programmable completion features (you don't need to enable
+# this, if it's already enabled in /etc/bash.bashrc and /etc/profiles
+# sources /etc/bash.bashrc).
+if [ -f /etc/bash_completion ]; then
+    . /etc/bash_completion
+fi
+
+# Run /bin/zsh if we have it
+if [ -x /bin/zsh -a -e $HOME/.zshrc ] ; then
+  export SHELL=/bin/zsh
+  exec /bin/zsh -l
+fi
+echo "WARNING: No /bin/zsh found. Continuing as " $SHELL
+
+# Run /bin/zsh if we have it
+zshell=$(command -v zsh)
+if [ -n "$zshell" -a -e $HOME/.zshrc ] ; then
+  export SHELL=$zshell
+
+  # test for login/interactive
+  [[ $- == *i* ]] && INTERACTIVE="-i" || INTERACTIVE=""
+  shopt -q login_shell && LOGIN="-l" || LOGIN=""
+
+  # replace shell with proper zsh
+  exec $SHELL $INTERACTIVE $LOGIN
+fi
+echo "WARNING: No /bin/zsh found. Continuing as " $SHELL
+
+export PATH="$PATH:$HOME/.rvm/bin" # Add RVM to PATH for scripting

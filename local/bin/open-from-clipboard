@@ -1,0 +1,3 @@
+#!/bin/bash
+date > /tmp/date.txt
+open $(pbpaste)

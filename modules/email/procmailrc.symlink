@@ -1,0 +1,38 @@
+SENDER=`formail -c -x Return-Path`
+SENDMAILFLAGS="-oi -f $SENDER"
+
+DROPPRIVS=yes
+KILLFILE=$MAILDIR/.killfile
+WHITELIST=$MAILDIR/.whitelist
+MAILDIR=$HOME/Maildir/
+#LISTBASE=${MAILDIR}/.lists.
+LISTBASE=${MAILDIR}/.lists-
+
+# send copy to gmail
+:0 c
+! ianduggan@gmail.com
+
+INCLUDERC=$HOME/.procmail/whitelist
+INCLUDERC=$HOME/.procmail/killfile
+INCLUDERC=$HOME/.procmail/listcatch
+
+#:0
+#* ^From:.*root@
+#$MAILDIR/.0root/
+
+#SPAMPROBE
+#:0
+#SCORE=| /usr/bin/spamprobe receive
+#:0 wf
+#| formail -I "X-SpamProbe: $SCORE"
+#:0 a:
+#*^X-SpamProbe: SPAM
+#$MAILDIR/.0SPAM/
+
+#CRM114
+:0fw: .msgid.lock
+| /usr/bin/crm -u /home/ijcd/.crm114 mailfilter.crm
+:0:
+* ^X-CRM114-Status: SPAM.*
+$MAILDIR/.0SPAM/
+

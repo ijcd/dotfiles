@@ -1,0 +1,11 @@
+; DO NOT EDIT (unless you know what you are doing)
+;
+; This subdirectory is a git "subrepo", and this file is maintained by the
+; git-subrepo command. See https://github.com/git-commands/git-subrepo#readme
+;
+[subrepo]
+	remote = https://github.com/tarjoilija/zgen.git
+	branch = master
+	commit = 774088c9fcea57c502c3643ea7d07901957eb588
+	parent = 26596a851ab29b90b8145f5da90bde7ab1d69985
+	cmdver = 0.2.1

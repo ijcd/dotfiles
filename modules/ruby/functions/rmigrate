@@ -1,0 +1,4 @@
+function rmigrate {
+  rake db:migrate "$@"
+  intest rake db:migrate "$@"
+}

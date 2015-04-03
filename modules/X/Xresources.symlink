@@ -1,0 +1,211 @@
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+!!!                    DASH                   !!!
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
+
+Dash*logoutButton*geometry:		80x33-2-2
+Dash*logoutButton*label.label:		Split
+Dash*logoutDialog*question.label:	Leaving So Soon?
+Dash*logoutDialog*yes.label:		IHTFP!!!!
+Dash*logoutDialog*no.label:		Gotta stay...
+Dash*logoutButton*background:		black
+Dash*logoutDialog*background:		black
+
+#ifdef COLOR
+  Dash*background:			black
+  Dash*foreground:			green
+  Dash*logoutButton*foreground:		red
+  Dash*logoutDialog*foreground:		red
+#else
+  Dash*background:			white
+  Dash*foreground:			black
+  Dash*logoutButton*foreground:		white
+  Dash*logoutDialog*foreground:		white
+#endif
+
+
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+!!!                   ZEPHYR                  !!!
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
+
+zwgc*cursorCode:                                58
+zwgc*reverseStack:                              false
+zwgc*borderWidth:                               5
+zwgc*internalBorder:				2
+zwgc*minTimeToLive:                             500
+
+
+
+#ifdef COLOR
+  zwgc*background:				black
+  zwgc*foreground:				AntiqueWhite1
+  zwgc*borderColor:				gold
+  zwgc*pointerColor:				yellow
+  zwgc.style.message.personal*background:	black
+  zwgc.style.message.personal*foreground:	AntiqueWhite1
+  zwgc.style.mail*foreground:			red
+  zwgc.style.mail*background:			black
+  zwgc.style.login*foreground:			green
+  zwgc.style.login*background:			black
+  zwgc.style.message.urgent*foreground:		green
+  zwgc.style.message.urgent*background:		red
+#else
+  zwgc*foreground:				white
+  zwgc*background:				maroon
+#endif
+
+
+
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+!!!                 CONSOLE	              !!!
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
+
+console*autoUnmap:				10
+
+
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+!!!                 XZEWD                     !!!
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
+
+xzewd*growth:                                   right
+xzewd*no-one*labelString:                       All Alone...
+xzewd*periodicCheck:                            5
+xzewd*autoSubscribe:                            True
+xzewd*lineBreak:                                True
+xzewd*lineBreakLen:                             80
+xzewd*clearOnSend:                              True
+xzewd*hideOnSend:                               False
+xzewd*langwrite:                                True
+xzewd*fingerDirection:                          random
+xzewd*historySize:                              50
+xzewd*resizeStyle:                              vtwm
+xzewd*annoyingMysteryErrors:                    false
+
+#ifdef COLOR
+  xzewd*background:				black
+  xzewd*foreground:				maroon
+  xzewd-sender*background:			darkgrey
+  xzewd-sender*foreground:			navy
+  xzewd-sender*destination*background:		black
+  xzewd-sender*destination*foreground:		yellow
+  xzewd-sender*message*foreground:		blue
+  xzewd-sender*message*background:		lightgrey
+  xzewd-sender*reverseVideo:			true
+  xzewd-signature*foreground:			white
+  xzewd-signature*background:			black
+  xzewd-list*foreground:			navy
+  xzewd-list*background:			lightgrey
+  xzewd*snow*foreground:			red
+#endif
+
+
+
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+!!!                 XTERM                     !!!
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
+xterm*scrollBar:	True
+xterm*saveLines:	5000
+xterm*font:		fixed
+
+#ifdef COLOR
+  xterm*Background:	lightgrey
+  xterm*Foreground:	black
+  xterm*cursorColor:	green
+  xterm*pointerColor:	red
+  xterm*reverseVideo:	off
+#else
+  xterm*Background:	black
+  xterm*Foreground:	white
+#endif
+
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+!!!              EMACS &                      !!!
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
+#ifdef COLOR
+  emacs*Foreground:	black
+  emacs*Background:	antiquewhite
+  emacs*pointerColor:   red
+  emacs*cursorColor:	green
+#else
+  emacs*Background:	black
+  emacs*Foreground:	white
+#endif
+
+
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+!!!                    XMH                    !!!
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
+#ifdef COLOR
+  xmh*Foreground:	white
+  xmh*Background:	DodgerBlue4
+#else
+  xmh*Background:	AntiqueWhite1
+  xmh*Foreground:	black
+#endif
+
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+!!!                    MISC                   !!!
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
+
+matlab*Foreground:      white
+matlab*Background:      grey35
+
+ez*BackGround:		Grey65
+ez*Foreground:		midnightblue
+
+
+
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+!!! 	           XSCREENSAVER               !!! 
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
+xscreensaver*geometry:			60x33-12-60
+xscreensaver*Foreground:		gold
+xscreensaver*Background:		black
+xscreensaver*displayElapsed:            True
+xscreensaver*displayTime:               false
+xscreensaver*displayTimeout:		false
+!!! xscreensaver*float.bitmap:              
+xscreensaver*lockMessage:               I'll be right back!
+xscreensaver*logoutButtonTimeout:       200
+xscreensaver*timeout:			180
+xscreensaver.autoLock:                  on
+xscreensaver.lockCommand:               zaway
+xscreensaver.useBackground:             True
+xscreensaver*velocity:			80
+
+
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! XCLOCK   - me own
+
+xclock*Foreground:			gold
+xclock*Background:			dim gray
+xclock*geometry:			-1+2
+xclock*chime:				true
+
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!! DCLOCK   - me own
+
+dclock*Foreground:			gold
+dclock*Background:			dim gray
+dclock*geometry:			-170+2
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

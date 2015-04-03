@@ -1,0 +1,66 @@
+#!/usr/bin/ruby
+
+#
+# A script for parsing ~/.MacOSX/environment.plist and loading the
+# environment variables it defines into a shell environment.
+#
+
+# determine which shell the user is running
+# currently we support bash and tcsh
+if /^\/[-A-Za-z\/]+\/(bash|tcsh|zsh)$/ =~ ENV['SHELL']
+    shell = $1
+else
+    # if we can't determine the users shell, or if
+    # it's an unsupported shell, bail out here
+    $stderr.puts "Unknown shell."
+    exit 1
+end
+
+# a regex for matching <key>...</key> lines
+# group 1 is the name of the key
+key_re = /^\s*<key>([A-Za-z]+[_A-Za-z0-9]*)<\/key>\s*$/
+
+# a regex for matching <string>...</string> value lines
+# group 1 is the value of the environment variable
+value_re = /^\s*<string>([-_:.\/0-9A-Za-z]+)<\/string>\s*$/
+
+File.open("#{ENV['HOME']}/.MacOSX/environment.plist", "r") do |plist|
+
+    currentKey = "" # the key we're currently processing
+
+    # look at each line of the file to find keys
+    # followed by values
+    plist.each_line do |next_line|
+
+        # if we find a key, hold on to it
+        if key_re =~ next_line
+            currentKey = $1
+            currentValue = ""
+
+        # since key lines alternate with value lines,
+        # if we match a value line, we know it's a value
+        # for the previously matched key
+        elsif value_re =~ next_line
+            currentValue = $1
+
+            if shell == "bash" or shell == "zsh"
+                # output a setenv command to stdout that's
+                # suitable for running through bash's eval
+                puts "#{currentKey}=#{currentValue}; export #{currentKey};"
+            elsif shell == "tcsh"
+                # output a setenv command to stdout that's
+                # suitable for running through tcsh's eval
+                puts "setenv #{currentKey} #{currentValue};"
+            else
+                # we should never get to this point since we
+                # exit much earlier if the shell type can't be
+                # determined. But, just in case, exit here too.
+                exit 1
+            end
+
+            currentKey = currentValue = ""
+        end
+
+    end
+
+end

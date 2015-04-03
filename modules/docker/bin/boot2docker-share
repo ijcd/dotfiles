@@ -1,0 +1,19 @@
+# https://github.com/boot2docker/boot2docker/issues/188
+# on Mac:
+# Install  osxfuse and sshfs from http://osxfuse.github.io
+#
+# ———
+# on boot2docker:
+# sudo mkdir /mnt/sda1/share
+# sudo chown -R docker:docker /mnt/sda1/share
+#
+# ------
+# on Mac
+# create a file /.boot2docker/b2d-passwd
+# put there tcuser
+#
+# to mount
+# sshfs docker@localhost:/mnt/sda1/share ~/b2d-share -oping_diskarb,volname=b2d-share -p 2022 -o reconnect -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o password_stdin < ~/.boot2docker/b2d-passwd
+#
+# to unmount
+# umount -f  ~/b2d-share

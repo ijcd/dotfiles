@@ -1,0 +1,216 @@
+KILLFILE=$MAILDIR/.killfile
+MAILDIR=$HOME/Maildir/
+LISTBASE=${MAILDIR}.0.
+
+:0:
+* ? /usr/bin/fgrep -is -f $KILLFILE
+/tmp/killed
+
+
+###########################
+# Automatic List Collection
+###########################
+
+# Yahoo Groups
+# (e.g. Mailing-List: list mt-dev@yahoogroups.com)
+:0
+* ^Mailing-List: list \/[^@]+
+${LISTBASE}${MATCH}/
+
+# Mailman and other intelligent software lists
+# (e.g. List-Post: <mailto:Pluginmanager-l@rayners.org>)
+:0
+* ^List-Post: \<mailto:\/[^@]+
+${LISTBASE}${MATCH}/
+
+# Other list software?
+# (e.g. X-Mailing-List: <ftjava-test@firedrake.org>)
+:0
+* ^X-Mailing-List: \<\/[^@]+
+${LISTBASE}${MATCH}/
+
+# Mojo Lists
+# (e.g. List: lug)
+:0
+* ^List-Software: Mojo Mail
+* ^List: \/[^@]+
+${LISTBASE}${MATCH}/
+
+# ListProc (all those UMBC lists)
+# (e.g. Sender: owner-umbclinux@listproc.umbc.edu)
+:0
+* ^Sender: owner-\/[^@]+
+${LISTBASE}${MATCH}/
+
+# More lists (realms-l)
+# (e.g. From owner-realms-l@ORACLE.WIZARDS.COM)
+#:0:
+#* ^From owner-\/[^@]+
+#${LISTBASE}${MATCH}/
+
+
+:0
+* ^(TO|CC|RESENT-TO):.*(gnu-arch-users)
+{
+
+	:0 c
+	* ^(TO|CC|RESENT-TO):.*ian@ianduggan.net
+	$HOME/Maildir/
+
+	:0
+	$HOME/Maildir/.0.arch/
+
+}
+
+:0
+* ^(TO|CC|RESENT-TO):.*(jadmin|jdev)@jabber.org
+{
+
+	:0 c
+	* ^(TO|CC|RESENT-TO):.*ian@ianduggan.net
+	$HOME/Maildir/
+
+	:0
+	$HOME/Maildir/.0.jabber/
+
+}
+
+:0
+* ^(TO|CC|RESENT-TO):.*(playainfo-)
+{
+
+	:0 c
+	* ^(TO|CC|RESENT-TO):.*ian@ianduggan.net
+	$HOME/Maildir/
+
+	:0
+	$HOME/Maildir/.burningman.playainfo/
+
+}
+
+:0
+* ^(TO|CC|RESENT-TO):.*(obe-user)
+{
+
+	:0 c
+	* ^(TO|CC|RESENT-TO):.*ian@ianduggan.net
+	$HOME/Maildir/
+
+	:0
+	$HOME/Maildir/.0.obe/
+
+}
+
+
+:0
+* ^(TO|CC|RESENT-TO):.*(linux-kernel|kernelnewbies)
+{
+
+	:0 c
+	* ^(TO|CC|RESENT-TO):.*ian@ianduggan.net
+	$HOME/Maildir/
+
+	:0
+	$HOME/Maildir/.0.linux/
+
+}
+
+
+:0
+* ^(TO|CC|RESENT-TO):.*(oskit-)
+{
+
+	:0 c
+	* ^(TO|CC|RESENT-TO):.*ian@ianduggan.net
+	$HOME/Maildir/
+
+	:0
+	$HOME/Maildir/.0.oskit/
+
+}
+
+
+:0
+* ^(TO|CC|RESENT-TO):.*(l4-hurd|l4-hackers|l4ka|dice@os.inf.tu-dresden.de)
+{
+
+	:0 c
+	* ^(TO|CC|RESENT-TO):.*ian@ianduggan.net
+	$HOME/Maildir/
+
+	:0
+	$HOME/Maildir/.0.l4hurd/
+
+}
+
+
+:0
+* ^(TO|CC|RESENT-TO):.*(-hurd|hurd-)
+{
+
+	:0 c
+	* ^(TO|CC|RESENT-TO):.*ian@ianduggan.net
+	$HOME/Maildir/
+
+	:0
+	$HOME/Maildir/.0.hurd/
+
+}
+
+
+:0
+* ^(TO|CC|RESENT-TO):.*(debian-|submit@bugs.debian.org)
+{
+
+	:0 c
+	* ^(TO|CC|RESENT-TO):.*ian@ianduggan.net
+	$HOME/Maildir/
+
+	:0
+	$HOME/Maildir/.0.debian/
+
+}
+
+
+:0
+* ^(TO|CC|RESENT-TO):.*(plex86)
+{
+
+	:0 c
+	* ^(TO|CC|RESENT-TO):.*ian@ianduggan.net
+	$HOME/Maildir/
+
+	:0
+	$HOME/Maildir/.0.plex86/
+
+}
+
+
+:0
+* ^From:.*root@
+$HOME/Maildir/.0root/
+
+#BOGOFILTER
+#:0fw
+#| bogofilter -l -u -e -p
+#
+## if bogofilter failed, return the mail to the queue, the MTA will
+## retry to deliver it later
+## 75 is the value for EX_TEMPFAIL in /usr/include/sysexits.h
+#:0e
+#{ EXITCODE=75 HOST }
+#
+## file the mail to spam-bogofilter if it's spam.
+#:0:
+#* ^X-Bogosity: Yes, tests=bogofilter
+#$HOME/Maildir/.0SPAM/
+
+#SPAMPROBE
+:0
+SCORE=| /usr/bin/spamprobe receive
+:0 wf
+| formail -I "X-SpamProbe: $SCORE"
+:0 a:
+*^X-SpamProbe: SPAM
+$HOME/Maildir/.0SPAM/
+

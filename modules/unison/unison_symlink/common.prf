@@ -1,0 +1,30 @@
+# Helps out a lot on Windows
+fastcheck = true
+
+# place new files at the top of the list
+sortnewfirst = true
+
+# turn on ssh compression
+rshargs = -C
+
+# ignore permissions
+perms = 0
+
+# use rsync
+rsync = true
+
+# backups
+backup = Name *
+
+# corsair has case-sensitive HFS+
+ignorecase = false
+
+ignore = Path .unison/backup
+ignore = Path .unison/ara*
+ignore = Path .unison/lck*
+
+ignore = Name Thumbs.db
+ignore = Name *~
+ignore = Name *.tmp
+ignore = Name #*#
+ignore = Name .DS_Store

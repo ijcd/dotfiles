@@ -1,0 +1,19 @@
+:0
+* ^From:.*mailman-bounces@spacecowboys.org
+/dev/null
+
+:0
+* ^From:.*news@mx3.efax.com
+/dev/null
+
+:0
+* ^From:.*postmaster@sfexaminer.com
+/dev/null
+
+:0
+* ^Subject:.*/usr/local/sbin/stats.sh
+/dev/null
+
+:0
+* ^Subject:.*/usr/share/webapps/awstats/6.5/hostroot/cgi-bin/awstats.pl
+/dev/null
