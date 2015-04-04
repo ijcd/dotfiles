@@ -10,6 +10,12 @@ I use a single git clone and symlink to files within that. I find it works bette
 
 # Installing
 
+Set zsh as your login shell:
+
+```
+chsh -s $(which zsh)
+```
+
 Dotfiles only
 
 ```
@@ -67,6 +73,7 @@ Resync things by running:
 * **plugins**: https://github.com/unixorn/awesome-zsh-plugins
 * **ponies**: https://github.com/mika/zsh-pony
 * **tricks**: http://reasoniamhere.com/2014/01/11/outrageously-useful-tips-to-master-your-z-shell/
+* **pick**: https://github.com/thoughtbot/pick
 
 # Inspiration
 
