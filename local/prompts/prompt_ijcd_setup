@@ -36,7 +36,7 @@ function prompt_ijcd_precmd {
 
 function prompt_ijcd_setup {
   setopt localoptions nolocaltraps noksharrays unset
-  typedef -gA _prompt_colors
+  # typeset -gA _prompt_colors
 
   # Load required functions.
   autoload -Uz add-zsh-hook
