@@ -2,9 +2,11 @@
 
 These are my dotfiles. There are many like them but these ones are mine. I've built these up over a few decades of unix use. Things I use:
 
-* zsh
-* zgen
-* brew (OSX)
+* [zsh](https://github.com/zsh-users/zsh)
+* [zgen](https://github.com/tarjoilija/zgen)
+* [brew](https://github.com/homebrew/homebrew) (OSX)
+* [prezto](https://github.com/sorin-ionescu/prezto) (some modules)
+* [oh-my-zsh](https://github.com/robbyrussell/oh-my-zsh) (some modules)
 
 I use a single git clone and symlink to files within that. I find it works better for me than approaches like vcsh or trying to exclude my entire home directory with .gitignore (an approach I used for years).
 
@@ -77,12 +79,10 @@ Resync things by running:
 
 # Inspiration
 
-* yadr
-* skwp
-* rtomayko
-* matiasbynens
-* sorin-ionescu
-* ryanb
+* [yadr](https://github.com/skwp/dotfiles)
+* [rtomayko](https://github.com/rtomayko/dotfiles)
+* [matiasbynens](https://github.com/mathiasbynens/dotfiles)
+* [sorin-ionescu](https://github.com/sorin-ionescu/dotfiles)
 
 # History
 
