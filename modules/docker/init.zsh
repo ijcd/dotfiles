@@ -1,1 +1,5 @@
-which boot2docker && $(boot2docker shellinit)
+hash boot2docker && {
+	if [ "$(boot2docker status)" = "running" ] ; then
+	    $(boot2docker shellinit)
+	fi
+}

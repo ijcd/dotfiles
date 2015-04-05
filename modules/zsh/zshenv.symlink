@@ -1,9 +1,18 @@
 # zshenv -> [login? zprofile] -> [interactive? zshrc] -> [login? zlogin] -> [exiting? zlogout]
 
 export DOTFILES_NOISY_STARTUP=false
+export DOTFILES_DEBUG_TIMING=false
 # alias alias=echo
 
 if [[ -o interactive ]] ; then
+
+    # egrep '^[0-9]+ /Users/ijcd/.[zd]' zshstartlog.83722 | less -S
+    $DOTFILES_DEBUG_TIMING && {
+        PS4=$'%D{%M%S%.} %N:%i> '
+        exec 3>&2 2>/tmp/zshstartlog.$$
+        setopt xtrace prompt_subst
+    }
+
     function tai_time_current () {
         echo | tai64n | tai64nlocal | awk '{print $2}' | sed 's/://g'
     }

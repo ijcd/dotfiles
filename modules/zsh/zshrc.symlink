@@ -67,8 +67,8 @@ if ! zgen saved; then
     zgen load zsh-users/zaw
     zgen load willghatch/zsh-zaw-extras
 
-    zgen load horosgrisa/zsh-gvm
-    zgen load marzocchi/zsh-notify
+    #zgen load horosgrisa/zsh-gvm
+    #zgen load marzocchi/zsh-notify
     zgen load caarlos0/zsh-pg
 
     # https://github.com/unixorn/git-extra-commands

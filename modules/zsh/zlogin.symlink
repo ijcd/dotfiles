@@ -35,3 +35,9 @@ test -n "$INTERACTIVE" -a -n "$LOGIN" && {
 }
 
 echo "Dotfiles evaluated in $(tai_time_elapsed) seconds"
+
+# egrep '^[0-9]+ /Users/ijcd/.[zd]' zshstartlog.83722 | less -S
+$DOTFILES_DEBUG_TIMING && {
+    unsetopt xtrace
+    exec 2>&3 3>&-
+}
