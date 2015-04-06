@@ -54,7 +54,7 @@ if ! zgen saved; then
     zgen prezto modules/emacs
     zgen prezto modules/fasd
     zgen prezto modules/haskell
-    zgen prezto modules/homebrew
+    #zgen prezto modules/homebrew
     zgen prezto modules/node
     zgen prezto modules/osx
     zgen prezto modules/screen
@@ -111,3 +111,4 @@ dotfiles-unexport-file ~/.zshrc
 
 # set the prompt
 prompt ijcd
+#prompt pure
