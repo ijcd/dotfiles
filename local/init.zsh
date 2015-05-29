@@ -257,7 +257,14 @@ for dir in \
 done
 
 # MANPATH
-for dir in /sw/man /opt/local/man /usr/local/man ; do
+for dir in \
+    /usr/share/man \
+    /usr/local/share/man \
+    /usr/X11/share/man \
+    /sw/man \
+    /opt/local/man \
+    /usr/local/man \
+; do
 	if [[ -d $dir ]]; then
 		punshift $dir MANPATH
 	fi
