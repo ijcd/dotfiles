@@ -1,0 +1,3 @@
+docker-clean-procs() {
+    docker ps -a -q | xargs -n1 docker rm
+}

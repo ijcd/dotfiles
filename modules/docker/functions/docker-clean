@@ -1,4 +1,4 @@
-function docker-clean() {
-    docker ps -a -q | xargs -n1 docker rm
-    docker images | grep "^<none>" | awk '{print $3}' | xargs -n1 docker rmi
+docker-clean() {
+    docker-clean-procs
+    docker-clean-images
 }
