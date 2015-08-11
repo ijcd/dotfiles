@@ -88,14 +88,14 @@ ACK_PAGER_COLOR="$PAGER"
 # MACOS X / DARWIN SPECIFIC
 # ----------------------------------------------------------------------
 
-if [ "$UNAME" = Darwin ]; then
-    # setup java environment. puke.
-    export JAVA_HOME="/System/Library/Frameworks/JavaVM.framework/Home"
-
-    # hold jruby's hand
-    test -d /opt/jruby &&
-    export JRUBY_HOME="/opt/jruby"
-fi
+#if [ "$UNAME" = Darwin ]; then
+#    # setup java environment. puke.
+#    export JAVA_HOME="/System/Library/Frameworks/JavaVM.framework/Home"
+#
+#    # hold jruby's hand
+#    test -d /opt/jruby &&
+#    export JRUBY_HOME="/opt/jruby"
+#fi
 
 # ----------------------------------------------------------------------
 # ALIASES / FUNCTIONS
@@ -240,6 +240,7 @@ for dir in \
     /var/lib/gems/1.8/bin \
     /bin/sw/sbin \
     $HOME/.cabal/bin \
+    $HOME/Library/Haskell/bin \
     /opt/local/bin \
     /opt/local/sbin \
     /usr/local/bin \

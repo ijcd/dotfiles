@@ -1,4 +1,4 @@
 #!/bin/bash
-git diff -w "$@" > /tmp/patch.$$
+git diff HEAD -w "$@" > /tmp/patch.$$
 git diff | patch -R -p1
 patch -p1 < /tmp/patch.$$

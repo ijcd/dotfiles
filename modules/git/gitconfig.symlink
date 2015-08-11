@@ -176,30 +176,32 @@
 [merge]
     summary = true
     verbosity = 1
-    tool = diffmerge
+    tool = ediff
     # Include summaries of merged commits in newly created merge commit messages
     log = true
-
 
 [mergetool]
     prompt = false
     keepBackup = false
+
+[mergetool "ediff"]
+    cmd = emacsclient -c -a \"\"  --eval \"(ediff-merge-files-with-ancestor \\\"$LOCAL\\\" \\\"$REMOTE\\\" \\\"$BASE\\\" nil \\\"$MERGED\\\")\"
 
 [merge "gemfilelock"]
     name = relocks the gemfile.lock
     driver = bundle lock
 
 [mergetool "mvimdiff"]
-  cmd="mvim -c 'Gdiff' $MERGED"     # use fugitive.vim for 3-way merge
-  keepbackup=false
+    cmd="mvim -c 'Gdiff' $MERGED"     # use fugitive.vim for 3-way merge
+    keepbackup=false
 
 [mergetool "diffmerge"]
     cmd = diffmerge --merge --result=$MERGED $LOCAL $BASE $REMOTE
     trustExitCode = true
 
 [mergetool "sourcetree"]
-	cmd = /opt/homebrew-cask/Caskroom/sourcetree/2.0.5.2/SourceTree.app/Contents/Resources/opendiff-w.sh \"$LOCAL\" \"$REMOTE\" -ancestor \"$BASE\" -merge \"$MERGED\"
-	trustExitCode = true
+    cmd = /opt/homebrew-cask/Caskroom/sourcetree/2.0.5.2/SourceTree.app/Contents/Resources/opendiff-w.sh \"$LOCAL\" \"$REMOTE\" -ancestor \"$BASE\" -merge \"$MERGED\"
+    trustExitCode = true
 
 [diff]
     # Git diff will use (i)ndex, (w)ork tree, (c)ommit and (o)bject

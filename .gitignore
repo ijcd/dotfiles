@@ -1,3 +1,6 @@
 /refs
 *.zwc
 logs
+
+/modules/gnupg/gnupg.symlink/*.gpg
+/modules/gnupg/gnupg.symlink/random_seed
