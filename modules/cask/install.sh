@@ -3,8 +3,7 @@
 export HOMEBREW_CASK_OPTS="--appdir=/Applications"
 
 # Install native apps
-brew tap phinze/homebrew-cask
-brew install brew-cask
+brew install caskroom/cask/brew-cask
 
 function installcask() {
 	brew cask install "${@}" 2> /dev/null
