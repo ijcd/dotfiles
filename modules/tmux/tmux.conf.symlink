@@ -70,3 +70,9 @@ set -g history-limit 10000
 
 # Local config
 if-shell "[ -f ~/.tmux.conf.user ]" 'source ~/.tmux.conf.user'
+
+# List of plugins
+set -g @plugin 'tmux-plugins/tpm'
+set -g @plugin 'tmux-plugins/tmux-sensible'
+set -g @plugin 'tmux-plugins/tmux-resurrect'
+set -g @plugin 'tmux-plugins/tmux-continuum'

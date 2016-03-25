@@ -18,7 +18,7 @@
 #send-hook     ^emm@example\\.com$     "my_hdr From: agent 007 <john@isp1.com>"
 
 set imap_user = "ianduggan@gmail.com"
-set smtp_url = "smtp://ianduggan@smtp.gmail.com:587/"
+#set smtp_url = "smtp://ianduggan@smtp.gmail.com:587/"
 set from = "ian@ianduggan.net"
 set realname = "Ian Duggan"
 
@@ -31,3 +31,5 @@ set message_cachedir=~/.mutt/cache/bodies
 set certificate_file=~/.mutt/certificates
 
 set move = no
+
+set smtp_authenticators = 'gssapi:login'

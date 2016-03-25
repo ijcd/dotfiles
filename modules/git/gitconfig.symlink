@@ -22,6 +22,9 @@
     delete-merged = "!git branch --merged | grep -v '\\*' | xargs -n 1 git branch -d"
     dm = delete-merged
 
+    # add without whitespace
+    addnw = !sh -c 'git diff -w --no-color "$@" | git apply --cached --ignore-whitespace' -
+
     # commit
     c = commit -m                     # commit with message
     ca = commit -am                   # commit all with message
@@ -249,3 +252,6 @@
     cmd = /bin/sh -c 'open http://git-scm.com/docs/$(basename $1 .html)' --
 
 
+[github]
+	user = ijcd
+	password =

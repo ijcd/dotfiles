@@ -250,6 +250,7 @@ for dir in \
     $ANDROID_HOME/tools \
     $ANDROID_HOME/platform-tools \
     ~/bin \
+    ~/go/bin \
     ~/lib/play-2.0.2 \
 ; do
 	if [[ -d $dir ]]; then
@@ -288,9 +289,9 @@ MANPATH=$(puniq $MANPATH)
 # -------------------------------------------------------------------
 
 # Make Things All Right
-[ -x /bin/stty ] && /bin/stty erase ^? 2>/dev/null
-[ -x /usr/X11R6/bin/xrdb ] && /usr/X11R6/bin/xrdb -load ~/.Xresources 2>/dev/null
-[ -x /usr/X11R6/bin/xmodmap ] && [ -r ~/.xmodmap-`uname -n` ] && /usr/X11R6/bin/xmodmap ~/.xmodmap-`uname -n`
+#[ -x /bin/stty ] && /bin/stty erase ^? 2>/dev/null
+#[ -x /usr/X11R6/bin/xrdb ] && /usr/X11R6/bin/xrdb -load ~/.Xresources 2>/dev/null
+#[ -x /usr/X11R6/bin/xmodmap ] && [ -r ~/.xmodmap-`uname -n` ] && /usr/X11R6/bin/xmodmap ~/.xmodmap-`uname -n`
 
 # run keychain and source ssh-agent vars
 if [ -z "$SSH_CLIENT" ] ; then
