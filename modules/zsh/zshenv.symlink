@@ -6,6 +6,8 @@ export DOTFILES_DEBUG_TIMING=false
 
 if [[ -o interactive ]] ; then
 
+    export PATH=/usr/local/bin:$PATH
+
     # egrep '^[0-9]+ /Users/ijcd/.[zd]' zshstartlog.83722 | less -S
     $DOTFILES_DEBUG_TIMING && {
         PS4=$'%D{%M%S%.} %N:%i> '

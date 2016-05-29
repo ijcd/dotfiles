@@ -13,6 +13,10 @@ autoload-fpath $DOTDIR/modules/zsh/functions
 # bring in the prompts
 autoload-fpath $DOTDIR/local/prompts
 
+# for bash completion scripts
+autoload bashcompinit
+bashcompinit
+
 # load zgen
 source "${HOME}/.dotfiles/zgen/zgen.zsh"
 
@@ -31,7 +35,7 @@ if ! zgen saved; then
     echo "Creating a zgen save"
 
     zgen oh-my-zsh
-    zgen oh-my-zsh plugins/colored-man
+    #zgen oh-my-zsh plugins/colored-man
     zgen oh-my-zsh plugins/debian
     zgen oh-my-zsh plugins/extract
     zgen oh-my-zsh plugins/git-extras
@@ -64,8 +68,8 @@ if ! zgen saved; then
     zgen prezto modules/git
 
     # zaw (ctrl-x ;) https://github.com/zsh-users/zaw
-    zgen load zsh-users/zaw
-    zgen load willghatch/zsh-zaw-extras
+    #zgen load zsh-users/zaw
+    #zgen load willghatch/zsh-zaw-extras
 
     #zgen load horosgrisa/zsh-gvm
     #zgen load marzocchi/zsh-notify

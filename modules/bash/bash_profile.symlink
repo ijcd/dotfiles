@@ -4,3 +4,5 @@
 # added by twitch devenv setup
 #if which rbenv > /dev/null; then eval "$(rbenv init -)"; fi
 #[[ -s "/Users/iduggan/.gvm/scripts/gvm" ]] && source "/Users/iduggan/.gvm/scripts/gvm"
+. $HOME/.asdf/asdf.sh
+. $HOME/.asdf/completions/asdf.bash
