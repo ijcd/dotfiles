@@ -9,6 +9,9 @@ end_of_line = lf
 insert_final_newline = true
 trim_trailing_whitespace = true
 
+[Makefile]
+indent_style = tab
+
 # Matches multiple files with brace expansion notation
 # Set default charset
 [*.{js,py}]
@@ -43,6 +46,10 @@ indent_style = space
 indent_size = 4
 
 [*.scala]
+indent_style = space
+indent_size = 4
+
+[*.elm]
 indent_style = space
 indent_size = 4
 
