@@ -194,9 +194,9 @@ function clean_dotcache () {
 
 function clean_dotfiles () {
     info "Cleaning dotfiles"
-    find $HOME -type l -maxdepth 1 -ls | grep $DOTFILES_ROOT | awk '{print $11}' | while read file ; do
-        info "Removing $file"
-        rm $file
+    find $HOME -type l -maxdepth 1 -ls | grep $DOTFILES_ROOT | awk '{print $(NF-2), $(NF)}' | while read source target ; do
+        info "Removing $source -> $target"
+        rm $source
     done
 }
 
