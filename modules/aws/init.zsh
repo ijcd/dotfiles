@@ -28,3 +28,5 @@ source /usr/local/share/zsh/site-functions/_aws
 # }
 #
 # enable_aws
+
+export AWS_DEFAULT_REGION="us-west-2"
