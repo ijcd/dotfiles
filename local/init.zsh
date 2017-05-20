@@ -234,24 +234,13 @@ alias ymd-hms=yyyymmdd-hhmmss
 
 # PATH
 for dir in \
-    /usr/local/heroku/bin \
-    /opt/local/lib/mysql5/bin \
-    /opt/local/lib/postgresql91/bin \
-    /var/lib/gems/1.8/bin \
-    /bin/sw/sbin \
+    $HOME/bin \
+    $HOME/go/bin \
+    $HOME/.cargo/bin \
     $HOME/.cabal/bin \
     $HOME/Library/Haskell/bin \
-    /opt/local/bin \
-    /opt/local/sbin \
     /usr/local/bin \
     /usr/local/sbin \
-    ~/.gem/ruby/1.8/bin \
-    ~/lib/ec2/ec2-*/bin \
-    $ANDROID_HOME/tools \
-    $ANDROID_HOME/platform-tools \
-    ~/bin \
-    ~/go/bin \
-    ~/lib/play-2.0.2 \
 ; do
 	if [[ -d $dir ]]; then
 	    punshift $dir PATH
@@ -263,8 +252,6 @@ for dir in \
     /usr/share/man \
     /usr/local/share/man \
     /usr/X11/share/man \
-    /sw/man \
-    /opt/local/man \
     /usr/local/man \
 ; do
 	if [[ -d $dir ]]; then
