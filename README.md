@@ -44,7 +44,7 @@ I use modules to organize my dotfiles. Using zgen, I'm able to pull in modules f
 
 Loading happens in a few steps, starting from modules/zsh/zshrc.symlink which is symlinked by the system as ~/.zshrc
 
-In addition to the oh-my-zsh and prezto modules, I have all of my local customization organizes by major topic area with a local module loading function (dotfiles-import-local-module) and installation script that do the following for each module:
+In addition to the oh-my-zsh and prezto modules, I have all of my local customization organized by major topic area with a local module loading function (dotfiles-import-local-module) and installation script that do the following for each module:
 
 * symlink all files/directories named *.symlink to the correspondinging dotfile in ~
 * add $modpath/bin to the path
