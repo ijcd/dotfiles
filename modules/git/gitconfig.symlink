@@ -7,6 +7,9 @@
     addremove = !git add -u "${@:-.}" && git add "${@:-.}" && git status
     ar = !git addremove
 
+    # git reset hard
+    rcc = !git reset "${@:-.}" && git checkout "${@:-.}"
+
     # via http://blog.apiaxle.com/post/handy-git-tips-to-stop-you-getting-fired/
     snapshot = !git stash save "snapshot: $(date)" && git stash apply "stash@{0}"
     snapshots = !git stash list --grep snapshot
@@ -245,6 +248,7 @@
 
 [hub]
     http-clone = true
+    host = git-aws.internal.justin.tv
 
 [help]
     browser = gitscm
@@ -252,7 +256,12 @@
 [browser "gitscm"]
     cmd = /bin/sh -c 'open http://git-scm.com/docs/$(basename $1 .html)' --
 
-
 [github]
 	user = ijcd
 	password =
+
+[filter "lfs"]
+	process = git-lfs filter-process
+	required = true
+	clean = git-lfs clean -- %f
+	smudge = git-lfs smudge -- %f

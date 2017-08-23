@@ -52,3 +52,5 @@ Thumbs.db
 GPATH
 GRTAGS
 GTAGS
+
+.envrc
