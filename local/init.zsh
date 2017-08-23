@@ -239,8 +239,10 @@ for dir in \
     $HOME/.cargo/bin \
     $HOME/.cabal/bin \
     $HOME/Library/Haskell/bin \
-    /usr/local/bin \
-    /usr/local/sbin \
+    $(command -v yarn && yarn global bin) \
+    $HOME/miniconda3/bin \
+    /opt/local/bin \
+    /opt/local/sbin \
 ; do
 	if [[ -d $dir ]]; then
 	    punshift $dir PATH
