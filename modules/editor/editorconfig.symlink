@@ -49,6 +49,10 @@ indent_size = 4
 indent_style = space
 indent_size = 4
 
+[*.{ex,exs}]
+indent_style = space
+indent_size = 2
+
 [*.elm]
 indent_style = space
 indent_size = 4

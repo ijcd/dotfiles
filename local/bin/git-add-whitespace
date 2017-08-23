@@ -1,0 +1,4 @@
+#!/usr/bin/env bash
+
+git add -A
+git diff --cached -w | git apply --cached -R

@@ -140,7 +140,7 @@
 [core]
     autocrlf = false
     editor = vim
-	excludesfile = /Users/iduggan/.gitignore
+    excludesfile = ~/.gitignore
     attributesfile = ~/.gitattributes
     whitespace = space-before-tab,indent-with-non-tab,trailing-space
 
