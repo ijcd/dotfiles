@@ -1,3 +1,3 @@
-if which direnv >/dev/null ; then
-    eval "$(direnv hook zsh)"
+if [ $commands[direnv] ]; then
+  source <(direnv hook zsh)
 fi

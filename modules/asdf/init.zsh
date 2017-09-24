@@ -1,4 +1,9 @@
 [ -d $HOME/.asdf ] && {
-  . $HOME/.asdf/asdf.sh
-  . $HOME/.asdf/completions/asdf.bash
+  source $HOME/.asdf/asdf.sh
+  source $HOME/.asdf/completions/asdf.bash
+}
+
+[ -d /usr/local/opt/asdf ] && {
+  source /usr/local/opt/asdf/asdf.sh
+  source /usr/local/opt/asdf/etc/bash_completion.d/asdf.bash
 }
