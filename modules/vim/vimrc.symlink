@@ -41,7 +41,10 @@ Plug 'tpope/vim-sensible'
 " Initialize plugin system
 call plug#end()
 
-
+if $VIM_CRONTAB == "true"
+    set nobackup
+    set nowritebackup
+endif
 
 nmap <F7> :NERDTreeToggle<CR>
 nmap <F8> :TagbarToggle<CR>
