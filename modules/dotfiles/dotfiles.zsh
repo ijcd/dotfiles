@@ -36,14 +36,17 @@ function dotfiles-import-local-module () {
 }
 
 function dotfiles-unexport-file () {
-    grep '^function' $1 | awk '{print $2}' | xargs -n1 unfunction
+    for fn in $(grep '^function' $1 | awk '{print $2}') ; do
+        unfunction $fn
+    done
 }
 
 function dotfiles-zgen-check-modules () {
     # report oh-my-zsh modules that could be taken from prezto instead
-    zgen list | grep oh-my-zsh | awk '{print $2}' | xargs basename | while read omz_module ; do
-        if [ -d $ZPREZTODIR/modules/$omz_module ] ; then
-            -dots-alert-message "oh-my-zsh module $omz_module is also in prezto"
+    for mod in $(zgen list | grep oh-my-zsh | awk '{print $2}') ; do
+	mod=$(basename $mod)
+        if [ -d $ZPREZTODIR/modules/$mod ] ; then
+            -dots-alert-message "oh-my-zsh module $mod is also in prezto"
         fi
     done
 }
