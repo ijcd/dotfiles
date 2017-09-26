@@ -9,7 +9,7 @@ function autoload-fpath () {
     [ -d $dir ] && fpath=($dir $fpath)
   fi
   
-  for func in $(find $dir -type f -maxdepth 1) ; do
+  for func in $(find $dir -maxdepth 1 -type f) ; do
     funcfile=$(basename $func)
     autoload $funcfile
   done

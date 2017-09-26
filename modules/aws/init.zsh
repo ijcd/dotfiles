@@ -1,4 +1,4 @@
-source /usr/local/share/zsh/site-functions/_aws
+test -f /usr/local/share/zsh/site-functions/_aws && source /usr/local/share/zsh/site-functions/_aws 
 
 # function read_aws_credentials_key {
 #   section=$1

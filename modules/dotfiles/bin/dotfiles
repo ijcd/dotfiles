@@ -78,7 +78,11 @@ fail () {
 symlink () {
   to=$1
   from=$2
-  ln -hfs $1 $2
+  if uname | grep -q Linux ; then
+    ln -nfs $1 $2
+  else
+    ln -hfs $1 $2
+  fi
   success "symlinked $2 -> $1"
 }
 
