@@ -26,7 +26,7 @@
     dm = delete-merged
 
     # add without whitespace
-    addnw = !sh -c 'git diff -w --no-color "$@" | git apply --cached --ignore-whitespace' -
+    addnw = !sh -c 'git diff -U0 -w --no-color | git apply --cached --ignore-whitespace --unidiff-zero -'
 
     # commit
     c = commit -m                     # commit with message

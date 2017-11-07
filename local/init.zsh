@@ -235,6 +235,7 @@ alias ymd-hms=yyyymmdd-hhmmss
 # PATH
 for dir in \
     $HOME/bin \
+    $HOME/.mix \
     $HOME/go/bin \
     $HOME/.cargo/bin \
     $HOME/.cabal/bin \
