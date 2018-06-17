@@ -116,3 +116,5 @@ dotfiles-unexport-file ~/.zshrc
 # set the prompt
 prompt ijcd
 #prompt pure
+
+test -e "${HOME}/.iterm2_shell_integration.zsh" && source "${HOME}/.iterm2_shell_integration.zsh"
