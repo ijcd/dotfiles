@@ -1,0 +1,3 @@
+function portkill {
+	[ ! -z $1 ] && conns -l | grep " TCP " | grep :"$1 " | awk '{print $2}' | xargs kill
+}

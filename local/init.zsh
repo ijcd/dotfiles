@@ -156,10 +156,10 @@ export P=$PENDING
 export GNUTERM=x11
 
 # ruby
-export RUBYGEMS_GEMDEPS=1
+#export RUBYGEMS_GEMDEPS=1
 
 # rails
-alias ss=spring
+#alias ss=spring
 
 # disk usage with human sizes and minimal depth
 alias du1='du -h --max-depth=1'

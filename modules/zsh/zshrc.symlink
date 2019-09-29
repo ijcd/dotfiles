@@ -79,7 +79,7 @@ if ! zgen saved; then
     zgen load unixorn/git-extra-commands
 
     # autoenv
-    zgen load ijcd/autoenv
+    #zgen load ijcd/autoenv
 
     # extra completions (not part of zsh yet)
     # zgen prezto modules/completion
