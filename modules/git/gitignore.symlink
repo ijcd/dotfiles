@@ -50,6 +50,9 @@ ehthumbs.db
 Thumbs.db
 .swp
 
+# Elixir Language Server
+.elixir_ls
+
 GPATH
 GRTAGS
 GTAGS
