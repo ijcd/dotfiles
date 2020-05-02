@@ -237,6 +237,7 @@ for dir in \
     $HOME/bin \
     $HOME/.mix \
     $HOME/go/bin \
+    $HOME/.local/bin \
     $HOME/.cargo/bin \
     $HOME/.cabal/bin \
     $HOME/Library/Haskell/bin \

@@ -6,35 +6,43 @@ alias fortune=true
 source $ZPREZTODIR/runcoms/zlogin
 unalias fortune
 
-# amuse me
-hash fortune 2>/dev/null && {
-  _fortune=$(fortune -s -n 300)
-  _fortune=$(hash cowsay 2>/dev/null && echo $_fortune | cowsay || echo $_fortune)
-  if hash lolcat 2>/dev/null ; then
-  	echo $_fortune | lolcat
-  else
-    echo $_fortune
-  fi
-  echo
-  unset _fortune
+try_fortune() {
+  # amuse me
+  hash fortune 2>/dev/null && {
+      _fortune=$(fortune -s -n 300)
+      _fortune=$(hash cowsay 2>/dev/null && echo $_fortune | cowsay || echo $_fortune)
+      if hash lolcat 2>/dev/null ; then
+      	echo $_fortune | lolcat
+      else
+          echo $_fortune
+      fi
+      echo
+      unset _fortune
+  }
 }
 
-# abuse me
-hash ddate 2>/dev/null && {
-  if hash lolcat 2>/dev/null ; then
-  	ddate | lolcat
-  else
-    ddate
-  fi
-  echo
+try_ddate() {
+  # abuse me
+  hash ddate 2>/dev/null && {
+      if hash lolcat 2>/dev/null ; then
+      	ddate | lolcat
+      else
+        ddate
+      fi
+      echo
+  }
 }
 
 test -n "$INTERACTIVE" -a -n "$LOGIN" && {
+    try_fortune
+    try_ddate
     uname -npsr
     uptime
 }
 
-echo "Dotfiles evaluated in $(tai_time_elapsed) seconds"
+if [[ -o interactive ]] ; then
+    echo "Dotfiles evaluated in $(tai_time_elapsed) seconds"
+fi
 
 # egrep '^[0-9]+ /Users/ijcd/.[zd]' zshstartlog.83722 | less -S
 $DOTFILES_DEBUG_TIMING && {

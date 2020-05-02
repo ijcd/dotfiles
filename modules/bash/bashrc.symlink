@@ -46,25 +46,25 @@ if [ -f /etc/bash_completion ]; then
     . /etc/bash_completion
 fi
 
-# Run /bin/zsh if we have it
-if [ -x /bin/zsh -a -e $HOME/.zshrc ] ; then
-  export SHELL=/bin/zsh
-  exec /bin/zsh -l
-fi
-echo "WARNING: No /bin/zsh found. Continuing as " $SHELL
+## Run /bin/zsh if we have it
+#if [ -x /bin/zsh -a -e $HOME/.zshrc ] ; then
+#  export SHELL=/bin/zsh
+#  exec /bin/zsh -l
+#fi
+#echo "WARNING: No /bin/zsh found. Continuing as " $SHELL
 
 # Run /bin/zsh if we have it
-zshell=$(command -v zsh)
-if [ -n "$zshell" -a -e $HOME/.zshrc ] ; then
-  export SHELL=$zshell
-
-  # test for login/interactive
-  [[ $- == *i* ]] && INTERACTIVE="-i" || INTERACTIVE=""
-  shopt -q login_shell && LOGIN="-l" || LOGIN=""
-
-  # replace shell with proper zsh
-  exec $SHELL $INTERACTIVE $LOGIN
-fi
-echo "WARNING: No /bin/zsh found. Continuing as " $SHELL
+#zshell=$(command -v zsh)
+#if [ -n "$zshell" -a -e $HOME/.zshrc ] ; then
+#  export SHELL=$zshell
+#
+#  # test for login/interactive
+#  [[ $- == *i* ]] && INTERACTIVE="-i" || INTERACTIVE=""
+#  shopt -q login_shell && LOGIN="-l" || LOGIN=""
+#
+#  # replace shell with proper zsh
+#  exec $SHELL $INTERACTIVE $LOGIN
+#fi
+#echo "WARNING: No /bin/zsh found. Continuing as " $SHELL
 
 export PATH="$PATH:$HOME/.rvm/bin" # Add RVM to PATH for scripting
