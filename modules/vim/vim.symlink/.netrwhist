@@ -1,8 +1,2 @@
 let g:netrw_dirhistmax  =10
-let g:netrw_dirhist_cnt =6
-let g:netrw_dirhist_1='/Users/ijcd/.dotfiles/modules/nix'
-let g:netrw_dirhist_2='/Users/ijcd/work/theliberties/reasonml/liberties/.git'
-let g:netrw_dirhist_3='/Users/ijcd/work/llamascript/bucklescript/src/common'
-let g:netrw_dirhist_4='/Users/ijcd/work/llamascript/bucklescript/src/core'
-let g:netrw_dirhist_5='/Users/ijcd/work/llamascript/bucklescript/src/common'
-let g:netrw_dirhist_6='/Users/ijcd/.dotfiles/modules/ocaml'
+let g:netrw_dirhist_cnt =0

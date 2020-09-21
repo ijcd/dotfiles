@@ -143,7 +143,7 @@
 [core]
     autocrlf = false
     editor = vim
-    excludesfile = ~/.gitignore
+	excludesfile = /Users/ijcd/.gitignore
     attributesfile = ~/.gitattributes
     whitespace = space-before-tab,indent-with-non-tab,trailing-space
 
@@ -207,7 +207,7 @@
     trustExitCode = true
 
 [mergetool "sourcetree"]
-	cmd = /Applications/SourceTree.app/Contents/Resources/opendiff-w.sh \"$LOCAL\" \"$REMOTE\" -ancestor \"$BASE\" -merge \"$MERGED\"
+	cmd = /Users/ijcd/Desktop/aura1024/Applications/SourceTree.app/Contents/Resources/opendiff-w.sh \"$LOCAL\" \"$REMOTE\" -ancestor \"$BASE\" -merge \"$MERGED\"
 	trustExitCode = true
 
 [diff]

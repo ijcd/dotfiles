@@ -69,6 +69,7 @@ Resync things by running:
 Fun Things
 ----------
 
+* **zmv**: zmv | zcp | zln
 * **zaw**: ctrl-x ctrl-;
 * **command search**: ctrl-r
 * **plugins**: https://github.com/unixorn/awesome-zsh-plugins

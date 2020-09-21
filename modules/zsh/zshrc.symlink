@@ -35,13 +35,13 @@ if ! zgen saved; then
     echo "Creating a zgen save"
 
     zgen oh-my-zsh
-    #zgen oh-my-zsh plugins/colored-man
+    zgen oh-my-zsh plugins/colored-man
     zgen oh-my-zsh plugins/debian
     zgen oh-my-zsh plugins/extract
     zgen oh-my-zsh plugins/git-extras
     zgen oh-my-zsh plugins/gem
-    zgen oh-my-zsh plugins/heroku
-    zgen oh-my-zsh plugins/vagrant
+    # zgen oh-my-zsh plugins/heroku
+    # zgen oh-my-zsh plugins/vagrant
     zgen oh-my-zsh plugins/sudo
 
     zgen prezto
@@ -56,7 +56,7 @@ if ! zgen saved; then
     zgen prezto modules/archive
     zgen prezto modules/command-not-found
     zgen prezto modules/emacs
-    zgen prezto modules/fasd
+    #zgen prezto modules/fasd
     zgen prezto modules/haskell
     #zgen prezto modules/homebrew
     zgen prezto modules/node
