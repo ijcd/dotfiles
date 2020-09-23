@@ -3,19 +3,10 @@
 # TODO:
 #   * https://github.com/clvv/fasd
 #   * install your dependencies, like "brew install ack"
-#   * autoload as many functions as possible (autoload?)
-#   * compile as much of startup as possible (zcompile?)
-#   * grep for and remove passwords (irssi room password, for example)
-#   * create a blacklist of files not to be pushed (grep password?)
-#   * move dependencies (submodules to own directory, maybe make into subtrees?)
-#   * switch to rbenv
 #   * generate .MacOSX/environment.plist
-#   * .pow setup
-#   * what to do about things like gpg, ssh/config, etc
 #   * should unison be synced? maybe have a private repo using vcsh for private things
 #   * inputrc.symlink cleanup
 #   * screenrc.symlink cleanup
-#   * get clean git history w/out stray TODO files before commiting all the work upstream
 #
 # module def:   (look at oh-my-zsh and prezto, can we merge/incorporate?)
 #   bin/*                   install or symlink?
@@ -29,6 +20,11 @@
 #   * look at command history on startup to suggest modules to add from list-modules ('suggest' module)
 #   * check aliases when commands are run to see if one could have been used ('suggest' module)
 #
+# passwords
+#   * grep for and remove passwords (irssi room password, for example)
+#   * create a blacklist of files not to be pushed (grep password?)
+#   * what to do about things like gpg, ssh/config, etc
+#
 # git module
 #   * move git-* commands into .gitconfig aliases?
 #   * move git-* commands into one file and symlink or alias from .gitconfig?
@@ -37,6 +33,8 @@
 # ruby module
 #   * install.sh should install rvm?
 #   * rbenv.zsh
+#   * .pow setup
+#   * switch to rbenv
 #
 # grc module
 #   * setup grc.zsh
@@ -46,10 +44,6 @@
 #
 # vim module
 #   * ryanb vim folder?
-#
-# not taken:
-#   * holman/bin/cloudapp   copy files to cloudapp
-#   * holman/bin/dot        install dependencies (osx defaults, brew update, brew install)
 
 
 #set -x
@@ -78,6 +72,7 @@ fail () {
 symlink () {
   to=$1
   from=$2
+  echo symlink $to $from
   if uname | grep -q Linux ; then
     ln -nfs $1 $2
   else
@@ -198,11 +193,16 @@ install_dotfiles () {
   info 'Installing dotfiles'
 
   link_pairs=()
-  for src in $(find $DOTFILES_ROOT/modules/* -maxdepth 2 -name \*.symlink)
+  for src in $(\find ~/.dotfiles/modules/*/symlinks -type f)
   do
-      dest="$HOME/.$(basename ${src%.*})"
-      link_pairs+=($src)
-      link_pairs+=($dest)
+      filename=$(basename ${src})
+      fromdir=$(dirname $(dirname $src))
+      fromfile=$fromdir/$filename
+
+      tofile="$HOME/.$(basename ${src})"
+
+      link_pairs+=($fromfile)
+      link_pairs+=($tofile)
   done
 
   install_files ${link_pairs[@]}
@@ -233,6 +233,7 @@ case $1 in
             install_zgen
             install_prezto_links
             install_dotfiles
+            install_dotfiles2
         })
 
         # # If we're on a Mac, let's install and setup homebrew.
