@@ -18,13 +18,14 @@ autoload bashcompinit
 bashcompinit
 
 # load zgen
-source "${HOME}/.dotfiles/zgen/zgen.zsh"
+source "${HOME}/.zgen/zgen.zsh"
 
 # While developing:
 #rm -f ~/.zgen/init.zsh
 
 # Plugins here:
 # https://github.com/unixorn/awesome-zsh-plugins
+# https://github.com/sorin-ionescu/prezto/tree/master/modules
 
 # Tricks here:
 # https://github.com/mika/zsh-pony
@@ -35,65 +36,65 @@ if ! zgen saved; then
     echo "Creating a zgen save"
 
     zgen oh-my-zsh
-    zgen oh-my-zsh plugins/colored-man
+    zgen oh-my-zsh plugins/colored-man-pages
     zgen oh-my-zsh plugins/debian
     zgen oh-my-zsh plugins/extract
-    zgen oh-my-zsh plugins/git-extras
-    zgen oh-my-zsh plugins/gem
-    # zgen oh-my-zsh plugins/heroku
-    # zgen oh-my-zsh plugins/vagrant
-    zgen oh-my-zsh plugins/sudo
+    # zgen oh-my-zsh plugins/git-extras
+    # zgen oh-my-zsh plugins/gem
+    # # zgen oh-my-zsh plugins/heroku
+    # # zgen oh-my-zsh plugins/vagrant
+    # zgen oh-my-zsh plugins/sudo
 
-    zgen prezto
-    zgen prezto modules/environment
-    zgen prezto modules/terminal
-    zgen prezto modules/utility
-    # zgen prezto modules/editor
-    zgen prezto modules/history
-    zgen prezto modules/directory
-    zgen prezto modules/spectrum
-    zgen prezto modules/utility
-    zgen prezto modules/archive
-    zgen prezto modules/command-not-found
-    zgen prezto modules/emacs
-    #zgen prezto modules/fasd
-    zgen prezto modules/haskell
-    #zgen prezto modules/homebrew
-    zgen prezto modules/node
-    zgen prezto modules/osx
-    zgen prezto modules/screen
-    zgen prezto modules/ssh
-    zgen prezto modules/fasd
-    zgen prezto modules/tmux
-    zgen prezto modules/git
+    # zgen prezto
+    # zgen prezto modules/environment
+    # zgen prezto modules/terminal
+    # zgen prezto modules/utility
+    # # zgen prezto modules/editor
+    # zgen prezto modules/history
+    # zgen prezto modules/directory
+    # zgen prezto modules/spectrum
+    # zgen prezto modules/utility
+    # zgen prezto modules/archive
+    # zgen prezto modules/command-not-found
+    # zgen prezto modules/emacs
+    # #zgen prezto modules/fasd
+    # zgen prezto modules/haskell
+    # #zgen prezto modules/homebrew
+    # zgen prezto modules/node
+    # zgen prezto modules/osx
+    # zgen prezto modules/screen
+    # zgen prezto modules/ssh
+    # zgen prezto modules/fasd
+    # zgen prezto modules/tmux
+    # zgen prezto modules/git
 
-    # zaw (ctrl-x ;) https://github.com/zsh-users/zaw
-    #zgen load zsh-users/zaw
-    #zgen load willghatch/zsh-zaw-extras
+    # # zaw (ctrl-x ;) https://github.com/zsh-users/zaw
+    # #zgen load zsh-users/zaw
+    # #zgen load willghatch/zsh-zaw-extras
 
-    #zgen load horosgrisa/zsh-gvm
-    #zgen load marzocchi/zsh-notify
-    zgen load caarlos0/zsh-pg
+    # #zgen load horosgrisa/zsh-gvm
+    # #zgen load marzocchi/zsh-notify
+    # zgen load caarlos0/zsh-pg
 
-    # https://github.com/unixorn/git-extra-commands
-    zgen load unixorn/git-extra-commands
+    # # https://github.com/unixorn/git-extra-commands
+    # zgen load unixorn/git-extra-commands
 
-    # autoenv
-    #zgen load ijcd/autoenv
+    # # autoenv
+    # #zgen load ijcd/autoenv
 
-    # extra completions (not part of zsh yet)
-    # zgen prezto modules/completion
-    zgen load zsh-users/zsh-completions src
+    # # extra completions (not part of zsh yet)
+    # # zgen prezto modules/completion
+    # zgen load zsh-users/zsh-completions src
 
-    # theme
-    # zgen oh-my-zsh themes/arrow
+    # # theme
+    # # zgen oh-my-zsh themes/arrow
 
-    # highlighting (prezto includes older zsh-users -- this should be second to last (before theme))
-    # must come last, in this order
-    #zgen prezto modules/syntax-highlighting
-    zgen load zsh-users/zsh-syntax-highlighting
-    zgen load zsh-users/zsh-history-substring-search
-    zgen prezto modules/prompt
+    # # highlighting (prezto includes older zsh-users -- this should be second to last (before theme))
+    # # must come last, in this order
+    # #zgen prezto modules/syntax-highlighting
+    # zgen load zsh-users/zsh-syntax-highlighting
+    # zgen load zsh-users/zsh-history-substring-search
+    # zgen prezto modules/prompt
 
     # save all to init script
     zgen save

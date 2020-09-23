@@ -1,4 +1,0 @@
-#!/usr/bin/env bash
-
-#sudo discoveryutil mdnsflushcache ; sudo discoveryutil udnsflushcaches
-sudo killall -HUP mDNSResponder;sudo killall mDNSResponderHelper;sudo dscacheutil -flushcache

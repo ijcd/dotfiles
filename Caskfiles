@@ -1,8 +1,0 @@
-brew install daemontools
-brew install fasd
-brew install fortune
-brew install cowsay
-gem install lolcat
-
-brew cask install asepsis
-brew cask install trim-enabler

@@ -98,16 +98,33 @@ list_modules () {
     curl $url 2>/dev/null | grep js-directory-link | sed 's/^.*">//' | sed 's/<.*//' | awk -v t="$tag" '{print t "/" $1}'
 }
 
+install_zgen () {
+    if [[ -d "${HOME}/.zgen" ]]
+    then
+        update_zgen
+    else
+        git clone https://github.com/tarjoilija/zgen.git "${HOME}/.zgen"
+    fi
+}
+
+update_zgen () {
+    (cd "${HOME}/.zgen" && git pull)    
+}
+
+reset_zgen () {
+    rm "${HOME}/.zgen/init.zsh"
+}
+
 install_prezto_links () {
     info "Setting up prezto"
     symlink $HOME/.zgen/sorin-ionescu/prezto-master $HOME/.zprezto
 }
 
-update_antigen () {
-    source $(dirname $0)/antigen/antigen.zsh clone/antigen.zsh
-    git submodule update --recursive
-    antigen update
-}
+# update_antigen () {
+#     source $(dirname $0)/antigen/antigen.zsh clone/antigen.zsh
+#     git submodule update --recursive
+#     antigen update
+# }
 
 install_files () {
     link_pairs=$1
@@ -213,6 +230,7 @@ case $1 in
         (cd $DOTFILES_ROOT && {
             clean_dotcache
             clean_dotfiles
+            install_zgen
             install_prezto_links
             install_dotfiles
         })
@@ -242,7 +260,9 @@ case $1 in
     update)
         # find the updaters and run them iteratively
         find . -name update.sh | while read update ; do sh -c "${update}" ; done
-        update_antigen
+        update_zgen
+        reset_zgen
+        # update_antigen
         ;;
 
     list-modules)

@@ -1,4 +1,0 @@
-function popd-ijcd {
-    builtin popd $*
-    pwd
-}
