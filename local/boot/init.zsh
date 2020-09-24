@@ -114,6 +114,7 @@ if ! zgen saved; then
     zgen load caarlos0/zsh-pg
     zgen load unixorn/git-extra-commands
     zgen load MenkeTechnologies/zsh-more-completions
+    zgen load zdharma/zsh-diff-so-fancy
 
     zgen load marzocchi/zsh-notify
     zgen load MichaelAquilina/zsh-auto-notify
