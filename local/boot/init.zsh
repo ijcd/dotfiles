@@ -1,9 +1,7 @@
-# While developing:
-# dotfiles-reset-cache
-
 # check if there's no init script
 if ! zgen saved; then
     echo "Creating a zgen save"
+    source "${DOTDIR}/local/boot/save_aliases.zsh"
 
     # Plugins (oh-my-zsh): https://github.com/ohmyzsh/ohmyzsh/wiki/Plugins
     zgen oh-my-zsh
@@ -118,12 +116,12 @@ if ! zgen saved; then
     zgen load MichaelAquilina/zsh-auto-notify
     zgen load t413/zsh-background-notify
 
-
     # https://github.com/ohmyzsh/ohmyzsh/wiki/Themes
     # zgen oh-my-zsh themes/arrow
 
     # save all to init script
     zgen save
+    source "${DOTDIR}/local/boot/restore_aliases.zsh"
 fi
 
 # look for ohmyzsh modules that could be prezto modules instead
