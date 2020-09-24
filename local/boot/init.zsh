@@ -3,8 +3,15 @@ if ! zgen saved; then
     echo "Creating a zgen save"
     source "${DOTDIR}/local/boot/save_aliases.zsh"
 
-    # Plugins (oh-my-zsh): https://github.com/ohmyzsh/ohmyzsh/wiki/Plugins
+    zgen load "${DOTDIR}/local/boot/override_zsh_location.zsh"
+
     zgen oh-my-zsh
+    zgen prezto
+
+    # does better if loaded first (k alias gets in the way)
+    zgen load rimraf/k
+
+    # Plugins (oh-my-zsh): https://github.com/ohmyzsh/ohmyzsh/wiki/Plugins
     zgen oh-my-zsh plugins/ansible
     zgen oh-my-zsh plugins/asdf
     # zgen oh-my-zsh plugins/autojump
@@ -58,9 +65,7 @@ if ! zgen saved; then
     zgen oh-my-zsh plugins/yarn
     zgen oh-my-zsh plugins/zsh-interactive-cd
 
-
     # Plugins (prezto): https://github.com/sorin-ionescu/prezto/tree/master/modules
-    zgen prezto
     zgen prezto archive
     zgen prezto autosuggestions
     zgen prezto command-not-found
@@ -72,7 +77,7 @@ if ! zgen saved; then
     zgen prezto editor
     zgen prezto emacs
     zgen prezto environment
-    # zgen prezto fasd
+    zgen prezto fasd
     zgen prezto git
     zgen prezto gnu-utility
     zgen prezto gpg
@@ -101,12 +106,10 @@ if ! zgen saved; then
     zgen prezto utility
     zgen prezto wakeonlan
     # zgen prezto yum
-
     
     # Plugins (other): # https://github.com/unixorn/awesome-zsh-plugins
     zgen load zsh-users/zaw # zaw (ctrl-x ;) 
     zgen load zsh-users/zsh-completions src
-    zgen load rimraf/k
     zgen load tarrasch/zsh-bd
     zgen load caarlos0/zsh-pg
     zgen load unixorn/git-extra-commands
