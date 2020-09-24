@@ -18,7 +18,12 @@ autoload bashcompinit
 bashcompinit
 
 # load zgen
+source "${DOTDIR}/local/boot/save_aliases.zsh"
 source "${HOME}/.zgen/zgen.zsh"
+source "${DOTDIR}/local/boot/restore_aliases.zsh"
+
+# While developing:
+#dotfiles-reset-cache
 
 # jump to local module which will init the rest of the dotfiles/modules
 source $DOTDIR/local/boot/init.zsh
