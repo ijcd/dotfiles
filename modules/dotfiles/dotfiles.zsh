@@ -41,7 +41,7 @@ function dotfiles-unexport-file () {
     done
 }
 
-function dotfiles-zgen-check-modules () {
+function dotfiles-zgen-check-ohmyzsh-vs-prezto () {
     # report oh-my-zsh modules that could be taken from prezto instead
     for mod in $(zgen list | grep oh-my-zsh | awk '{print $2}') ; do
 	mod=$(basename $mod)
@@ -49,4 +49,8 @@ function dotfiles-zgen-check-modules () {
             -dots-alert-message "oh-my-zsh module $mod is also in prezto"
         fi
     done
+}
+
+function dotfiles-reset-cache () {
+    rm -f ~/.zgen/init.zsh
 }
