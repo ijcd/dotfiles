@@ -6,7 +6,6 @@ tap "homebrew/cask-versions"
 tap "homebrew/core"
 tap "homebrew/services"
 tap "mongodb/brew"
-brew "python@3.8", link: true
 brew "autojump"
 brew "awscli"
 brew "cabal-install"
@@ -20,12 +19,14 @@ brew "ddate"
 brew "direnv"
 brew "elixir"
 brew "exercism"
+brew "pkg-config"
 brew "ffmpeg"
 brew "fortune"
 brew "fswatch"
 brew "fzf"
 brew "ghostscript"
 brew "git-subrepo"
+brew "gnupg"
 brew "graphviz"
 brew "gtk+"
 brew "gtk+3"
@@ -41,13 +42,13 @@ brew "jq"
 brew "keychain"
 brew "kubernetes-cli"
 brew "lolcat"
+brew "mas"
 brew "mtr"
 brew "mysql"
 brew "nmap"
 brew "opam"
 brew "openjdk"
 brew "parallel"
-brew "pkg-config"
 brew "postgresql"
 brew "postgresql@11"
 brew "pulumi"
@@ -59,6 +60,7 @@ brew "rbenv-bundler"
 brew "ripgrep"
 brew "ruby"
 brew "rustup-init"
+brew "terminal-notifier"
 brew "the_silver_searcher"
 brew "thrift"
 brew "todo-txt"
@@ -120,3 +122,39 @@ cask "vlc"
 cask "vuescan"
 cask "wireshark"
 cask "xquartz"
+mas "3Hub", id: 427515976
+mas "AdBlock", id: 1402042596
+mas "Be Focused", id: 973134470
+mas "Clocker", id: 1056643111
+mas "Compressor", id: 424390742
+mas "DW Spectrum", id: 794454285
+mas "Final Cut Pro", id: 424389933
+mas "GarageBand", id: 408980954
+mas "GarageBand", id: 682658836
+mas "Growl", id: 467939042
+mas "iMazing HEIC Converter", id: 1292198261
+mas "iMovie", id: 408981434
+mas "iMovie", id: 408981434
+mas "iMovie", id: 408981434
+mas "iPhoto", id: 408981381
+mas "Keynote", id: 409183694
+mas "Keynote", id: 409183694
+mas "Logic Pro X", id: 634148309
+mas "MainStage 3", id: 634159523
+mas "Markoff", id: 1084713122
+mas "Microsoft Excel", id: 462058435
+mas "Microsoft OneNote", id: 784801555
+mas "Microsoft Outlook", id: 985367838
+mas "Microsoft PowerPoint", id: 462062816
+mas "Microsoft Word", id: 462054704
+mas "Motion", id: 434290957
+mas "Numbers", id: 409203825
+mas "OneDrive", id: 823766827
+mas "Pages", id: 409201541
+mas "RB App Checker Lite", id: 519421117
+mas "Should I Sleep", id: 560851219
+mas "Slack", id: 803453959
+mas "Tomato One", id: 907364780
+mas "Trello", id: 1278508951
+mas "Ulysses", id: 1225570693
+mas "Xcode", id: 497799835

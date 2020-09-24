@@ -1,5 +1,12 @@
 #!/usr/bin/env bash
 
+# BLOG:
+# * these are my dotfiles
+# * zgen and why (zplugin looks faster but more complex, these start in 3s cached, good for now)
+# * module format (independently invented)
+# * don't like getting all the aliases, so screen those out
+# * I know where to look to make changes or can find it quickly
+
 # TODO:
 #   * https://github.com/clvv/fasd
 #   * install your dependencies, like "brew install ack"
