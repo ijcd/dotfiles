@@ -1,124 +1,170 @@
 # check if there's no init script
 if ! zgen saved; then
+
+    ztrace () {
+        echo "====================================================================="
+        echo zgen "$@"
+
+        declare -A binds
+        declare -A new_binds
+
+        # collect initial binds into associative array
+        for map in $(bindkey -l) ; do
+            binds[$map]=$(bindkey -M $map)
+        done
+        
+        zgen "$@"
+
+        # collect finished binds into associative array
+        for map in $(bindkey -l) ; do
+            new_binds[$map]=$(bindkey -M $map)
+        done
+
+        for map in $(bindkey -l) ; do
+            if ! diff -q <(echo $binds[$map]) <(echo $new_binds[$map]) >/dev/null
+            then
+                echo "---------------------------------------"
+                echo KEYMAP=$map
+                the_diff=$(diff -ud <(echo $binds) <(echo $new_binds))
+                echo $the_diff | grep -E '^(\+|-|\!)"'
+            fi
+        done
+    }
+
+    what_binds () {
+        for map in $(bindkey -l) ; do
+            if [ -n $1 ]
+            then
+                echo KEYMAP $map $1
+            fi
+            bindkey -M $map
+        done
+    }
+
     echo "Creating a zgen save"
     source "${DOTDIR}/local/boot/save_aliases.zsh"
 
-    zgen load "${DOTDIR}/local/boot/override_zsh_location.zsh"
+    ztrace load "${DOTDIR}/local/boot/override_zsh_location.zsh"
 
-    zgen oh-my-zsh
-    zgen prezto
+    ztrace oh-my-zsh
+    ztrace prezto
 
     # does better if loaded first (k alias gets in the way)
-    zgen load rimraf/k
+    ztrace load rimraf/k
 
     # Plugins (oh-my-zsh): https://github.com/ohmyzsh/ohmyzsh/wiki/Plugins
-    zgen oh-my-zsh plugins/ansible
-    zgen oh-my-zsh plugins/asdf
-    # zgen oh-my-zsh plugins/autojump
-    zgen oh-my-zsh plugins/aws
-    zgen oh-my-zsh plugins/battery
-    zgen oh-my-zsh plugins/cabal
-    zgen oh-my-zsh plugins/cargo
-    zgen oh-my-zsh plugins/colored-man-pages
-    zgen oh-my-zsh plugins/debian
-    zgen oh-my-zsh plugins/direnv
-    zgen oh-my-zsh plugins/docker-compose
-    zgen oh-my-zsh plugins/docker-machine
-    zgen oh-my-zsh plugins/docker
-    zgen oh-my-zsh plugins/extract
-    zgen oh-my-zsh plugins/fzf
-    zgen oh-my-zsh plugins/gatsby
-    zgen oh-my-zsh plugins/gem
-    # zgen oh-my-zsh plugins/git-prompt
-    zgen oh-my-zsh plugins/git-extras
-    zgen oh-my-zsh plugins/golang
-    zgen oh-my-zsh plugins/gpg-agent
-    zgen oh-my-zsh plugins/helm
-    # zgen oh-my-zsh plugins/heroku
-    zgen oh-my-zsh plugins/httpie
-    zgen oh-my-zsh plugins/iterm2
-    zgen oh-my-zsh plugins/kops
-    zgen oh-my-zsh plugins/kubectl
-    zgen oh-my-zsh plugins/magic-enter
-    zgen oh-my-zsh plugins/minikube
-    zgen oh-my-zsh plugins/mix
-    zgen oh-my-zsh plugins/nmap
-    zgen oh-my-zsh plugins/node
-    zgen oh-my-zsh plugins/npm
-    zgen oh-my-zsh plugins/osx
-    zgen oh-my-zsh plugins/pip
-    zgen oh-my-zsh plugins/pipenv
-    zgen oh-my-zsh plugins/react-native
-    zgen oh-my-zsh plugins/rust
-    zgen oh-my-zsh plugins/rustup
-    zgen oh-my-zsh plugins/sublime
-    zgen oh-my-zsh plugins/sudo
-    zgen oh-my-zsh plugins/systemd
-    zgen oh-my-zsh plugins/terraform
-    zgen oh-my-zsh plugins/tig
-    zgen oh-my-zsh plugins/ubuntu
-    zgen oh-my-zsh plugins/ufw
-    # zgen oh-my-zsh plugins/vagrant
-    zgen oh-my-zsh plugins/vscode
-    zgen oh-my-zsh plugins/vundle
-    zgen oh-my-zsh plugins/xcode
-    zgen oh-my-zsh plugins/yarn
-    zgen oh-my-zsh plugins/zsh-interactive-cd
+    ztrace oh-my-zsh plugins/ansible
+    ztrace oh-my-zsh plugins/asdf
+    # ztrace oh-my-zsh plugins/autojump
+    ztrace oh-my-zsh plugins/aws
+    ztrace oh-my-zsh plugins/battery
+    ztrace oh-my-zsh plugins/cabal
+    ztrace oh-my-zsh plugins/cargo
+    ztrace oh-my-zsh plugins/colored-man-pages
+    ztrace oh-my-zsh plugins/debian
+    ztrace oh-my-zsh plugins/direnv
+    ztrace oh-my-zsh plugins/docker-compose
+    ztrace oh-my-zsh plugins/docker-machine
+    ztrace oh-my-zsh plugins/docker
+    ztrace oh-my-zsh plugins/extract
+    # ztrace oh-my-zsh plugins/fzf
+    ztrace oh-my-zsh plugins/gatsby
+    ztrace oh-my-zsh plugins/gem
+    # ztrace oh-my-zsh plugins/git-prompt
+    ztrace oh-my-zsh plugins/git-extras
+    ztrace oh-my-zsh plugins/golang
+    ztrace oh-my-zsh plugins/gpg-agent
+    ztrace oh-my-zsh plugins/helm
+    # ztrace oh-my-zsh plugins/heroku
+    ztrace oh-my-zsh plugins/httpie
+    ztrace oh-my-zsh plugins/iterm2
+    ztrace oh-my-zsh plugins/kops
+    ztrace oh-my-zsh plugins/kubectl
+    ztrace oh-my-zsh plugins/magic-enter
+    ztrace oh-my-zsh plugins/minikube
+    ztrace oh-my-zsh plugins/mix
+    ztrace oh-my-zsh plugins/nmap
+    ztrace oh-my-zsh plugins/node
+    ztrace oh-my-zsh plugins/npm
+    ztrace oh-my-zsh plugins/osx
+    ztrace oh-my-zsh plugins/pip
+    ztrace oh-my-zsh plugins/pipenv
+    ztrace oh-my-zsh plugins/react-native
+    ztrace oh-my-zsh plugins/rust
+    ztrace oh-my-zsh plugins/rustup
+    ztrace oh-my-zsh plugins/sublime
+    ztrace oh-my-zsh plugins/sudo
+    ztrace oh-my-zsh plugins/systemd
+    ztrace oh-my-zsh plugins/terraform
+    ztrace oh-my-zsh plugins/tig
+    ztrace oh-my-zsh plugins/ubuntu
+    ztrace oh-my-zsh plugins/ufw
+    # ztrace oh-my-zsh plugins/vagrant
+    ztrace oh-my-zsh plugins/vscode
+    ztrace oh-my-zsh plugins/vundle
+    ztrace oh-my-zsh plugins/xcode
+    ztrace oh-my-zsh plugins/yarn
+    # ztrace oh-my-zsh plugins/zsh-interactive-cd
 
     # Plugins (prezto): https://github.com/sorin-ionescu/prezto/tree/master/modules
-    zgen prezto archive
-    zgen prezto autosuggestions
-    zgen prezto command-not-found
-    zgen prezto completion
-    zgen prezto directory
-    # zgen prezto dnf             # yum package manager
-    zgen prezto docker
-    zgen prezto dpkg
-    zgen prezto editor
-    zgen prezto emacs
-    zgen prezto environment
-    zgen prezto fasd
-    zgen prezto git
-    zgen prezto gnu-utility
-    zgen prezto gpg
-    zgen prezto haskell
-    zgen prezto helper
-    zgen prezto history
-    zgen prezto history-substring-search
-    zgen prezto homebrew
-    # zgen prezto macports
-    zgen prezto node
-    zgen prezto ocaml
-    zgen prezto osx
-    # zgen prezto pacman
-    zgen prezto perl
-    zgen prezto prompt
-    zgen prezto python
-    zgen prezto rails
-    zgen prezto rsync
-    zgen prezto ruby
-    zgen prezto screen
-    zgen prezto spectrum
-    zgen prezto ssh
-    zgen prezto syntax-highlighting
-    zgen prezto terminal
-    zgen prezto tmux
-    zgen prezto utility
-    zgen prezto wakeonlan
-    # zgen prezto yum
+    ztrace prezto archive
+    ztrace prezto autosuggestions
+    ztrace prezto command-not-found
+    ztrace prezto completion
+    ztrace prezto directory
+    # ztrace prezto dnf             # yum package manager
+    ztrace prezto docker
+    ztrace prezto dpkg
+    ztrace prezto editor
+    ztrace prezto emacs
+    ztrace prezto environment
+    ztrace prezto fasd
+    ztrace prezto git
+    ztrace prezto gnu-utility
+    ztrace prezto gpg
+    ztrace prezto haskell
+    ztrace prezto helper
+    ztrace prezto history
+    ztrace prezto history-substring-search
+    ztrace prezto homebrew
+    # ztrace prezto macports
+    ztrace prezto node
+    ztrace prezto ocaml
+    ztrace prezto osx
+    # ztrace prezto pacman
+    ztrace prezto perl
+    ztrace prezto prompt
+    ztrace prezto python
+    ztrace prezto rails
+    ztrace prezto rsync
+    ztrace prezto ruby
+    ztrace prezto screen
+    ztrace prezto spectrum
+    ztrace prezto ssh
+    ztrace prezto syntax-highlighting
+    ztrace prezto terminal
+    ztrace prezto tmux
+    ztrace prezto utility
+    ztrace prezto wakeonlan
+    # ztrace prezto yum
     
     # Plugins (other): # https://github.com/unixorn/awesome-zsh-plugins
-    zgen load zsh-users/zaw # zaw (ctrl-x ;) 
-    zgen load zsh-users/zsh-completions src
-    zgen load tarrasch/zsh-bd
-    zgen load caarlos0/zsh-pg
-    zgen load unixorn/git-extra-commands
-    zgen load MenkeTechnologies/zsh-more-completions
-    zgen load zdharma/zsh-diff-so-fancy
+    ztrace load zsh-users/zaw # zaw (ctrl-x ;) 
+    ztrace load zsh-users/zsh-completions src
+    ztrace load tarrasch/zsh-bd
+    ztrace load caarlos0/zsh-pg
+    ztrace load unixorn/git-extra-commands
+    ztrace load MenkeTechnologies/zsh-more-completions
+    ztrace load zdharma/zsh-diff-so-fancy
 
-    zgen load marzocchi/zsh-notify
-    zgen load MichaelAquilina/zsh-auto-notify
-    zgen load t413/zsh-background-notify
+    ztrace load marzocchi/zsh-notify
+    ztrace load MichaelAquilina/zsh-auto-notify
+    ztrace load t413/zsh-background-notify
+
+    # interactive completions
+    ztrace oh-my-zsh plugins/fzf
+    ztrace oh-my-zsh plugins/zsh-interactive-cd
+    ztrace load wookayin/fzf-fasd
 
     # https://github.com/ohmyzsh/ohmyzsh/wiki/Themes
     # zgen oh-my-zsh themes/arrow
