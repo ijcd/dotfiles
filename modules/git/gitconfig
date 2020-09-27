@@ -150,7 +150,7 @@
     # Make `git rebase` safer on OS X
     # More info: <http://www.git-tower.com/blog/make-git-rebase-safe-on-osx/>
     trustctime = false
-    pager = diff-so-fancy | less --tabs=4 -RFX
+    pager = mydiff-so-fancy | less --tabs=4 -RFX
 
 
 #[color]

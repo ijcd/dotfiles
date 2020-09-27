@@ -1,0 +1,5 @@
+if [ -z ${NOFANCY+x} ]; then   
+    exec diff-so-fancy "$@"
+else
+    exec cat "$@"
+fi

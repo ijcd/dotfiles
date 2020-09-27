@@ -38,3 +38,21 @@ alias gg='cd $(git rev-parse --show-toplevel)'
 # Lock the screen (when going AFK)
 alias afk="/System/Library/CoreServices/Menu\ Extras/User.menu/Contents/Resources/CGSession -suspend"
 
+# ripgrep
+alias rgi="rg --no-ignore"
+
+# skip the function/git diff
+alias ddiff="/usr/bin/diff"
+alias udiff="/usr/bin/diff -urN"
+
+# fasd
+alias a='fasd -a'        # any
+alias s='fasd -si'       # show / search / select
+alias d='fasd -d'        # directory
+alias f='fasd -f'        # file
+alias sd='fasd -sid'     # interactive directory selection
+alias sf='fasd -sif'     # interactive file selection
+alias z='fasd_cd -d'     # cd, same functionality as j in autojump
+alias zz='fasd_cd -d -i' # cd with interactive selection
+alias j='fasd_cd -d'     # muscle memory
+alias jj='fasd_cd -d -i' # cd with interactive selection
