@@ -179,6 +179,9 @@ fi
 # look for ohmyzsh modules that could be prezto modules instead
 dotfiles-zgen-check-ohmyzsh-vs-prezto
 
+# bootstrap some functions
+source "${DOTDIR}/local/boot/00path_functions.zsh"
+
 # load local modules
 for modname ($DOTDIR/modules/*)
 do
