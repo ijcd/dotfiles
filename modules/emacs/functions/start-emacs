@@ -1,0 +1,3 @@
+start-emacs () {
+    emacs --daemon
+}

@@ -38,3 +38,4 @@ $DOTFILES_NOISY_STARTUP && {
     echo SHELL=$SHELL
     echo ZPREZTODIR=$ZPREZTODIR
 }
+if [ -e /Users/ijcd/.nix-profile/etc/profile.d/nix.sh ]; then . /Users/ijcd/.nix-profile/etc/profile.d/nix.sh; fi # added by Nix installer
