@@ -59,7 +59,7 @@ if ! zgen saved; then
     ztrace oh-my-zsh plugins/aws
     ztrace oh-my-zsh plugins/battery
     ztrace oh-my-zsh plugins/cabal
-    ztrace oh-my-zsh plugins/cargo
+    # ztrace oh-my-zsh plugins/cargo #deprecated, moved to rust
     ztrace oh-my-zsh plugins/colored-man-pages
     ztrace oh-my-zsh plugins/debian
     ztrace oh-my-zsh plugins/direnv
@@ -86,12 +86,13 @@ if ! zgen saved; then
     ztrace oh-my-zsh plugins/nmap
     ztrace oh-my-zsh plugins/node
     ztrace oh-my-zsh plugins/npm
-    ztrace oh-my-zsh plugins/osx
+    # ztrace oh-my-zsh plugins/osx # deprecated for "macos"?
+    ztrace oh-my-zsh plugins/macos
     ztrace oh-my-zsh plugins/pip
     ztrace oh-my-zsh plugins/pipenv
     ztrace oh-my-zsh plugins/react-native
     ztrace oh-my-zsh plugins/rust
-    ztrace oh-my-zsh plugins/rustup
+    # ztrace oh-my-zsh plugins/rustup # deprecated, moved to rust
     ztrace oh-my-zsh plugins/sublime
     ztrace oh-my-zsh plugins/sudo
     ztrace oh-my-zsh plugins/systemd
@@ -131,6 +132,7 @@ if ! zgen saved; then
     ztrace prezto node
     ztrace prezto ocaml
     ztrace prezto osx
+
     # ztrace prezto pacman
     ztrace prezto perl
     ztrace prezto prompt
