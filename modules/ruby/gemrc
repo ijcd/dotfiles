@@ -4,8 +4,8 @@
 :bulk_threshold: 1000
 :backtrace: false
 :benchmark: false
-gem: --no-rdoc --no-ri
 install: --no-rdoc --no-ri
 update: --no-rdoc --no-ri
 :sources: 
-rdoc: --inline-source --line-numbers --format=html --template=hanna
+rdoc: --inline-source --line-numbers --template=hanna
+gem: --no-document --no-ri

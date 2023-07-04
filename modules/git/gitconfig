@@ -184,9 +184,21 @@
 [merge]
     summary = true
     verbosity = 1
-    tool = ediff
-    # Include summaries of merged commits in newly created merge commit messages
-    log = true
+    tool = diffmerge
+#    tool = ediff
+#    # Include summaries of merged commits in newly created merge commit messages
+#    log = true
+#	tool = kdiff3
+
+[diff]
+    # Git diff will use (i)ndex, (w)ork tree, (c)ommit and (o)bject
+    # instead of a/b/c/d as prefixes for patches
+    mnemonicprefix = true
+    renamelimit = 0
+    tool = diffmerge
+#    algorithm = patience
+#	guitool = kdiff3
+#	guitool = kdiff3
 
 [mergetool]
     prompt = false
@@ -194,6 +206,18 @@
 
 [mergetool "ediff"]
     cmd = emacsclient -c -a \"\"  --eval \"(ediff-merge-files-with-ancestor \\\"$LOCAL\\\" \\\"$REMOTE\\\" \\\"$BASE\\\" nil \\\"$MERGED\\\")\"
+
+[mergetool "kdiff3"]
+	path = /Applications/kdiff3.app/Contents/MacOS/kdiff3
+	trustExitCode = false
+	path = /Applications/kdiff3.app/Contents/MacOS/kdiff3
+	trustExitCode = false
+
+[difftool "kdiff3"]
+	path = /Applications/kdiff3.app/Contents/MacOS/kdiff3
+	trustExitCode = false
+	path = /Applications/kdiff3.app/Contents/MacOS/kdiff3
+	trustExitCode = false
 
 [merge "gemfilelock"]
     name = relocks the gemfile.lock
@@ -204,23 +228,22 @@
     keepbackup=false
 
 [mergetool "diffmerge"]
-    cmd = diffmerge --merge --result=$MERGED $LOCAL $BASE $REMOTE
+    cmd = diffmerge --merge --result=\"$MERGED\" \"$LOCAL\" \"$BASE\" \"$REMOTE\"
     trustExitCode = true
 
 [mergetool "sourcetree"]
-	cmd = /Users/ijcd/Desktop/aura1024/Applications/SourceTree.app/Contents/Resources/opendiff-w.sh \"$LOCAL\" \"$REMOTE\" -ancestor \"$BASE\" -merge \"$MERGED\"
+	cmd = /Applications/Sourcetree.app/Contents/Resources/opendiff-w.sh \"$LOCAL\" \"$REMOTE\" -ancestor \"$BASE\" -merge \"$MERGED\"
 	trustExitCode = true
 
-[diff]
-    # Git diff will use (i)ndex, (w)ork tree, (c)ommit and (o)bject
-    # instead of a/b/c/d as prefixes for patches
-    mnemonicprefix = true
-    renamelimit = 0
-    tool = diffmerge
-    algorithm = patience
+[difftool "vscode"]
+  cmd = code --wait --diff $LOCAL $REMOTE
+
+[mergetool "vscode"]
+  cmd = code --wait $MERGED
 
 [difftool "diffmerge"]
-    cmd = diffmerge $LOCAL $REMOTE
+    cmd = diffmerge --nosplash \"$LOCAL\" \"$REMOTE\"
+    #cmd = diffmerge $LOCAL $REMOTE
 
 [difftool "sourcetree"]
 	cmd = opendiff \"$LOCAL\" \"$REMOTE\"

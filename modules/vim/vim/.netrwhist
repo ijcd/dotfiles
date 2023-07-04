@@ -1,3 +1,7 @@
 let g:netrw_dirhistmax  =10
-let g:netrw_dirhistcnt =1
+let g:netrw_dirhistcnt =5
+let g:netrw_dirhist_5='/Users/ijcd/.dotfiles/modules/asdf'
+let g:netrw_dirhist_4='/Users/ijcd/work/getting_started/petal_pro/remindly/.devcontainer'
+let g:netrw_dirhist_3='/Users/ijcd/work/theliberties/.git'
+let g:netrw_dirhist_2='/Users/ijcd/work/theliberties/liberties'
 let g:netrw_dirhist_1='/Users/ijcd/work/business/expo/playground/.git'
