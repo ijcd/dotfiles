@@ -1,2 +1,4 @@
 source .bashrc
 if [ -e /Users/ijcd/.nix-profile/etc/profile.d/nix.sh ]; then . /Users/ijcd/.nix-profile/etc/profile.d/nix.sh; fi # added by Nix installer
+
+complete -C /usr/local/bin/terraform terraform

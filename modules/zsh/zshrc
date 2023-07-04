@@ -27,3 +27,6 @@ source "${DOTDIR}/local/boot/restore_aliases.zsh"
 
 # jump to local module which will init the rest of the dotfiles/modules
 source $DOTDIR/local/boot/init.zsh
+
+autoload -U +X bashcompinit && bashcompinit
+complete -o nospace -C /usr/local/bin/terraform terraform

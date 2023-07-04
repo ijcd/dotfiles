@@ -29,4 +29,4 @@ test -f /usr/local/share/zsh/site-functions/_aws && source /usr/local/share/zsh/
 #
 # enable_aws
 
-export AWS_DEFAULT_REGION="us-west-2"
+# export AWS_DEFAULT_REGION="us-west-2"
