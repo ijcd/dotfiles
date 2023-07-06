@@ -2,6 +2,6 @@
 # Make sure that the .gnupg directory and its contents is accessibile by your user.
 chown -R $(whoami) ~/.gnupg/
 
-# Also correct the permissions and access rights on the directory
-chmod 600 ~/.gnupg/*
-chmod 700 ~/.gnupg
+# Correct access rights for .gnupg and subfolders:
+find ~/.gnupg/ -type f -exec chmod 600 {} \;
+find ~/.gnupg/ -type d -exec chmod 700 {} \;
