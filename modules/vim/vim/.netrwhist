@@ -1,7 +1,12 @@
 let g:netrw_dirhistmax  =10
-let g:netrw_dirhistcnt =5
+let g:netrw_dirhistcnt =1
+let g:netrw_dirhist_1='/Users/ijcd/work/r4g/repos/web/scripts'
+let g:netrw_dirhist_0='/Users/ijcd/work/r4g/repos/web/.yarn'
+let g:netrw_dirhist_9='/Users/ijcd/work/theliberties/liberties_vanilla/priv/data/toast/time_entries'
+let g:netrw_dirhist_8='/Users/ijcd/work/r4g/web/cypress'
+let g:netrw_dirhist_7='/Users/ijcd/work/r4g/web/components'
+let g:netrw_dirhist_6='/Users/ijcd/work/r4g/web/.git'
 let g:netrw_dirhist_5='/Users/ijcd/.dotfiles/modules/asdf'
 let g:netrw_dirhist_4='/Users/ijcd/work/getting_started/petal_pro/remindly/.devcontainer'
 let g:netrw_dirhist_3='/Users/ijcd/work/theliberties/.git'
 let g:netrw_dirhist_2='/Users/ijcd/work/theliberties/liberties'
-let g:netrw_dirhist_1='/Users/ijcd/work/business/expo/playground/.git'

@@ -17,12 +17,16 @@
     #via http://stackoverflow.com/questions/5188320/how-can-i-get-a-list-of-git-branches-ordered-by-most-recent-commit
     recent-branches = !git for-each-ref --count=5 --sort=-committerdate refs/heads/ --format='%(refname:short)'
 
+    # show unmerged
+    unmerged = !git --no-pager diff --name-only --diff-filter=U
+
     # branch
     b = branch -vv                    # branch (verbose)
     branches = branch -a
 
     # delete merged branches
-    delete-merged = "!git branch --merged | grep -v '\\*' | xargs -n 1 git branch -d"
+    #delete-merged = "!git branch --merged | grep -v '\\*' | xargs -n 1 git branch -d"
+    delete-merged = "!git branch --merged | grep -Ev '(^\\*|master|main|dev)' | xargs git branch -d"
     dm = delete-merged
 
     # add without whitespace
@@ -59,7 +63,7 @@
     # log
     l = log --graph --date=short
     ll = log --pretty=oneline -n 20 --graph --abbrev-commit
-    lg = log --graph --pretty=format:'%Cred%h%Creset -%C(yellow)%d%Creset %s %Cgreen(%cr) %C(bold blue)<%an>%Creset' --abbrev-commit --date=relative
+    lg = log --graph --pretty=format:'%Cred%h%Creset -%C(yellow)%d%Creset %s %Cgreen(%cs) %C(bold blue)<%an>%Creset' --abbrev-commit --date=relative
     ls = log --pretty=format:'%Cred%h%Creset -%C(yellow)%d%Creset %s %Cgreen(%cr) %C(bold blue)<%an>%Creset' --abbrev-commit --date=relative
     log1 = log --pretty=oneline
     logf = log --pretty=full
