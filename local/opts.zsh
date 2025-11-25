@@ -20,8 +20,8 @@ setopt MULTIOS
 # This makes cd=pushd
 setopt AUTO_PUSHD
 
-# This will use named dirs when possible
-setopt AUTO_NAME_DIRS
+# This will use named dirs when possible -- causes path to be weird when env var matches
+#setopt AUTO_NAME_DIRS
 
 # If we have a glob this will expand it
 setopt GLOB_COMPLETE

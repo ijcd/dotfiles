@@ -7,6 +7,13 @@
     addremove = !git add -u "${@:-.}" && git add "${@:-.}" && git status
     ar = !git addremove
 
+    # exec from root
+    exec = "!exec "
+
+    # where is the root, go to the root
+    root = rev-parse --show-toplevel
+    cdroot = !cd /tmp
+
     # git reset hard
     rcc = !git reset "${@:-.}" && git checkout "${@:-.}"
 
@@ -139,6 +146,7 @@
     # hub stuff
     browse       = !hub browse
     compare      = !hub compare
+
 
 [user]
 	name = Ian Duggan
@@ -317,3 +325,5 @@
 #
 # End diff-so-fancy
 #
+[init]
+	defaultBranch = main
