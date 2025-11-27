@@ -1,0 +1,59 @@
+* emacs files
+* vim files
+* chezmoi
+* nix/homemanager
+* cross-machine history managment (https://atuin.sh/)
+* brew files
+* remove .zgen
+
+
+:( ijcd@bearcat:~/.dotfiles (main) [25-11-26 16:45:09] [dotfiles]
+% ./dotfiles                                                                                                                                                                                                             (main)
+Usage ./dotfiles install|update|list-modules|uninstall
+
+:( ijcd@bearcat:~/.dotfiles (main) [25-11-26 16:45:12] [./dotfiles]
+% ./dotfiles uninstall                                                                                                                                                                                                   (main)
+  [ .. ] Cleaning ~/.zdotcache
+  [ .. ] Cleaning dotfiles
+  [ .. ] Removing /Users/ijcd/.wgetrc -> /Users/ijcd/.dotfiles/modules/wget/wgetrc
+  [ .. ] Removing /Users/ijcd/.zpreztorc -> /Users/ijcd/.dotfiles/modules/zsh/zpreztorc
+  [ .. ] Removing /Users/ijcd/.my.cnf -> /Users/ijcd/.dotfiles/modules/mysql/my.cnf
+  [ .. ] Removing /Users/ijcd/.procmail -> /Users/ijcd/.dotfiles/modules/email/procmail
+  [ .. ] Removing /Users/ijcd/.gemrc -> /Users/ijcd/.dotfiles/modules/ruby/gemrc
+  [ .. ] Removing /Users/ijcd/.dir_colors -> /Users/ijcd/.dotfiles/modules/files/dir_colors
+  [ .. ] Removing /Users/ijcd/.vim -> /Users/ijcd/.dotfiles/modules/vim/vim
+  [ .. ] Removing /Users/ijcd/.terminfo -> /Users/ijcd/.dotfiles/modules/terminal/terminfo
+  [ .. ] Removing /Users/ijcd/.gnupg -> /Users/ijcd/.dotfiles/modules/gnupg/gnupg
+  [ .. ] Removing /Users/ijcd/.tmux.conf -> /Users/ijcd/.dotfiles/modules/tmux/tmux.conf
+  [ .. ] Removing /Users/ijcd/.bashrc -> /Users/ijcd/.dotfiles/modules/bash/bashrc
+  [ .. ] Removing /Users/ijcd/.zshrc -> /Users/ijcd/.dotfiles/modules/zsh/zshrc
+  [ .. ] Removing /Users/ijcd/.hgignore -> /Users/ijcd/.dotfiles/modules/mercurial/hgignore
+  [ .. ] Removing /Users/ijcd/.irbrc -> /Users/ijcd/.dotfiles/modules/ruby/irbrc
+  [ .. ] Removing /Users/ijcd/.Xresources -> /Users/ijcd/.dotfiles/modules/X/Xresources
+  [ .. ] Removing /Users/ijcd/.irssi -> /Users/ijcd/.dotfiles/modules/irc/irssi
+  [ .. ] Removing /Users/ijcd/.zprofile -> /Users/ijcd/.dotfiles/modules/zsh/zprofile
+  [ .. ] Removing /Users/ijcd/.ackrc -> /Users/ijcd/.dotfiles/modules/ack/ackrc
+  [ .. ] Removing /Users/ijcd/.bash_logout -> /Users/ijcd/.dotfiles/modules/bash/bash_logout
+  [ .. ] Removing /Users/ijcd/.rdebugrc -> /Users/ijcd/.dotfiles/modules/ruby/rdebugrc
+  [ .. ] Removing /Users/ijcd/.muttrc -> /Users/ijcd/.dotfiles/modules/email/muttrc
+  [ .. ] Removing /Users/ijcd/.editorconfig -> /Users/ijcd/.dotfiles/modules/editor/editorconfig
+  [ .. ] Removing /Users/ijcd/.railsrc -> /Users/ijcd/.dotfiles/modules/ruby/railsrc
+  [ .. ] Removing /Users/ijcd/.pinerc -> /Users/ijcd/.dotfiles/modules/email/pinerc
+  [ .. ] Removing /Users/ijcd/.MacOSX -> /Users/ijcd/.dotfiles/modules/osx/MacOSX
+  [ .. ] Removing /Users/ijcd/.gitignore -> /Users/ijcd/.dotfiles/modules/git/gitignore
+  [ .. ] Removing /Users/ijcd/.zshenv -> /Users/ijcd/.dotfiles/modules/zsh/zshenv
+  [ .. ] Removing /Users/ijcd/.antrc -> /Users/ijcd/.dotfiles/modules/java/antrc
+  [ .. ] Removing /Users/ijcd/.vimrc -> /Users/ijcd/.dotfiles/modules/vim/vimrc
+  [ .. ] Removing /Users/ijcd/.screenrc -> /Users/ijcd/.dotfiles/modules/screen/screenrc
+  [ .. ] Removing /Users/ijcd/.pryrc -> /Users/ijcd/.dotfiles/modules/ruby/pryrc
+  [ .. ] Removing /Users/ijcd/.utop -> /Users/ijcd/.dotfiles/modules/ocaml/utop
+  [ .. ] Removing /Users/ijcd/.ctags -> /Users/ijcd/.dotfiles/modules/ctags/ctags
+  [ .. ] Removing /Users/ijcd/.bash_profile -> /Users/ijcd/.dotfiles/modules/bash/bash_profile
+  [ .. ] Removing /Users/ijcd/.weechat -> /Users/ijcd/.dotfiles/modules/irc/weechat
+  [ .. ] Removing /Users/ijcd/.inputrc -> /Users/ijcd/.dotfiles/modules/readline/inputrc
+  [ .. ] Removing /Users/ijcd/.gitconfig -> /Users/ijcd/.dotfiles/modules/git/gitconfig
+  [ .. ] Removing /Users/ijcd/.procmailrc -> /Users/ijcd/.dotfiles/modules/email/procmailrc
+  [ .. ] Removing /Users/ijcd/.gvimrc -> /Users/ijcd/.dotfiles/modules/vim/gvimrc
+  [ .. ] Removing /Users/ijcd/.aprc -> /Users/ijcd/.dotfiles/modules/ruby/aprc
+  [ .. ] Removing /Users/ijcd/.zlogin -> /Users/ijcd/.dotfiles/modules/zsh/zlogin
+  [ .. ] Removing /Users/ijcd/.zlogout -> /Users/ijcd/.dotfiles/modules/zsh/zlogout
