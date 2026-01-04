@@ -42,11 +42,9 @@ fi
 # ignore backups, CVS directories, python bytecode, vim swap files
 FIGNORE="~:CVS:#:.pyc:.swp:.swa:apache-solr-*"
 
-HISTFILE=$HOME/.zsh_history
-HISTSIZE=20000
-SAVEHIST=10000
-
-setopt HIST_IGNORE_DUPS HIST_IGNORE_SPACE HIST_REDUCE_BLANKS HIST_VERIFY SHARE_HISTORY
+# Source options and aliases
+source $ZDOTDIR/options.zsh
+source $ZDOTDIR/aliases.zsh
 
 ###########################################
 #  Set up for starship custom.last_command
@@ -87,8 +85,3 @@ export VISUAL=$EDITOR
 # always use PASSIVE mode ftp
 : ${FTP_PASSIVE:=1}
 export FTP_PASSIVE
-
-
-
-# Source aliases
-source $ZDOTDIR/aliases.zsh

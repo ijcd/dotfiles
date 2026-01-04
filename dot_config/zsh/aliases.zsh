@@ -2,6 +2,13 @@
 # MISC
 ###########
 
+# zmv - powerful rename/copy/link with patterns
+# Usage: zmv '(*).txt' '$1.md'  -- rename all .txt to .md
+autoload -U zmv
+alias zmv="noglob zmv -W"
+alias zcp="noglob zmv -C"
+alias zln="noglob zmv -L"
+
 alias la="ls -la";
 alias ..="cd ..";
 
