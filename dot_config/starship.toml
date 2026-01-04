@@ -1,0 +1,125 @@
+# Blank line before each prompt, like your original
+add_newline = true
+
+format = """
+${status}\
+${os}\
+${username}${hostname}${directory}\
+${time}\
+${custom.last_command}\
+${all}
+"""
+
+[status]
+disabled = false
+format = '[$symbol]($style) '
+symbol   = '[:\( \[$status\]](bold red)'
+success_symbol = '[:\)](bold green)'
+map_symbol = true
+pipestatus = true
+pipestatus_separator = "| "
+recognize_signal_code = true      # symbols instead of error codes
+
+[username]
+disabled    = false
+show_always = true
+style_user  = "yellow"
+format      = "[$user]($style)"
+
+[hostname]
+ssh_only = false
+style    = "216"
+format   = "@[$hostname]($style)"
+trim_at  = ''
+
+[directory]
+format            = ":[$path]($style) "
+truncation_length = 7
+truncation_symbol = '.../'
+truncate_to_repo  = true
+style             = "green"
+before_repo_root_style = "green"
+repo_root_style = "blue"
+repo_root_format = ':[$before_root_path]($before_repo_root_style)[$repo_root]($repo_root_style)[$path]($style)[$read_only]($read_only_style) '
+# fish_style_pwd_dir_length = 1
+
+[time]
+disabled    = false
+time_format = "%F %T"      # 2025-12-07 20:15:42
+style       = "white"
+format      = '[\[$time\]]($style) '
+
+[mise]
+disabled = false
+symbol = ""
+healthy_symbol = ""
+unhealthy_symbol = "mise unhealthy "
+format = '[$symbol$health]($style)'
+
+# The following needs this snippet in zsh dotfiles:
+#
+# starship_last_command_preexec() {
+#   export STARSHIP_LAST_COMMAND="$1"
+# }
+#
+# autoload -Uz add-zsh-hook
+# add-zsh-hook preexec starship_last_command_preexec
+
+[custom.last_cmd]
+when = true
+unsafe_no_escape = true
+command = "echo ${STARSHIP_LAST_COMMAND}"
+format = '[\($output\) ](bold purple)'
+use_stdin = true
+
+#
+# Enable these usually disabled modules until we figure out what we need
+#
+
+[azure]
+disabled = false
+
+[cpp]
+disabled = false
+
+[direnv]
+disabled = false
+
+[fossil_branch]
+disabled = false
+
+[fossil_metrics]
+disabled = false
+
+[git_metrics]
+disabled = false
+
+[kubernetes]
+disabled = false
+
+[localip]
+disabled = false
+
+[memory_usage]
+disabled = false
+
+# [hg_branch]
+# disabled = false
+
+# [hg_state]
+# disabled = false
+
+[os]
+disabled = true
+
+[pijul_channel]
+disabled = false
+
+[shell]
+disabled = true
+
+[shlvl]
+disabled = false
+
+[sudo]
+disabled = false

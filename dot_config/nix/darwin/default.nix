@@ -39,6 +39,7 @@
   home-manager = {
     useGlobalPkgs = true;
     useUserPackages = true;
+    backupFileExtension = "mine";
     users.${primaryUser} = {
       imports = [
         ../home
@@ -47,6 +48,14 @@
     extraSpecialArgs = {
       inherit inputs self primaryUser;
     };
+  };
+
+  # System zsh config (completion handled by Zim)
+  programs.zsh = {
+    enable = true;
+    enableCompletion = false;
+    enableBashCompletion = false;
+    promptInit = "";  # Disable default prompt, using starship
   };
 
   # macOS-specific settings

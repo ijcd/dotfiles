@@ -1,0 +1,1702 @@
+Last login: Sun Nov 30 20:48:10 on ttys002
+You have mail.
+ijcd@my-macbook ~ % nix-shell -p nix-info --run "nix-info -m"
+error: Nix daemon disconnected unexpectedly (maybe it crashed?)
+ijcd@my-macbook ~ % grep -R "ca-certificates.crt" ~/.zsh* ~/.config 2>/dev/null
+grep -R "NIX_SSL_CERT_FILE" ~/.zsh* ~/.config 2>/dev/null
+
+/Users/ijcd/.zsh_history:sudo rm ssl/certs/ca-certificates.crt.before-nix-darwin
+/Users/ijcd/.zsh_history:ls /etc/ssl/certs/ca-certificates.crt
+/Users/ijcd/.zsh_history:cat /etc/ssl/certs/ca-certificates.crt
+/Users/ijcd/.zsh_history:sudo  /etc/ssl/certs/ca-certificates.crt
+/Users/ijcd/.zsh_history:sudo cat /etc/ssl/certs/ca-certificates.crt
+/Users/ijcd/.zsh_history:sudo rm /etc/ssl/certs/ca-certificates.crt
+^C
+ijcd@my-macbook ~ % nix show-config | grep cert
+warning: 'show-config' is a deprecated alias for 'config show'
+ssl-cert-file = /etc/ssl/cert.pem
+ijcd@my-macbook ~ % nix config show | grep cert
+ssl-cert-file = /etc/ssl/cert.pem
+ijcd@my-macbook ~ % nix-shell -p nix-info --run "nix-info -m"
+
+error: Nix daemon disconnected unexpectedly (maybe it crashed?)
+ijcd@my-macbook ~ % sudo launchctl print system/org.nixos.nix-daemon
+
+Password:
+system/org.nixos.nix-daemon = {
+	active count = 1
+	path = /Library/LaunchDaemons/org.nixos.nix-daemon.plist
+	type = LaunchDaemon
+	state = running
+
+	program = /bin/sh
+	arguments = {
+		/bin/sh
+		-c
+		/bin/wait4path /nix/var/nix/profiles/default/bin/nix-daemon && exec /nix/var/nix/profiles/default/bin/nix-daemon
+	}
+
+	stdout path = /dev/null
+	stderr path = /var/log/nix-daemon.log
+	default environment = {
+		PATH => /usr/bin:/bin:/usr/sbin:/sbin
+	}
+
+	environment = {
+		XPC_SERVICE_NAME => org.nixos.nix-daemon
+	}
+
+	domain = system
+	minimum runtime = 10
+	exit timeout = 5
+	runs = 2
+	pid = 26833
+	immediate reason = inefficient
+	forks = 5
+	execs = 3
+	initialized = 1
+	trampolined = 1
+	started suspended = 0
+	proxy started suspended = 0
+	last terminating signal = Terminated: 15
+
+	spawn type = daemon (3)
+	jetsam priority = 40
+	jetsam memory limit (active) = (unlimited)
+	jetsam memory limit (inactive) = (unlimited)
+	jetsamproperties category = daemon
+	submitted job. ignore execute allowed
+	jetsam thread limit = 32
+	cpumon = default
+	resource limits = {
+		maxfiles (soft) => 1048576
+	}
+
+	probabilistic guard malloc policy = {
+		activation rate = 1/1000
+		sample rate = 1/0
+	}
+
+	properties = keepalive | runatload | inferred program | system service | tle system
+}
+ijcd@my-macbook ~ % log show --last 10m --predicate 'process == "nix-daemon"' --style syslog
+
+Filtering the log data using "process == "nix-daemon""
+Skipping info and debug messages, pass --info and/or --debug to include.
+Timestamp                       (process)[PID]
+ijcd@my-macbook ~ % for p in /Library/LaunchDaemons/*nix*.plist; do
+  echo "Stopping $(basename "$p")"
+  sudo launchctl bootout system "$p" 2>/dev/null || true
+done
+Stopping org.nixos.darwin-store.plist
+Stopping org.nixos.nix-daemon.plist
+ijcd@my-macbook ~ % for p in /Library/LaunchDaemons/*nix*.plist; do
+  echo "Starting $(basename "$p")"
+  sudo launchctl bootstrap system "$p" 2>/dev/null || true
+done
+Starting org.nixos.darwin-store.plist
+Starting org.nixos.nix-daemon.plist
+ijcd@my-macbook ~ % for p in /Library/LaunchDaemons/*nix*.plist; do
+  base=$(basename "$p" .plist)
+  echo "Kickstarting $base"
+  sudo launchctl kickstart -k "system/$base" 2>/dev/null || true
+done
+Kickstarting org.nixos.darwin-store
+Kickstarting org.nixos.nix-daemon
+ijcd@my-macbook ~ % sudo launchctl print system/org.nixos.nix-daemon
+
+system/org.nixos.nix-daemon = {
+	active count = 1
+	path = /Library/LaunchDaemons/org.nixos.nix-daemon.plist
+	type = LaunchDaemon
+	state = running
+
+	program = /bin/sh
+	arguments = {
+		/bin/sh
+		-c
+		/bin/wait4path /nix/var/nix/profiles/default/bin/nix-daemon && exec /nix/var/nix/profiles/default/bin/nix-daemon
+	}
+
+	stdout path = /dev/null
+	stderr path = /var/log/nix-daemon.log
+	default environment = {
+		PATH => /usr/bin:/bin:/usr/sbin:/sbin
+	}
+
+	environment = {
+		XPC_SERVICE_NAME => org.nixos.nix-daemon
+	}
+
+	domain = system
+	minimum runtime = 10
+	exit timeout = 5
+	runs = 2
+	pid = 26949
+	immediate reason = inefficient
+	forks = 1
+	execs = 3
+	initialized = 1
+	trampolined = 1
+	started suspended = 0
+	proxy started suspended = 0
+	last exit code = 0
+
+	spawn type = daemon (3)
+	jetsam priority = 40
+	jetsam memory limit (active) = (unlimited)
+	jetsam memory limit (inactive) = (unlimited)
+	jetsamproperties category = daemon
+	jetsam thread limit = 32
+	cpumon = default
+	resource limits = {
+		maxfiles (soft) => 1048576
+	}
+
+	probabilistic guard malloc policy = {
+		activation rate = 1/1000
+		sample rate = 1/0
+	}
+
+	properties = keepalive | runatload | inferred program | system service | tle system
+}
+ijcd@my-macbook ~ % nix store ping
+warning: 'ping' is a deprecated alias for 'info'
+Store URL: daemon
+Version: 2.32.4
+Trusted: 0
+ijcd@my-macbook ~ % nix-shell -p nix-info --run "nix-info -m"
+these 62 paths will be fetched (179.39 MiB download, 1302.76 MiB unpacked):
+  /nix/store/akb4qf17cpixl7m95y31dznab26jfk2n-Csu-88
+  /nix/store/fcfs1jxi4z27x79pjs4v77s1kwfrv0ws-DarwinTools-1
+  /nix/store/wc7bjj6jfrjyaka0nv06w2sy3m5156ws-apple-sdk-14.4
+  /nix/store/lbkni2ik42yc5hic017z8r6h5gn1gy04-bash-5.3p3
+  /nix/store/zvg29ysm8gkipkv03mbyq5hzjkswlnpg-bash-interactive-5.3p3
+  /nix/store/cpj94i67z305cnhnr9cz2sfhryadq54m-bzip2-1.0.8
+  /nix/store/r03gbsd3anklz7yvfqs9b61k0wpc6vgs-bzip2-1.0.8-bin
+  /nix/store/yam216gsjllbihm8a5y569yalncib5yk-cctools-1010.6
+  /nix/store/cq1xkfzfzgk23ndar36kjy6475zakvg1-cctools-1010.6-libtool
+  /nix/store/vp9l83sw5iqr78vn80zgm6sl80pvclfj-cctools-binutils-darwin-1010.6
+  /nix/store/gwapi9b3wid3zq2l0hw5l0jsh4ijlhf2-cctools-binutils-darwin-wrapper-1010.6
+  /nix/store/ar99kq0ka0f5irzhy16lypjj3vggkqxc-clang-21.1.2
+  /nix/store/wvc8kis5smxy4v63xcw179ahn3i6jsf1-clang-21.1.2-lib
+  /nix/store/fvj17s7clsf2n4rhyq0qqcrqhzybdqrz-clang-wrapper-21.1.2
+  /nix/store/ggwsbik5xqdrrlnilrsdms9d4pifsgkf-compiler-rt-libc-21.1.2
+  /nix/store/5hj0s57skczahbkr7w1r32wh97ck81pg-compiler-rt-libc-21.1.2-dev
+  /nix/store/f8q9yh6ry4pz5z1hf8sw0ah3gznqs8sr-coreutils-9.8
+  /nix/store/indnadpjzbc1ck97x0pwyilqhh95p0gm-cups-headers-2.4.14
+  /nix/store/kmr396gj6apl89ilrl1jqc2g6468sz54-diffutils-3.12
+  /nix/store/n8ajyip3cdwvmp3rsf9mycrh04xsgp3n-ed-1.22.2
+  /nix/store/0ypfl2dfmyxmk00bxmbninsvphpkb93k-expand-response-params
+  /nix/store/vx0bay96bzhpgvgfcfpqysdvahzkpphc-file-5.45
+  /nix/store/2i0a4lyqb4hlkcswsif0sgg75hgbm4jy-findutils-4.10.0
+  /nix/store/vgk81ybwgw7ql83cmq6jxbbv8jjyhs2z-gawk-5.3.2
+  /nix/store/21zibrlasg9w62r32mfgmx7cq8cv71jl-gettext-0.25.1
+  /nix/store/81yhb8j5116ik9ydaz9ic1np6fwr7vhg-gmp-with-cxx-6.3.0
+  /nix/store/bmwjhb6qh2d311gm18igv8x0kzy9mgnp-gnugrep-3.12
+  /nix/store/bc7w3vj6r09bi1izjnag31zw1s26bl3i-gnumake-4.4.1
+  /nix/store/7w2wwlbr9rmjlr34ng42hbp00hwjaawz-gnused-4.9
+  /nix/store/fhvg20iqjwxmy7df5wgfg3rank5c7hnl-gnutar-1.35
+  /nix/store/whsr09gg81jsrycc7pl29rpmi33kxpj3-gzip-1.14
+  /nix/store/fy8k53qw8sb0yvxld1bs1ds8lb4p6my7-ld64-954.16
+  /nix/store/nz25y6wiagrfapzpvl4ayiiw997a3s4c-ld64-954.16-lib
+  /nix/store/9ziivd6wjdl7qa9cinh5h10bfxa2fhr7-libSystem-B
+  /nix/store/1mzb0lbliqa5spskrmwj6qxv2gpi9gwx-libcxx-19.1.2+apple-sdk-15.5
+  /nix/store/bz0hjs6ph7knh7vbcyxrqwq9pddi1hzp-libffi-40
+  /nix/store/ala8mxpss08vad0a7c9fkwqy5hz9wwqc-libiconv-109.100.2
+  /nix/store/y0hbafr9r8p1gj6b3r94da25f3cym6x2-libiconv-109.100.2-dev
+  /nix/store/byx03lbr63fdsa7xcy2ixh50zglscd9a-libresolv-91
+  /nix/store/4mznacng40vxldcxc4f0q853chf4hq61-libresolv-91-dev
+  /nix/store/61aj608r9w0xahq3d6bpjpfvxb0k0p02-libsbuf-14.1.0
+  /nix/store/wwclcd9s8sy026xyrvvmskd1sn7c0pqy-libsbuf-14.1.0-dev
+  /nix/store/225k8s692z5fzq3g6pw32mi737zs3fvq-libutil-72
+  /nix/store/wavh49lp6i1hwf0im88rkyvjcr5bhfhk-libxml2-2.15.1
+  /nix/store/y84xz277pl8lxa9mzr2xna6872iw7v3h-llvm-21.1.2
+  /nix/store/y8isl1i6n5w5vj14fbnxwrk5xfw7pyyw-llvm-21.1.2-lib
+  /nix/store/h103x4bz3hm1y05gyz1zj9l5hjfm8mfs-locale-118
+  /nix/store/y7lgxf3a7v7b5vrbj99llqj7gkniqiwd-ncurses-6.5
+  /nix/store/0wazhbn8y38nw392yhifl0drxd8g8f97-ncurses-6.5-dev
+  /nix/store/2ggzbz293vbyzrw14lhmwpargglaiaw2-ncurses-6.5-man
+  /nix/store/izxj0wj678ypmy9l4q0k4kvzqsx24vgx-nix-info
+  /nix/store/q9a4wssx24xsy28w8kifdqizc01fh7sc-openssl-3.6.0
+  /nix/store/9xjbdl8jw1l9g45fwyq0in7i5kkavp5s-patch-2.8
+  /nix/store/bcvky08mzvvmfprp9k0y1bv0hqnpn0i5-pcre2-10.46
+  /nix/store/96k43nn8dgyi0sjgkl7xz01j80lp3zha-readline-8.3p1
+  /nix/store/nq5a7s4z5bkzk653mx94s9n8jnsl9s64-stdenv-darwin
+  /nix/store/g1a36lvb3isy9hpb0w9ca28xw5lmwzdh-xar-minimal-501-lib
+  /nix/store/jf5wczl7y786l9g4y872wwvjsw94xc9y-xcbuild-0.1.1-unstable-2019-11-20
+  /nix/store/pbh7dnhl8k2yz9h6bicw28pq6ikpv6y0-xcbuild-0.1.1-unstable-2019-11-20-xcrun
+  /nix/store/v4wp2bjcmdyxjzbcyx80yb0zqzrvk0x0-xz-5.8.1
+  /nix/store/d2hg2zn8k7nv1ivj1in3l7sld9g4k3ym-xz-5.8.1-bin
+  /nix/store/25f0inan8kkj3j4zd6l14298lyp8cvjy-zlib-1.3.1
+copying path '/nix/store/lbkni2ik42yc5hic017z8r6h5gn1gy04-bash-5.3p3' from 'https://cache.nixos.org'...
+copying path '/nix/store/fcfs1jxi4z27x79pjs4v77s1kwfrv0ws-DarwinTools-1' from 'https://cache.nixos.org'...
+copying path '/nix/store/vgk81ybwgw7ql83cmq6jxbbv8jjyhs2z-gawk-5.3.2' from 'https://cache.nixos.org'...
+copying path '/nix/store/7w2wwlbr9rmjlr34ng42hbp00hwjaawz-gnused-4.9' from 'https://cache.nixos.org'...
+copying path '/nix/store/ala8mxpss08vad0a7c9fkwqy5hz9wwqc-libiconv-109.100.2' from 'https://cache.nixos.org'...
+copying path '/nix/store/h103x4bz3hm1y05gyz1zj9l5hjfm8mfs-locale-118' from 'https://cache.nixos.org'...
+copying path '/nix/store/y7lgxf3a7v7b5vrbj99llqj7gkniqiwd-ncurses-6.5' from 'https://cache.nixos.org'...
+copying path '/nix/store/akb4qf17cpixl7m95y31dznab26jfk2n-Csu-88' from 'https://cache.nixos.org'...
+copying path '/nix/store/cpj94i67z305cnhnr9cz2sfhryadq54m-bzip2-1.0.8' from 'https://cache.nixos.org'...
+copying path '/nix/store/ggwsbik5xqdrrlnilrsdms9d4pifsgkf-compiler-rt-libc-21.1.2' from 'https://cache.nixos.org'...
+copying path '/nix/store/indnadpjzbc1ck97x0pwyilqhh95p0gm-cups-headers-2.4.14' from 'https://cache.nixos.org'...
+copying path '/nix/store/0ypfl2dfmyxmk00bxmbninsvphpkb93k-expand-response-params' from 'https://cache.nixos.org'...
+copying path '/nix/store/81yhb8j5116ik9ydaz9ic1np6fwr7vhg-gmp-with-cxx-6.3.0' from 'https://cache.nixos.org'...
+copying path '/nix/store/1mzb0lbliqa5spskrmwj6qxv2gpi9gwx-libcxx-19.1.2+apple-sdk-15.5' from 'https://cache.nixos.org'...
+copying path '/nix/store/9ziivd6wjdl7qa9cinh5h10bfxa2fhr7-libSystem-B' from 'https://cache.nixos.org'...
+copying path '/nix/store/225k8s692z5fzq3g6pw32mi737zs3fvq-libutil-72' from 'https://cache.nixos.org'...
+copying path '/nix/store/bz0hjs6ph7knh7vbcyxrqwq9pddi1hzp-libffi-40' from 'https://cache.nixos.org'...
+copying path '/nix/store/byx03lbr63fdsa7xcy2ixh50zglscd9a-libresolv-91' from 'https://cache.nixos.org'...
+copying path '/nix/store/61aj608r9w0xahq3d6bpjpfvxb0k0p02-libsbuf-14.1.0' from 'https://cache.nixos.org'...
+copying path '/nix/store/2ggzbz293vbyzrw14lhmwpargglaiaw2-ncurses-6.5-man' from 'https://cache.nixos.org'...
+copying path '/nix/store/q9a4wssx24xsy28w8kifdqizc01fh7sc-openssl-3.6.0' from 'https://cache.nixos.org'...
+copying path '/nix/store/bcvky08mzvvmfprp9k0y1bv0hqnpn0i5-pcre2-10.46' from 'https://cache.nixos.org'...
+copying path '/nix/store/r03gbsd3anklz7yvfqs9b61k0wpc6vgs-bzip2-1.0.8-bin' from 'https://cache.nixos.org'...
+copying path '/nix/store/v4wp2bjcmdyxjzbcyx80yb0zqzrvk0x0-xz-5.8.1' from 'https://cache.nixos.org'...
+copying path '/nix/store/wwclcd9s8sy026xyrvvmskd1sn7c0pqy-libsbuf-14.1.0-dev' from 'https://cache.nixos.org'...
+copying path '/nix/store/25f0inan8kkj3j4zd6l14298lyp8cvjy-zlib-1.3.1' from 'https://cache.nixos.org'...
+copying path '/nix/store/n8ajyip3cdwvmp3rsf9mycrh04xsgp3n-ed-1.22.2' from 'https://cache.nixos.org'...
+copying path '/nix/store/whsr09gg81jsrycc7pl29rpmi33kxpj3-gzip-1.14' from 'https://cache.nixos.org'...
+copying path '/nix/store/4mznacng40vxldcxc4f0q853chf4hq61-libresolv-91-dev' from 'https://cache.nixos.org'...
+copying path '/nix/store/vx0bay96bzhpgvgfcfpqysdvahzkpphc-file-5.45' from 'https://cache.nixos.org'...
+copying path '/nix/store/d2hg2zn8k7nv1ivj1in3l7sld9g4k3ym-xz-5.8.1-bin' from 'https://cache.nixos.org'...
+copying path '/nix/store/f8q9yh6ry4pz5z1hf8sw0ah3gznqs8sr-coreutils-9.8' from 'https://cache.nixos.org'...
+copying path '/nix/store/bmwjhb6qh2d311gm18igv8x0kzy9mgnp-gnugrep-3.12' from 'https://cache.nixos.org'...
+copying path '/nix/store/5hj0s57skczahbkr7w1r32wh97ck81pg-compiler-rt-libc-21.1.2-dev' from 'https://cache.nixos.org'...
+copying path '/nix/store/9xjbdl8jw1l9g45fwyq0in7i5kkavp5s-patch-2.8' from 'https://cache.nixos.org'...
+copying path '/nix/store/kmr396gj6apl89ilrl1jqc2g6468sz54-diffutils-3.12' from 'https://cache.nixos.org'...
+copying path '/nix/store/2i0a4lyqb4hlkcswsif0sgg75hgbm4jy-findutils-4.10.0' from 'https://cache.nixos.org'...
+copying path '/nix/store/nz25y6wiagrfapzpvl4ayiiw997a3s4c-ld64-954.16-lib' from 'https://cache.nixos.org'...
+copying path '/nix/store/21zibrlasg9w62r32mfgmx7cq8cv71jl-gettext-0.25.1' from 'https://cache.nixos.org'...
+copying path '/nix/store/y0hbafr9r8p1gj6b3r94da25f3cym6x2-libiconv-109.100.2-dev' from 'https://cache.nixos.org'...
+copying path '/nix/store/wavh49lp6i1hwf0im88rkyvjcr5bhfhk-libxml2-2.15.1' from 'https://cache.nixos.org'...
+copying path '/nix/store/y8isl1i6n5w5vj14fbnxwrk5xfw7pyyw-llvm-21.1.2-lib' from 'https://cache.nixos.org'...
+copying path '/nix/store/g1a36lvb3isy9hpb0w9ca28xw5lmwzdh-xar-minimal-501-lib' from 'https://cache.nixos.org'...
+copying path '/nix/store/jf5wczl7y786l9g4y872wwvjsw94xc9y-xcbuild-0.1.1-unstable-2019-11-20' from 'https://cache.nixos.org'...
+copying path '/nix/store/0wazhbn8y38nw392yhifl0drxd8g8f97-ncurses-6.5-dev' from 'https://cache.nixos.org'...
+copying path '/nix/store/96k43nn8dgyi0sjgkl7xz01j80lp3zha-readline-8.3p1' from 'https://cache.nixos.org'...
+copying path '/nix/store/pbh7dnhl8k2yz9h6bicw28pq6ikpv6y0-xcbuild-0.1.1-unstable-2019-11-20-xcrun' from 'https://cache.nixos.org'...
+copying path '/nix/store/bc7w3vj6r09bi1izjnag31zw1s26bl3i-gnumake-4.4.1' from 'https://cache.nixos.org'...
+copying path '/nix/store/fhvg20iqjwxmy7df5wgfg3rank5c7hnl-gnutar-1.35' from 'https://cache.nixos.org'...
+copying path '/nix/store/zvg29ysm8gkipkv03mbyq5hzjkswlnpg-bash-interactive-5.3p3' from 'https://cache.nixos.org'...
+copying path '/nix/store/izxj0wj678ypmy9l4q0k4kvzqsx24vgx-nix-info' from 'https://cache.nixos.org'...
+copying path '/nix/store/wvc8kis5smxy4v63xcw179ahn3i6jsf1-clang-21.1.2-lib' from 'https://cache.nixos.org'...
+copying path '/nix/store/fy8k53qw8sb0yvxld1bs1ds8lb4p6my7-ld64-954.16' from 'https://cache.nixos.org'...
+copying path '/nix/store/y84xz277pl8lxa9mzr2xna6872iw7v3h-llvm-21.1.2' from 'https://cache.nixos.org'...
+copying path '/nix/store/cq1xkfzfzgk23ndar36kjy6475zakvg1-cctools-1010.6-libtool' from 'https://cache.nixos.org'...
+copying path '/nix/store/yam216gsjllbihm8a5y569yalncib5yk-cctools-1010.6' from 'https://cache.nixos.org'...
+copying path '/nix/store/ar99kq0ka0f5irzhy16lypjj3vggkqxc-clang-21.1.2' from 'https://cache.nixos.org'...
+copying path '/nix/store/vp9l83sw5iqr78vn80zgm6sl80pvclfj-cctools-binutils-darwin-1010.6' from 'https://cache.nixos.org'...
+copying path '/nix/store/wc7bjj6jfrjyaka0nv06w2sy3m5156ws-apple-sdk-14.4' from 'https://cache.nixos.org'...
+copying path '/nix/store/gwapi9b3wid3zq2l0hw5l0jsh4ijlhf2-cctools-binutils-darwin-wrapper-1010.6' from 'https://cache.nixos.org'...
+copying path '/nix/store/fvj17s7clsf2n4rhyq0qqcrqhzybdqrz-clang-wrapper-21.1.2' from 'https://cache.nixos.org'...
+copying path '/nix/store/nq5a7s4z5bkzk653mx94s9n8jnsl9s64-stdenv-darwin' from 'https://cache.nixos.org'...
+ - system: `"x86_64-darwin"`
+ - host os: `Darwin 24.4.0, macOS 15.4.1`
+ - multi-user?: `yes`
+ - sandbox: `no`
+ - version: `nix-env (Nix) 2.32.4`
+ - channels(root): `"nixpkgs"`
+ - nixpkgs: `/nix/store/0zm10grpblji7ngmp5djfjfysp7i3vlr-nixpkgs/nixpkgs`
+
+ijcd@my-macbook ~ % which nix-switch
+nix-switch not found
+ijcd@my-macbook ~ % nix run "nix-darwin/master#darwin-rebuild" -- switch --flake ".#my-macbook" -L
+/nix/store/sspxgd7pkl0zibjhyfkz42agy72fali8-darwin-rebuild/bin/darwin-rebuild: system activation must now be run as root
+ijcd@my-macbook ~ % nix run "nix-darwin/master#darwin-rebuild" -- switch --flake ".#my-macbook" -L
+/nix/store/sspxgd7pkl0zibjhyfkz42agy72fali8-darwin-rebuild/bin/darwin-rebuild: system activation must now be run as root
+ijcd@my-macbook ~ % rg my-macbook
+^C
+ijcd@my-macbook ~ % cd .config/nix
+ijcd@my-macbook nix % nix run "nix-darwin/master#darwin-rebuild" -- switch --flake ".#my-macbook" -L
+/nix/store/sspxgd7pkl0zibjhyfkz42agy72fali8-darwin-rebuild/bin/darwin-rebuild: system activation must now be run as root
+ijcd@my-macbook nix % sudo nix run "nix-darwin/master#darwin-rebuild" -- switch --flake ".#my-macbook" -L
+warning: $HOME ('/Users/ijcd') is not owned by you, falling back to the one defined in the 'passwd' file ('/var/root')
+building the system configuration...
+brew> setup-ruby-path() {
+builder.pl> Running phase: patchPhase
+builder.pl> Running phase: configurePhase
+builder.pl> no configure script, doing nothing
+builder.pl> Running phase: buildPhase
+builder.pl> Running phase: checkPhase
+builder.pl> Running phase: installPhase
+builder.pl> no Makefile or custom installPhase, doing nothing
+builder.pl> Running phase: fixupPhase
+builder.pl> checking for references to /nix/var/nix/builds/nix-27124-2583743790/ in /nix/store/w6dx8lh41zawbzjmilapnlq7r5hvfcz2-builder.pl...
+builder.pl> patching script interpreter paths in /nix/store/w6dx8lh41zawbzjmilapnlq7r5hvfcz2-builder.pl
+brew> Running phase: patchPhase
+brew> Running phase: configurePhase
+brew> no configure script, doing nothing
+brew> Running phase: buildPhase
+brew> Running phase: checkPhase
+brew> Running phase: installPhase
+brew> no Makefile or custom installPhase, doing nothing
+brew> Running phase: fixupPhase
+brew> checking for references to /nix/var/nix/builds/nix-27124-2583743791/ in /nix/store/ffwsacahns5gqly119v7kr1fdris2sxl-brew...
+darwin-option> Running phase: patchPhase
+darwin-option> Running phase: configurePhase
+darwin-option> no configure script, doing nothing
+darwin-option> Running phase: buildPhase
+darwin-option> Running phase: checkPhase
+darwin-option> Running phase: installPhase
+darwin-option> no Makefile or custom installPhase, doing nothing
+darwin-option> Running phase: fixupPhase
+darwin-option> checking for references to /nix/var/nix/builds/nix-27124-2583743793/ in /nix/store/87bahn8fqpxxal15dby2df95mqgnjilq-darwin-option...
+darwin-option> patching script interpreter paths in /nix/store/87bahn8fqpxxal15dby2df95mqgnjilq-darwin-option
+darwin-option> Running phase: patchPhase
+darwin-option> Running phase: configurePhase
+darwin-option> no configure script, doing nothing
+darwin-option> Running phase: buildPhase
+darwin-option> Running phase: checkPhase
+darwin-option> Running phase: installPhase
+darwin-option> no Makefile or custom installPhase, doing nothing
+darwin-option> Running phase: fixupPhase
+darwin-option> checking for references to /nix/var/nix/builds/nix-27124-2583743794/ in /nix/store/a11m3gwb4bximlrl5yx27pazkg9xn3k0-darwin-option...
+darwin-option> patching script interpreter paths in /nix/store/a11m3gwb4bximlrl5yx27pazkg9xn3k0-darwin-option
+darwin-rebuild> Running phase: patchPhase
+darwin-rebuild> Running phase: configurePhase
+darwin-rebuild> no configure script, doing nothing
+darwin-rebuild> Running phase: buildPhase
+darwin-rebuild> Running phase: checkPhase
+darwin-rebuild> Running phase: installPhase
+darwin-rebuild> no Makefile or custom installPhase, doing nothing
+darwin-rebuild> Running phase: fixupPhase
+darwin-rebuild> checking for references to /nix/var/nix/builds/nix-27124-2583743795/ in /nix/store/fq1bd9ipxkfiv5nx8kis089ra6xvli9s-darwin-rebuild...
+darwin-rebuild> patching script interpreter paths in /nix/store/fq1bd9ipxkfiv5nx8kis089ra6xvli9s-darwin-rebuild
+darwin-rebuild> Running phase: patchPhase
+darwin-rebuild> Running phase: configurePhase
+darwin-rebuild> no configure script, doing nothing
+darwin-rebuild> Running phase: buildPhase
+darwin-rebuild> Running phase: checkPhase
+darwin-rebuild> Running phase: installPhase
+darwin-rebuild> no Makefile or custom installPhase, doing nothing
+darwin-rebuild> Running phase: fixupPhase
+darwin-rebuild> checking for references to /nix/var/nix/builds/nix-27124-2583743796/ in /nix/store/m8pkfkvqiq9qxk89886553px0vsyng8c-darwin-rebuild...
+darwin-rebuild> patching script interpreter paths in /nix/store/m8pkfkvqiq9qxk89886553px0vsyng8c-darwin-rebuild
+darwin-version> Running phase: patchPhase
+darwin-version> Running phase: configurePhase
+
+
+# System-wide profile for interactive zsh(1) shells.
+darwin-version> no configure script, doing nothing
+darwin-version> Running phase: buildPhase
+darwin-version> Running phase: checkPhase
+darwin-version> Running phase: installPhase
+darwin-version> no Makefile or custom installPhase, doing nothing
+darwin-version> Running phase: fixupPhase
+darwin-version> checking for references to /nix/var/nix/builds/nix-27124-2583743797/ in /nix/store/vdxbbd6nqsn021hva1pjnc31i3h6wyh2-darwin-version...
+darwin-version> patching script interpreter paths in /nix/store/vdxbbd6nqsn021hva1pjnc31i3h6wyh2-darwin-version
+graphite-cli>
+graphite-cli> trying https://registry.npmjs.org/@withgraphite/graphite-cli/-/graphite-cli-1.6.6.tgz
+graphite-cli>   % Total    % Received % Xferd  Average Speed   Time    Time     Time  Current
+graphite-cli>                                  Dload  Upload   Total   Spent    Left  Speed
+graphite-cli> 100  680k  100  680k    0     0  1344k      0 --:--:-- --:--:-- --:--:-- 1342k
+graphite-cli> Running phase: unpackPhase
+graphite-cli> unpacking source archive /nix/store/cl5c8210jcn9qihds74ipp9pxlhbp8c3-graphite-cli-1.6.6.tgz
+graphite-cli> source root is package
+graphite-cli> setting SOURCE_DATE_EPOCH to timestamp 499162500 of file "package/package.json"
+graphite-cli> Running phase: patchPhase
+graphite-cli> Running phase: configurePhase
+graphite-cli> no configure script, doing nothing
+graphite-cli> Running phase: buildPhase
+graphite-cli> Running phase: fixupPhase
+graphite-cli> checking for references to /nix/var/nix/builds/nix-27124-2583743810/ in /nix/store/lh1y4ymffjhwk2bmixjkp5fxb1pz1gpr-graphite-cli-1.6.6-npm-deps...
+graphite-cli> patching script interpreter paths in /nix/store/lh1y4ymffjhwk2bmixjkp5fxb1pz1gpr-graphite-cli-1.6.6-npm-deps
+check-link-targets.sh> Running phase: patchPhase
+check-link-targets.sh> Running phase: configurePhase
+check-link-targets.sh> no configure script, doing nothing
+check-link-targets.sh> Running phase: buildPhase
+check-link-targets.sh> Running phase: checkPhase
+check-link-targets.sh> Running phase: installPhase
+check-link-targets.sh> no Makefile or custom installPhase, doing nothing
+check-link-targets.sh> Running phase: fixupPhase
+check-link-targets.sh> checking for references to /nix/var/nix/builds/nix-27124-2583743811/ in /nix/store/liwpd76k7da017aqkq87vhxvhflwy9zl-check-link-targets.sh...
+check-link-targets.sh> patching script interpreter paths in /nix/store/liwpd76k7da017aqkq87vhxvhflwy9zl-check-link-targets.sh
+graphite-cli> Running phase: unpackPhase
+graphite-cli> unpacking source archive /nix/store/cl5c8210jcn9qihds74ipp9pxlhbp8c3-graphite-cli-1.6.6.tgz
+graphite-cli> source root is package
+graphite-cli> setting SOURCE_DATE_EPOCH to timestamp 499162500 of file "package/package.json"
+graphite-cli> Running phase: patchPhase
+graphite-cli> Executing npmConfigHook
+graphite-cli> Configuring npm
+graphite-cli> Validating consistency between /nix/var/nix/builds/nix-27124-2583743813/package/package-lock.json and /nix/store/lh1y4ymffjhwk2bmixjkp5fxb1pz1gpr-graphite-cli-1.6.6-npm-deps/package-lock.json
+graphite-cli> Setting npm_config_cache to /nix/store/lh1y4ymffjhwk2bmixjkp5fxb1pz1gpr-graphite-cli-1.6.6-npm-deps
+graphite-cli> Installing dependencies
+graphite-cli>
+graphite-cli> added 1 package, and audited 2 packages in 1s
+graphite-cli>
+graphite-cli> found 0 vulnerabilities
+graphite-cli> patching script interpreter paths in node_modules
+graphite-cli> node_modules/semver/bin/semver.js: interpreter directive changed from "#!/usr/bin/env node" to "/nix/store/swzij8xmzv1c81rvhcf2fzlnarjpjcnb-nodejs-22.16.0/bin/node"
+graphite-cli> rebuilt dependencies successfully
+graphite-cli> patching script interpreter paths in node_modules
+graphite-cli> Finished npmConfigHook
+graphite-cli> Running phase: configurePhase
+graphite-cli> no configure script, doing nothing
+graphite-cli> Running phase: buildPhase
+graphite-cli> no Makefile or custom buildPhase, doing nothing
+graphite-cli> Running phase: installPhase
+graphite-cli> Executing npmInstallHook
+graphite-cli>
+graphite-cli> up to date, audited 2 packages in 711ms
+graphite-cli>
+graphite-cli> found 0 vulnerabilities
+graphite-cli> Finished npmInstallHook
+graphite-cli> Running phase: fixupPhase
+graphite-cli> checking for references to /nix/var/nix/builds/nix-27124-2583743813/ in /nix/store/qp73pd2hn8pdsnj3669xrh7r56j4gbl1-graphite-cli-1.6.6...
+graphite-cli> patching script interpreter paths in /nix/store/qp73pd2hn8pdsnj3669xrh7r56j4gbl1-graphite-cli-1.6.6
+graphite-cli> /nix/store/qp73pd2hn8pdsnj3669xrh7r56j4gbl1-graphite-cli-1.6.6/lib/node_modules/@withgraphite/graphite-cli/graphite.js: interpreter directive changed from "#!/usr/bin/env node" to "/nix/store/swzij8xmzv1c81rvhcf2fzlnarjpjcnb-nodejs-22.16.0/bin/node"
+mise-settings>
+nuke-homebrew-repository> Running phase: patchPhase
+nuke-homebrew-repository> Running phase: configurePhase
+nuke-homebrew-repository> no configure script, doing nothing
+nuke-homebrew-repository> Running phase: buildPhase
+nuke-homebrew-repository> Running phase: checkPhase
+nuke-homebrew-repository> Running phase: installPhase
+nuke-homebrew-repository> no Makefile or custom installPhase, doing nothing
+nuke-homebrew-repository> Running phase: fixupPhase
+nuke-homebrew-repository> checking for references to /nix/var/nix/builds/nix-27124-2583743827/ in /nix/store/6qxiiql8s51dlj8f7493dr0pa1phrl5y-nuke-homebrew-repository...
+nuke-homebrew-repository> patching script interpreter paths in /nix/store/6qxiiql8s51dlj8f7493dr0pa1phrl5y-nuke-homebrew-repository
+home-manager-applications> created 0 symlinks in user environment
+home-manager-fonts> created 2 symlinks in user environment
+home-manager-path> created 774 symlinks in user environment
+starship-config>
+system-applications> created 0 symlinks in user environment
+system-path> created 180 symlinks in user environment
+system-applications> created 0 symlinks in user environment
+system-path> created 182 symlinks in user environment
+user-environment> created 111 symlinks in user environment
+error: Unexpected files in /etc, aborting activation
+The following files have unrecognized content and would be overwritten:
+
+  /etc/bashrc
+  /etc/zshrc
+
+Please check there is nothing critical in these files, rename them by adding .before-nix-darwin to the end, and then try again.
+ijcd@my-macbook nix % less /etc/bashrc /etc/zshrc
+ijcd@my-macbook nix % sudo vi /etc/bashrc /etc/zshrc
+Password:
+2 files to edit
+ijcd@my-macbook nix % sudo nix run "nix-darwin/master#darwin-rebuild" -- switch --flake ".#my-macbook" -L
+warning: $HOME ('/Users/ijcd') is not owned by you, falling back to the one defined in the 'passwd' file ('/var/root')
+building the system configuration...
+setting up /Applications/Nix Apps...
+setting up pam...
+applying patches...
+setting up /etc...
+system defaults...
+user defaults...
+setting up launchd services...
+creating service org.nixos.activate-system
+configuring networking...
+configuring application firewall...
+configuring power...
+setting up /Library/Fonts/Nix Fonts...
+setting nvram variables...
+setting up Homebrew prefixes...
+setting up Homebrew (/usr/local)...
+Homebrew bundle...
+Using nikitabobko/tap
+Using docker
+Using colima
+Using aerospace
+Using cleanshot
+Using hiddenbar
+Using raycast
+Using betterdisplay
+Using cursor
+Using ghostty
+Using visual-studio-code
+Using zed
+Using discord
+Using slack
+Using signal
+Using 1password
+Installing anki
+==> Downloading https://github.com/ankitects/anki/releases/download/25.09/anki-launcher-25.09-mac.dmg
+Already downloaded: /Users/ijcd/Library/Caches/Homebrew/downloads/94cc0446a2d578f68586887a87a9b59a0987d1de0656ec401606bdf158c80679--anki-launcher-25.09-mac.dmg
+Warning: macOS's Gatekeeper has been disabled for this Cask
+==> Installing Cask anki
+==> Adopting existing App at '/Applications/Anki.app'
+Error: The bundle short version of /usr/local/Caskroom/anki/25.09/Anki.app is 25.09 but is 2.1.32 for /Applications/Anki.app!
+Error: It seems the existing App is different from the one being installed.
+==> Purging files for version 25.09 of Cask anki
+Installing anki has failed!
+Using brave-browser
+Using obsidian
+Using protonvpn
+Using spotify
+Installing thebrowsercompany-dia
+Error: Cask thebrowsercompany-dia depends on hardware architecture being one of [{type: :arm, bits: 64}], but you are running {type: :intel, bits: 64}.
+Installing thebrowsercompany-dia has failed!
+Using zen
+`brew bundle` failed! 2 Brewfile dependencies failed to install
+ijcd@my-macbook nix % sudo nix run "nix-darwin/master#darwin-rebuild" -- switch --flake ".#my-macbook" -L
+Password:
+warning: $HOME ('/Users/ijcd') is not owned by you, falling back to the one defined in the 'passwd' file ('/var/root')
+building the system configuration...
+setting up /Applications/Nix Apps...
+setting up pam...
+applying patches...
+setting up /etc...
+system defaults...
+user defaults...
+setting up launchd services...
+configuring networking...
+configuring application firewall...
+configuring power...
+setting up /Library/Fonts/Nix Fonts...
+setting nvram variables...
+setting up Homebrew prefixes...
+setting up Homebrew (/usr/local)...
+Homebrew bundle...
+Using nikitabobko/tap
+Using docker
+Using colima
+Using cleanshot
+Using hiddenbar
+Using cursor
+Using ghostty
+Using visual-studio-code
+Using zed
+Using discord
+Using slack
+Using signal
+Using 1password
+Installing anki
+==> Downloading https://github.com/ankitects/anki/releases/download/25.09/anki-launcher-25.09-mac.dmg
+Already downloaded: /Users/ijcd/Library/Caches/Homebrew/downloads/94cc0446a2d578f68586887a87a9b59a0987d1de0656ec401606bdf158c80679--anki-launcher-25.09-mac.dmg
+Warning: macOS's Gatekeeper has been disabled for this Cask
+==> Installing Cask anki
+==> Adopting existing App at '/Applications/Anki.app'
+Error: The bundle short version of /usr/local/Caskroom/anki/25.09/Anki.app is 25.09 but is 2.1.32 for /Applications/Anki.app!
+Error: It seems the existing App is different from the one being installed.
+==> Purging files for version 25.09 of Cask anki
+Installing anki has failed!
+Using obsidian
+Using protonvpn
+Using spotify
+`brew bundle` failed! 1 Brewfile dependency failed to install
+ijcd@my-macbook nix % brew list anki
+Error: Cask 'anki' is not installed.
+ijcd@my-macbook nix % rm -rf /Applications/Anki.app
+ijcd@my-macbook nix % nix-switch
+zsh: command not found: nix-switch
+ijcd@my-macbook nix % sudo nix run "nix-darwin/master#darwin-rebuild" -- switch --flake ".#my-macbook" -L
+Password:
+warning: $HOME ('/Users/ijcd') is not owned by you, falling back to the one defined in the 'passwd' file ('/var/root')
+building the system configuration...
+setting up /Applications/Nix Apps...
+setting up pam...
+applying patches...
+setting up /etc...
+system defaults...
+user defaults...
+setting up launchd services...
+configuring networking...
+configuring application firewall...
+configuring power...
+setting up /Library/Fonts/Nix Fonts...
+setting nvram variables...
+setting up Homebrew prefixes...
+setting up Homebrew (/usr/local)...
+Homebrew bundle...
+Using nikitabobko/tap
+Using docker
+Using colima
+Using cleanshot
+Using hiddenbar
+Using cursor
+Using ghostty
+Using visual-studio-code
+Using zed
+Using discord
+Using slack
+Using signal
+Using 1password
+Installing anki
+Using obsidian
+Using protonvpn
+Using spotify
+`brew bundle` complete! 17 Brewfile dependencies now installed.
+Error: Unexpected method 'discontinued' called during caveats on Cask sketchup.
+Follow the instructions here:
+  https://github.com/Homebrew/homebrew-cask#reporting-bugs
+Error: Unexpected method 'appcast' called on Cask teamviewer.
+Follow the instructions here:
+  https://github.com/Homebrew/homebrew-cask#reporting-bugs
+Error: Unexpected method 'appcast' called on Cask xquartz.
+Follow the instructions here:
+  https://github.com/Homebrew/homebrew-cask#reporting-bugs
+==> Implied `brew uninstall --cask aerospace`
+==> Backing App 'AeroSpace.app' up to '/usr/local/Caskroom/aerospace/0.20.0-Beta/AeroSpace-v0.20.0-Beta/AeroSpace.app'
+==> Removing App '/Applications/AeroSpace.app'
+==> Unlinking Binary '/usr/local/share/zsh/site-functions/_aerospace'
+==> Unlinking Binary '/usr/local/etc/bash_completion.d/aerospace'
+==> Unlinking Binary '/usr/local/share/fish/vendor_completions.d/aerospace.fish'
+==> Unlinking Binary '/usr/local/bin/aerospace'
+==> Unlinking Manpage '/usr/local/share/man/man1/aerospace-debug-windows.1'
+==> Unlinking Manpage '/usr/local/share/man/man1/aerospace-enable.1'
+==> Unlinking Manpage '/usr/local/share/man/man1/aerospace-exec-and-forget.1'
+==> Unlinking Manpage '/usr/local/share/man/man1/aerospace-flatten-workspace-tree.1'
+==> Unlinking Manpage '/usr/local/share/man/man1/aerospace-focus-back-and-forth.1'
+==> Unlinking Manpage '/usr/local/share/man/man1/aerospace-focus-monitor.1'
+==> Unlinking Manpage '/usr/local/share/man/man1/aerospace-focus.1'
+==> Unlinking Manpage '/usr/local/share/man/man1/aerospace-fullscreen.1'
+==> Unlinking Manpage '/usr/local/share/man/man1/aerospace-join-with.1'
+==> Unlinking Manpage '/usr/local/share/man/man1/aerospace-layout.1'
+==> Unlinking Manpage '/usr/local/share/man/man1/aerospace-list-apps.1'
+==> Unlinking Manpage '/usr/local/share/man/man1/aerospace-list-exec-env-vars.1'
+==> Unlinking Manpage '/usr/local/share/man/man1/aerospace-list-modes.1'
+==> Unlinking Manpage '/usr/local/share/man/man1/aerospace-list-monitors.1'
+==> Unlinking Manpage '/usr/local/share/man/man1/aerospace-list-windows.1'
+==> Unlinking Manpage '/usr/local/share/man/man1/aerospace-list-workspaces.1'
+==> Unlinking Manpage '/usr/local/share/man/man1/aerospace-macos-native-fullscreen.1'
+==> Unlinking Manpage '/usr/local/share/man/man1/aerospace-macos-native-minimize.1'
+==> Unlinking Manpage '/usr/local/share/man/man1/aerospace-mode.1'
+==> Unlinking Manpage '/usr/local/share/man/man1/aerospace-move-mouse.1'
+==> Unlinking Manpage '/usr/local/share/man/man1/aerospace-move-node-to-monitor.1'
+==> Unlinking Manpage '/usr/local/share/man/man1/aerospace-move-node-to-workspace.1'
+==> Unlinking Manpage '/usr/local/share/man/man1/aerospace-move-workspace-to-monitor.1'
+==> Unlinking Manpage '/usr/local/share/man/man1/aerospace-move.1'
+==> Unlinking Manpage '/usr/local/share/man/man1/aerospace-reload-config.1'
+==> Unlinking Manpage '/usr/local/share/man/man1/aerospace-resize.1'
+==> Unlinking Manpage '/usr/local/share/man/man1/aerospace-split.1'
+==> Unlinking Manpage '/usr/local/share/man/man1/aerospace-summon-workspace.1'
+==> Unlinking Manpage '/usr/local/share/man/man1/aerospace-swap.1'
+==> Unlinking Manpage '/usr/local/share/man/man1/aerospace-trigger-binding.1'
+==> Unlinking Manpage '/usr/local/share/man/man1/aerospace-volume.1'
+==> Unlinking Manpage '/usr/local/share/man/man1/aerospace-workspace-back-and-forth.1'
+==> Unlinking Manpage '/usr/local/share/man/man1/aerospace-workspace.1'
+==> Unlinking Manpage '/usr/local/share/man/man1/aerospace.1'
+==> Unlinking Manpage '/usr/local/share/man/man1/aerospace-balance-sizes.1'
+==> Unlinking Manpage '/usr/local/share/man/man1/aerospace-close-all-windows-but-current.1'
+==> Unlinking Manpage '/usr/local/share/man/man1/aerospace-close.1'
+==> Unlinking Manpage '/usr/local/share/man/man1/aerospace-config.1'
+Warning: No zap stanza present for Cask 'aerospace'
+==> Removing all staged versions of Cask 'aerospace'
+==> Implied `brew uninstall --cask alfred`
+==> Quitting application 'com.runningwithcrayons.Alfred'...
+Application 'com.runningwithcrayons.Alfred' quit successfully.
+==> Removing login item /Applications/Alfred 5.app
+==> Removing login item Alfred5
+==> Backing App 'Alfred 5.app' up to '/usr/local/Caskroom/alfred/5.5,2257/Alfred 5.app'
+==> Removing App '/Applications/Alfred 5.app'
+==> Dispatching zap stanza
+==> Trashing files:
+~/Library/Application Support/Alfred
+~/Library/Caches/com.runningwithcrayons.Alfred
+~/Library/Cookies/com.runningwithcrayons.Alfred.binarycookies
+~/Library/Preferences/com.runningwithcrayons.Alfred-Preferences.plist
+~/Library/Preferences/com.runningwithcrayons.Alfred.plist
+~/Library/Saved Application State/com.runningwithcrayons.Alfred-Preferences.savedState
+==> Removing all staged versions of Cask 'alfred'
+==> Implied `brew uninstall --cask amitv87-pip`
+==> Backing App 'PiP.app' up to '/usr/local/Caskroom/amitv87-pip/2.70/PiP.app'
+==> Removing App '/Applications/PiP.app'
+==> Dispatching zap stanza
+==> Trashing files:
+~/Library/Saved Application State/com.boggyb.PiP.savedState
+==> Removing all staged versions of Cask 'amitv87-pip'
+==> Implied `brew uninstall --cask android-studio`
+==> Backing App 'Android Studio.app' up to '/usr/local/Caskroom/android-studio/2023.2.1.23/Android Studio.app'
+==> Removing App '/Applications/Android Studio.app'
+==> Unlinking Binary '/usr/local/bin/studio'
+==> Dispatching zap stanza
+==> Trashing files:
+~/.android
+~/Library/Android/sdk
+~/Library/Application Support/Google/AndroidStudio2023.2
+~/Library/Caches/Google/AndroidStudio2023.2
+~/Library/Logs/Google/AndroidStudio2023.2
+~/Library/Preferences/com.android.Emulator.plist
+~/Library/Preferences/com.google.android.studio.plist
+~/Library/Saved Application State/com.google.android.studio.savedState
+==> Removing directories if empty:
+~/AndroidStudioProjects
+~/AndroidStudioProjects/ToastEmulator
+~/Library/Android
+==> Removing all staged versions of Cask 'android-studio'
+==> Implied `brew uninstall --cask audacity`
+==> Backing App 'Audacity.app' up to '/usr/local/Caskroom/audacity/3.7.5/Audacity.app'
+==> Removing App '/Applications/Audacity.app'
+==> Dispatching zap stanza
+==> Trashing files:
+~/Library/Application Support/audacity
+~/Library/Preferences/org.audacityteam.audacity.plist
+~/Library/Saved Application State/org.audacityteam.audacity.savedState
+==> Removing all staged versions of Cask 'audacity'
+==> Implied `brew uninstall --cask backblaze`
+==> Removing launchctl service com.backblaze.bzbmenu
+Password:
+==> Removing launchctl service com.backblaze.bzserv
+==> Removing files:
+/Applications/Backblaze.app
+/Applications/BackblazeRestore.app
+/Library/Logs/DiagnosticReports/bzbmenu_*.*_resource.diag
+/Library/PreferencePanes/BackblazeBackup.prefPane
+==> Dispatching zap stanza
+==> Trashing files:
+/Library/Backblaze.bzpkg
+~/Library/Application Support/com.apple.sharedfilelist/com.apple.LSSharedFileList.ApplicationRecentDocuments/com.backblaze.*.sfl*
+~/Library/Logs/BackblazeGUIInstaller
+~/Library/Preferences/com.backblaze.bzbmenu.plist
+==> Using sudo to gain ownership of path '/Library/Backblaze.bzpkg'
+Warning: The following files could not be trashed, please do so manually:
+/Library/Backblaze.bzpkg
+==> Removing all staged versions of Cask 'backblaze'
+==> Implied `brew uninstall --cask betterdisplay`
+==> Removing login item /Applications/BetterDisplay.app
+==> Removing login item BetterDisplay
+==> Backing App 'BetterDisplay.app' up to '/usr/local/Caskroom/betterdisplay/4.0.4/BetterDisplay.app'
+==> Removing App '/Applications/BetterDisplay.app'
+==> Unlinking Binary '/usr/local/bin/betterdisplaycli'
+==> Dispatching zap stanza
+==> Trashing files:
+~/Library/Application Support/BetterDisplay
+~/Library/Application Support/BetterDummy
+~/Library/Caches/pro.betterdisplay.BetterDisplay
+~/Library/Caches/SentryCrash/BetterDisplay
+~/Library/HTTPStorages/pro.betterdisplay.BetterDisplay
+~/Library/HTTPStorages/pro.betterdisplay.BetterDisplay.binarycookies
+~/Library/Preferences/pro.betterdisplay.BetterDisplay.plist
+==> Removing all staged versions of Cask 'betterdisplay'
+==> Implied `brew uninstall --cask bettertouchtool`
+==> Backing App 'BetterTouchTool.app' up to '/usr/local/Caskroom/bettertouchtool/5.304,2025040803/BetterTouchTool.app'
+==> Removing App '/Applications/BetterTouchTool.app'
+==> Dispatching zap stanza
+==> Trashing files:
+~/Library/Application Support/BetterTouchTool
+~/Library/Preferences/com.hegenberg.BetterTouchTool.plist
+==> Removing all staged versions of Cask 'bettertouchtool'
+==> Implied `brew uninstall --cask blender`
+==> Backing App 'Blender.app' up to '/usr/local/Caskroom/blender/4.5.5/Blender.app'
+==> Removing App '/Applications/Blender.app'
+==> Unlinking Binary '/usr/local/bin/blender'
+==> Dispatching zap stanza
+==> Trashing files:
+~/Library/Application Support/Blender
+~/Library/Saved Application State/org.blenderfoundation.blender.savedState
+==> Removing all staged versions of Cask 'blender'
+==> Implied `brew uninstall --cask brave-browser`
+==> Backing App 'Brave Browser.app' up to '/usr/local/Caskroom/brave-browser/1.31.91.0,131.91/Brave Browser.app'
+==> Removing App '/Applications/Brave Browser.app'
+==> Dispatching zap stanza
+==> Trashing files:
+~/Library/Application Support/BraveSoftware/Brave-Browser
+~/Library/Preferences/com.brave.Browser.plist
+~/Library/Saved Application State/com.brave.Browser.savedState
+==> Removing all staged versions of Cask 'brave-browser'
+==> Implied `brew uninstall --cask charles`
+==> Removing launchctl service com.xk72.Charles.ProxyHelper
+==> Removing files:
+/Library/PrivilegedHelperTools/com.xk72.Charles.ProxyHelper
+==> Backing App 'Charles.app' up to '/usr/local/Caskroom/charles/5.0.3/Charles.app'
+==> Removing App '/Applications/Charles.app'
+==> Dispatching zap stanza
+==> Trashing files:
+~/Library/Application Support/Charles
+~/Library/Preferences/com.xk72.charles.config
+~/Library/Preferences/com.xk72.Charles.plist
+~/Library/Saved Application State/com.xk72.Charles.savedState
+==> Removing all staged versions of Cask 'charles'
+==> Implied `brew uninstall --cask claude-code`
+==> Unlinking Binary '/usr/local/bin/claude'
+==> Dispatching zap stanza
+==> Trashing files:
+~/.cache/claude
+~/.claude
+~/.claude.json*
+~/.config/claude
+~/.local/bin/claude
+~/.local/share/claude
+~/.local/state/claude
+~/Library/Caches/claude-cli-nodejs
+==> Removing all staged versions of Cask 'claude-code'
+==> Implied `brew uninstall --cask cyberduck`
+==> Backing App 'Cyberduck.app' up to '/usr/local/Caskroom/cyberduck/7.9.2,34986/Cyberduck.app'
+==> Removing App '/Applications/Cyberduck.app'
+==> Dispatching zap stanza
+==> Trashing files:
+~/Library/Application Support/Cyberduck
+~/Library/Caches/ch.sudo.cyberduck
+~/Library/Group Containers/G69SCX94XU.duck
+~/Library/Preferences/ch.sudo.cyberduck.plist
+~/Library/Saved Application State/ch.sudo.cyberduck.savedState
+==> Removing all staged versions of Cask 'cyberduck'
+==> Implied `brew uninstall --cask dash`
+==> Backing App 'Dash.app' up to '/usr/local/Caskroom/dash/6.4.0,1006/Dash.app'
+==> Removing App '/Applications/Dash.app'
+==> Dispatching zap stanza
+==> Trashing files:
+~/Library/Application Support/Dash
+~/Library/Application Support/com.kapeli.dashdoc
+~/Library/Caches/com.kapeli.dashdoc
+~/Library/Cookies/com.kapeli.dashdoc.binarycookies
+~/Library/HTTPStorages/com.kapeli.dashdoc.binarycookies
+~/Library/Logs/Dash
+~/Library/Preferences/com.kapeli.dashdoc.plist
+~/Library/Saved Application State/com.kapeli.dashdoc.savedState
+~/Library/WebKit/com.kapeli.dashdoc
+==> Removing all staged versions of Cask 'dash'
+==> Implied `brew uninstall --cask firefox`
+==> Backing App 'Firefox.app' up to '/usr/local/Caskroom/firefox/122.0/Firefox.app'
+==> Removing App '/Applications/Firefox.app'
+==> Unlinking Binary '/usr/local/bin/firefox'
+==> Dispatching zap stanza
+==> Trashing files:
+/Library/Logs/DiagnosticReports/firefox_*
+~/Library/Application Support/com.apple.sharedfilelist/com.apple.LSSharedFileList.ApplicationRecentDocuments/org.mozilla.firefox.sfl*
+~/Library/Application Support/CrashReporter/firefox_*
+~/Library/Application Support/Firefox
+~/Library/Caches/Firefox
+~/Library/Caches/Mozilla/updates/Applications/Firefox
+~/Library/Caches/org.mozilla.crashreporter
+~/Library/Caches/org.mozilla.firefox
+~/Library/Preferences/org.mozilla.crashreporter.plist
+~/Library/Preferences/org.mozilla.firefox.plist
+~/Library/Saved Application State/org.mozilla.firefox.savedState
+~/Library/WebKit/org.mozilla.firefox
+==> Removing directories if empty:
+~/Library/Application Support/Mozilla
+~/Library/Application Support/Mozilla/NativeMessagingHosts
+~/Library/Caches/Mozilla
+~/Library/Caches/Mozilla/updates
+~/Library/Caches/Mozilla/updates/Applications
+==> Removing all staged versions of Cask 'firefox'
+==> Implied `brew uninstall --cask flutter`
+==> Unlinking Binary '/usr/local/bin/dart'
+==> Unlinking Binary '/usr/local/bin/flutter'
+==> Dispatching zap stanza
+==> Trashing files:
+~/.flutter
+==> Removing all staged versions of Cask 'flutter'
+==> Implied `brew uninstall --cask gimp`
+==> Backing App 'GIMP.app' up to '/usr/local/Caskroom/gimp/3.0.6/GIMP.app'
+==> Removing App '/Applications/GIMP.app'
+==> Unlinking Binary '/usr/local/bin/gimp'
+==> Dispatching zap stanza
+==> Trashing files:
+~/Library/Application Support/Gimp
+~/Library/Preferences/org.gimp.gimp-3.0.plist
+~/Library/Saved Application State/org.gimp.gimp-3.0.savedState
+==> Removing all staged versions of Cask 'gimp'
+==> Implied `brew uninstall --cask google-drive`
+==> Quitting application 'com.google.drivefs'...
+Application 'com.google.drivefs' quit successfully.
+==> Removing login item Google Drive
+==> Uninstalling packages with sudo; the password may be necessary:
+com.google.drivefs.shortcuts
+com.google.drivefs.x86_64
+==> Dispatching zap stanza
+==> Removing launchctl service com.google.keystone.agent
+==> Removing launchctl service com.google.keystone.daemon
+==> Removing launchctl service com.google.keystone.system.agent
+==> Removing launchctl service com.google.keystone.system.xpcservice
+==> Removing launchctl service com.google.keystone.xpcservice
+==> Uninstalling packages with sudo; the password may be necessary:
+com.google.pkg.Keystone
+==> Trashing files:
+~/Library/Application Scripts/com.google.drivefs.finderhelper.findersync
+~/Library/Application Scripts/com.google.drivefs.finderhelper
+~/Library/Application Scripts/com.google.drivefs.fpext
+~/Library/Application Support/FileProvider/com.google.drivefs.fpext
+~/Library/Application Support/Google/DriveFS
+~/Library/Caches/com.google.drivefs
+~/Library/Containers/com.google.drivefs.finderhelper.findersync
+~/Library/Containers/com.google.drivefs.finderhelper
+~/Library/Containers/com.google.drivefs.fpext
+~/Library/Group Containers/EQHXZ8M8AV.group.com.google.drivefs
+~/Library/Group Containers/group.com.google.drivefs
+~/Library/Preferences/com.google.drivefs.helper.renderer.plist
+~/Library/Preferences/com.google.drivefs.plist
+~/Library/Preferences/com.google.drivefs.settings.plist
+~/Library/Preferences/Google Drive File Stream Helper.plist
+==> Removing all staged versions of Cask 'google-drive'
+==> Implied `brew uninstall --cask google-drive-file-stream`
+==> Removing login item Google Drive File Stream
+Warning: No zap stanza present for Cask 'google-drive-file-stream'
+==> Removing all staged versions of Cask 'google-drive-file-stream'
+==> Implied `brew uninstall --cask hammerspoon`
+==> Quitting application 'org.hammerspoon.Hammerspoon'...
+Application 'org.hammerspoon.Hammerspoon' quit successfully.
+==> Backing App 'Hammerspoon.app' up to '/usr/local/Caskroom/hammerspoon/1.0.0/Hammerspoon.app'
+==> Removing App '/Applications/Hammerspoon.app'
+==> Unlinking Binary '/usr/local/bin/hs'
+==> Dispatching zap stanza
+==> Trashing files:
+~/.hammerspoon
+~/Library/Application Support/com.crashlytics/org.hammerspoon.Hammerspoon
+~/Library/Caches/org.hammerspoon.Hammerspoon
+~/Library/Preferences/org.hammerspoon.Hammerspoon.plist
+~/Library/Saved Application State/org.hammerspoon.Hammerspoon.savedState
+==> Removing all staged versions of Cask 'hammerspoon'
+==> Implied `brew uninstall --cask hazel`
+==> Quitting application '86Z3GCJ4MF.com.noodlesoft.HazelHelper'...
+Application '86Z3GCJ4MF.com.noodlesoft.HazelHelper' quit successfully.
+==> Backing App 'Hazel.app' up to '/usr/local/Caskroom/hazel/5.0.7/Hazel.app'
+==> Removing App '/Applications/Hazel.app'
+==> Dispatching zap stanza
+==> Trashing files:
+~/Library/Logs/Hazel
+~/Library/Application Support/Hazel
+~/Library/Caches/com.noodlesoft.HazelHelper
+~/Library/Preferences/com.noodlesoft.Hazel.plist
+~/Library/Preferences/com.noodlesoft.HazelHelper.plist
+~/Library/Preferences/86Z3GCJ4MF.com.noodlesoft.HazelHelper.plist
+~/Library/Saved Application State/com.noodlesoft.Hazel.savedState
+/Applications/Hazel.app/Contents/Library/LoginItems/86Z3GCJ4MF.com.noodlesoft.HazelHelper.app
+==> Removing all staged versions of Cask 'hazel'
+==> Implied `brew uninstall --cask inkscape`
+==> Backing App 'Inkscape.app' up to '/usr/local/Caskroom/inkscape/1.4.230579/Inkscape.app'
+==> Removing App '/Applications/Inkscape.app'
+==> Unlinking Binary '/usr/local/bin/inkscape'
+==> Dispatching zap stanza
+==> Trashing files:
+~/.config/inkscape
+~/Library/Application Support/Inkscape
+~/Library/Application Support/org.inkscape.Inkscape
+~/Library/Caches/org.inkscape.Inkscape*
+~/Library/Preferences/org.inkscape.Inkscape.plist
+~/Library/Saved Application State/org.inkscape.Inkscape.savedState
+==> Removing all staged versions of Cask 'inkscape'
+==> Implied `brew uninstall --cask intellij-idea`
+==> Backing App 'IntelliJ IDEA.app' up to '/usr/local/Caskroom/intellij-idea/2023.1.3,231.9161.38/IntelliJ IDEA.app'
+==> Removing App '/Applications/IntelliJ IDEA.app'
+==> Dispatching zap stanza
+==> Trashing files:
+~/Library/Application Support/JetBrains/IntelliJIdea2023.1
+~/Library/Caches/JetBrains/IntelliJIdea2023.1
+~/Library/Logs/JetBrains/IntelliJIdea2023.1
+~/Library/Preferences/com.jetbrains.intellij.plist
+~/Library/Preferences/IntelliJIdea2023.1
+~/Library/Preferences/jetbrains.idea.*.plist
+~/Library/Saved Application State/com.jetbrains.intellij.savedState
+==> Removing all staged versions of Cask 'intellij-idea'
+==> Implied `brew uninstall --cask kdiff3`
+==> Backing App 'kdiff3.app' up to '/usr/local/Caskroom/kdiff3/1.12.3/kdiff3.app'
+==> Removing App '/Applications/kdiff3.app'
+==> Unlinking Binary '/usr/local/bin/kdiff3'
+==> Dispatching zap stanza
+==> Trashing files:
+~/.kdiff3rc
+~/Library/Application Support/kdiff3
+~/Library/Preferences/kdiff3rc
+==> Removing all staged versions of Cask 'kdiff3'
+==> Implied `brew uninstall --cask keybase`
+==> Removing launchctl service keybase.Helper
+==> Signalling 'TERM' to application ID 'keybase.Electron'
+==> Signalling 'TERM' to application ID 'keybase.ElectronHelper'
+==> Signalling 'KILL' to application ID 'keybase.Electron'
+==> Signalling 'KILL' to application ID 'keybase.ElectronHelper'
+==> Running uninstall script /Applications/Keybase.app/Contents/SharedSupport/bin/keybase
+2025-11-30T21:46:43.204906-08:00 ▶ [INFO keybase launchd.go:154] 001 Nothing to stop (keybase.kbfs)
+2025-11-30T21:46:43.218238-08:00 ▶ [INFO keybase launchd.go:154] 002 Nothing to stop (homebrew.mxcl.kbfs)
+2025-11-30T21:46:43.231545-08:00 ▶ [INFO keybase launchd.go:154] 003 Nothing to stop (keybase.service)
+2025-11-30T21:46:43.246357-08:00 ▶ [INFO keybase launchd.go:154] 004 Nothing to stop (homebrew.mxcl.keybase)
+2025-11-30T21:46:43.262145-08:00 ▶ [INFO keybase launchd.go:154] 005 Nothing to stop (keybase.updater)
+2025-11-30T21:46:43.805327-08:00 ▶ [INFO keybase app.go:112] 006 Removing KBFuse
+2025-11-30T21:46:44.170756-08:00 ▶ [INFO keybase install_darwin.go:847] 007 Uninstalling KBNM NativeMessaging whitelists
+2025-11-30T21:46:44.173418-08:00 ▶ [INFO keybase app.go:124] 008 Removing privileged helper tool
+2025-11-30T21:46:44.519213-08:00 ▶ [INFO keybase install.go:224] 009 Removing /usr/local/bin/keybase
+2025-11-30T21:46:44.519593-08:00 ▶ [INFO keybase install.go:224] 00a Removing /usr/local/bin/git-remote-keybase
+
+You can now remove /Applications/Keybase.app to complete your uninstall.
+==> Removing files:
+/Library/Logs/keybase*
+/Library/PrivilegedHelperTools/keybase.Helper
+==> Backing App 'Keybase.app' up to '/usr/local/Caskroom/keybase/6.0.4,20230113191846,6e1343b357/Keybase.app'
+==> Removing App '/Applications/Keybase.app'
+==> Dispatching zap stanza
+==> Trashing files:
+~/Library/Application Support/Keybase
+~/Library/Caches/Keybase
+~/Library/Group Containers/keybase
+~/Library/Logs/Keybase*
+~/Library/Preferences/keybase*
+==> Removing directories if empty:
+==> Removing all staged versions of Cask 'keybase'
+==> Implied `brew uninstall --cask livebook`
+==> Backing App 'Livebook.app' up to '/usr/local/Caskroom/livebook/0.17.3/Livebook.app'
+==> Removing App '/Applications/Livebook.app'
+==> Dispatching zap stanza
+==> Trashing files:
+~/Library/Application Support/livebook
+==> Removing all staged versions of Cask 'livebook'
+==> Implied `brew uninstall --cask loom`
+==> Removing login item /Applications/Loom.app
+==> Removing login item Loom
+==> Backing App 'Loom.app' up to '/usr/local/Caskroom/loom/0.173.3/Loom.app'
+==> Removing App '/Applications/Loom.app'
+==> Dispatching zap stanza
+==> Trashing files:
+~/Library/Application Support/Loom
+~/Library/Logs/Loom
+~/Library/Preferences/com.loom.desktop.plist
+~/Library/Saved Application State/com.loom.desktop.savedState
+==> Removing all staged versions of Cask 'loom'
+==> Implied `brew uninstall --cask macforge`
+==> Removing launchctl service com.macenhance.MacForge.Injector
+==> Removing login item /Applications/MacForge.app
+==> Removing login item MacForgeHelper
+==> Removing files:
+/Library/Application Support/MacEnhance
+/Library/LaunchDaemons/com.macenhance.MacForge.Injector.plist
+/Library/PrivilegedHelperTools/com.macenhance.MacForge.Injector
+==> Backing App 'MacForge.app' up to '/usr/local/Caskroom/macforge/1.1.0/MacForge.app'
+==> Removing App '/Applications/MacForge.app'
+==> Dispatching zap stanza
+==> Trashing files:
+~/Library/Application Support/com.macenhance.MacForge
+~/Library/Application Support/MacEnhance
+~/Library/Caches/com.macenhance.MacForge
+~/Library/Caches/com.macenhance.MacForgeHelper
+~/Library/HTTPStorages/com.macenhance.MacForge
+~/Library/HTTPStorages/com.macenhance.MacForge.binarycookies
+~/Library/HTTPStorages/com.macenhance.MacForgeHelper
+~/Library/Preferences/com.macenhance.MacForge.plist
+~/Library/Preferences/com.macenhance.MacForgeHelper.plist
+~/Library/Saved Application State/com.macenhance.MacForge.savedState
+~/Library/WebKit/com.macenhance.MacForge
+==> Removing all staged versions of Cask 'macforge'
+==> Implied `brew uninstall --cask messenger`
+==> Backing App 'Messenger.app' up to '/usr/local/Caskroom/messenger/212.0.0.12.233/Messenger.app'
+==> Removing App '/Applications/Messenger.app'
+==> Dispatching zap stanza
+==> Trashing files:
+~/Library/Application Support/Messenger
+~/Library/Caches/Messenger
+~/Library/Logs/Messenger
+==> Removing all staged versions of Cask 'messenger'
+==> Implied `brew uninstall --cask mos`
+==> Backing App 'Mos.app' up to '/usr/local/Caskroom/mos/3.5.0/Mos.app'
+==> Removing App '/Applications/Mos.app'
+==> Dispatching zap stanza
+==> Trashing files:
+~/Library/Preferences/com.caldis.Mos.plist
+==> Removing all staged versions of Cask 'mos'
+==> Implied `brew uninstall --cask motion`
+==> Backing App 'Motion.app' up to '/usr/local/Caskroom/motion/0.83.0/Motion.app'
+==> Removing App '/Applications/Motion.app'
+==> Dispatching zap stanza
+==> Trashing files:
+~/Library/Application Support/Motion
+~/Library/HTTPStorages/com.electron.motion*
+~/Library/Logs/Motion
+~/Library/Preferences/com.electron.motion.plist
+~/Library/Saved Application State/com.electron.motion.savedState
+==> Removing all staged versions of Cask 'motion'
+==> Implied `brew uninstall --cask ngrok`
+==> Unlinking Binary '/usr/local/bin/ngrok'
+==> Dispatching zap stanza
+==> Trashing files:
+~/.ngrok3
+~/Library/Application Support/ngrok
+==> Removing all staged versions of Cask 'ngrok'
+==> Implied `brew uninstall --cask omnifocus`
+==> Quitting application 'com.omnigroup.OmniFocus4'...
+Application 'com.omnigroup.OmniFocus4' quit successfully.
+==> Backing App 'OmniFocus.app' up to '/usr/local/Caskroom/omnifocus/4.5.1/OmniFocus.app'
+==> Removing App '/Applications/OmniFocus.app'
+==> Using sudo to gain ownership of path '/Applications/OmniFocus.app'
+==> Dispatching zap stanza
+==> Trashing files:
+~/Library/Application Scripts/34YW5XSRB7.com.omnigroup.OmniFocus*
+~/Library/Application Scripts/34YW5XSRB7.com.omnigroup.OmniSoftwareUpdate
+~/Library/Application Scripts/com.omnigroup.OmniFocus*
+~/Library/Application Support/com.apple.sharedfilelist/com.apple.LSSharedFileList.ApplicationRecentDocuments/com.omnigroup.omnifocus*.sfl*
+~/Library/Caches/Metadata/com.omnigroup.OmniFocus*
+~/Library/Containers/com.omnigroup.OmniFocus*
+~/Library/Group Containers/34YW5XSRB7.com.omnigroup.OmniFocus
+~/Library/Preferences/com.omnigroup.OmniFocus*.LSSharedFileList.plist
+~/Library/Preferences/com.omnigroup.OmniSoftwareUpdate.plist
+~/Library/Saved Application State/com.omnigroup.OmniFocus*.savedState
+==> Removing all staged versions of Cask 'omnifocus'
+==> Implied `brew uninstall --cask onyx`
+Warning: It seems there is already an App at '/usr/local/Caskroom/onyx/4.7.6/OnyX.app'; overwriting.
+==> Removing App '/usr/local/Caskroom/onyx/4.7.6/OnyX.app'
+==> Backing App 'OnyX.app' up to '/usr/local/Caskroom/onyx/4.7.6/OnyX.app'
+==> Removing App '/Applications/OnyX.app'
+==> Dispatching zap stanza
+==> Trashing files:
+~/Library/Caches/com.apple.helpd/SDMHelpData/Other/English/HelpSDMIndexFile/com.titanium.OnyX.help*
+~/Library/Logs/OnyX.log
+~/Library/Preferences/com.titanium.OnyX.plist
+~/Library/Preferences/com.titanium.OnyX.update.plist
+~/Library/Preferences/OnyX.plist
+~/Library/Saved Application State/com.titanium.OnyX.savedState
+==> Removing all staged versions of Cask 'onyx'
+==> Implied `brew uninstall --cask oracle-jdk`
+==> Uninstalling packages with sudo; the password may be necessary:
+com.oracle.jdk-25.0.1
+Warning: No zap stanza present for Cask 'oracle-jdk'
+==> Removing all staged versions of Cask 'oracle-jdk'
+==> Implied `brew uninstall --cask pgadmin4`
+==> Backing App 'pgAdmin 4.app' up to '/usr/local/Caskroom/pgadmin4/9.10/pgAdmin 4.app'
+==> Removing App '/Applications/pgAdmin 4.app'
+==> Dispatching zap stanza
+==> Trashing files:
+~/.pgadmin
+~/Library/Application Support/com.apple.sharedfilelist/com.apple.LSSharedFileList.ApplicationRecentDocuments/org.pgadmin.pgadmin4.sfl*
+~/Library/Application Support/pgAdmin 4
+~/Library/Caches/pgAdmin 4
+~/Library/Preferences/org.pgadmin.pgadmin4.plist
+~/Library/Saved Application State/org.pgadmin.pgAdmin4.savedState
+==> Removing all staged versions of Cask 'pgadmin4'
+==> Implied `brew uninstall --cask plex-media-server`
+==> Removing launchctl service com.plexapp.mediaserver
+==> Quitting application 'com.plexapp.plexmediaserver'...
+Application 'com.plexapp.plexmediaserver' quit successfully.
+==> Backing App 'Plex Media Server.app' up to '/usr/local/Caskroom/plex-media-server/1.41.5.9522,a96edc606/Plex Media Server.app'
+==> Removing App '/Applications/Plex Media Server.app'
+==> Unlinking Binary '/usr/local/bin/plexms'
+==> Dispatching zap stanza
+==> Trashing files:
+~/Library/Application Support/Plex Media Server/
+~/Library/Caches/PlexMediaServer/
+~/Library/Logs/Plex Media Server/
+~/Library/Preferences/com.plexapp.plexmediaserver.plist
+==> Removing all staged versions of Cask 'plex-media-server'
+==> Implied `brew uninstall --cask qbittorrent`
+==> Backing App 'qBittorrent.app' up to '/usr/local/Caskroom/qbittorrent/5.0.5/qbittorrent.app'
+==> Removing App '/Applications/qBittorrent.app'
+==> Dispatching zap stanza
+==> Trashing files:
+~/.config/qBittorrent
+~/Library/Application Support/qBittorrent
+~/Library/Caches/qBittorrent
+~/Library/Preferences/org.qbittorrent.qBittorrent.plist
+~/Library/Preferences/qBittorrent
+~/Library/Saved Application State/org.qbittorrent.qBittorrent.savedState
+==> Removing all staged versions of Cask 'qbittorrent'
+==> Implied `brew uninstall --cask raycast`
+==> Removing login item /Applications/Raycast.app
+==> Removing login item Raycast
+==> Backing App 'Raycast.app' up to '/usr/local/Caskroom/raycast/1.103.8/Raycast.app'
+==> Removing App '/Applications/Raycast.app'
+==> Dispatching zap stanza
+==> Trashing files:
+~/.config/raycast
+~/Library/Application Scripts/com.raycast.macos.BrowserExtension
+~/Library/Application Support/com.raycast.macos
+~/Library/Caches/com.raycast.macos
+~/Library/Caches/SentryCrash/Raycast
+~/Library/Containers/com.raycast.macos.BrowserExtension
+~/Library/Cookies/com.raycast.macos.binarycookies
+~/Library/HTTPStorages/com.raycast.macos
+~/Library/Preferences/com.raycast.macos.plist
+~/Library/WebKit/com.raycast.macos
+==> Removing all staged versions of Cask 'raycast'
+==> Implied `brew uninstall --cask reaper`
+==> Backing App 'REAPER.app' up to '/usr/local/Caskroom/reaper/7.54/REAPER.app'
+==> Removing App '/Applications/REAPER.app'
+==> Dispatching zap stanza
+==> Trashing files:
+~/Library/Application Support/REAPER
+~/Library/Preferences/com.cockos.reaper.plist
+~/Library/Saved Application State/com.cockos.ReaMote.savedState
+~/Library/Saved Application State/com.cockos.reaper.savedState
+~/Library/Saved Application State/com.cockos.reaperhosti386.savedState
+~/Library/Saved Application State/com.cockos.reaperhostx8664.savedState
+==> Removing all staged versions of Cask 'reaper'
+==> Implied `brew uninstall --cask rectangle`
+==> Quitting application 'com.knollsoft.Rectangle'...
+Application 'com.knollsoft.Rectangle' quit successfully.
+==> Backing App 'Rectangle.app' up to '/usr/local/Caskroom/rectangle/0.64,70/Rectangle.app'
+==> Removing App '/Applications/Rectangle.app'
+==> Dispatching zap stanza
+==> Trashing files:
+~/Library/Application Scripts/com.knollsoft.RectangleLauncher
+~/Library/Application Support/Rectangle
+~/Library/Caches/com.knollsoft.Rectangle
+~/Library/HTTPStorages/com.knollsoft.Rectangle
+~/Library/Containers/com.knollsoft.RectangleLauncher
+~/Library/Preferences/com.knollsoft.Rectangle.plist
+==> Removing all staged versions of Cask 'rectangle'
+==> Implied `brew uninstall --cask scribus`
+==> Backing App 'Scribus.app' up to '/usr/local/Caskroom/scribus/1.6.4/Scribus.app'
+==> Removing App '/Applications/Scribus.app'
+==> Dispatching zap stanza
+==> Trashing files:
+~/Library/Application Support/Scribus
+~/Library/Preferences/Scribus
+~/Library/Saved Application State/net.scribus.savedState
+==> Removing all staged versions of Cask 'scribus'
+Error: Unexpected method 'discontinued' called during caveats on Cask sketchup.
+Follow the instructions here:
+  https://github.com/Homebrew/homebrew-cask#reporting-bugs
+==> Implied `brew uninstall --cask sketchup`
+==> Dispatching zap stanza
+==> Trashing files:
+~/Library/Application Support/com.apple.sharedfilelist/com.apple.LSSharedFileList.ApplicationRecentDocuments/com.sketchup.sketchup.2017.sfl*
+~/Library/Application Support/com.apple.sharedfilelist/com.apple.LSSharedFileList.ApplicationRecentDocuments/com.sketchup.stylebuilder.2017.sfl*
+~/Library/Application Support/SketchUp 2017
+~/Library/Application Support/Trimble Connect for SketchUp
+~/Library/Caches/com.sketchup.SketchUp.2017
+~/Library/Cookies/com.sketchup.SketchUp.2017.binarycookies
+~/Library/Preferences/com.sketchup.SketchUp.2017.plist
+~/Library/Preferences/com.sketchup.SketchUp.2017.plist
+~/Library/Preferences/Trimble.SketchUp-Helper.plist
+==> Using sudo to gain ownership of path '/Users/ijcd/Library/Preferences/com.sketchup.SketchUp.2017.plist'
+chown: /Users/ijcd/Library/Preferences/com.sketchup.SketchUp.2017.plist: No such file or directory
+Warning: The following files could not be trashed, please do so manually:
+/Users/ijcd/Library/Preferences/com.sketchup.SketchUp.2017.plist
+==> Removing all staged versions of Cask 'sketchup'
+==> Implied `brew uninstall --cask sourcetree`
+==> Removing launchctl service com.atlassian.SourceTreePrivilegedHelper2
+==> Backing App 'Sourcetree.app' up to '/usr/local/Caskroom/sourcetree/4.1.6,242/Sourcetree.app'
+==> Removing App '/Applications/Sourcetree.app'
+==> Unlinking Binary '/usr/local/bin/stree'
+==> Dispatching zap stanza
+==> Trashing files:
+~/Library/Application Support/com.apple.sharedfilelist/com.apple.LSSharedFileList.ApplicationRecentDocuments/com.torusknot.sourcetreenotmas.sfl2
+~/Library/Application Support/SourceTree
+~/Library/Caches/com.torusknot.SourceTreeNotMAS
+~/Library/Preferences/com.torusknot.SourceTreeNotMAS.LSSharedFileList.plist
+~/Library/Preferences/com.torusknot.SourceTreeNotMAS.plist
+~/Library/Saved Application State/com.torusknot.SourceTreeNotMAS.savedState
+==> Removing all staged versions of Cask 'sourcetree'
+==> Implied `brew uninstall --cask steam`
+==> Removing launchctl service com.valvesoftware.steamclean
+==> Removing launchctl service com.valvesoftware.steam.ipctool
+==> Backing App 'Steam.app' up to '/usr/local/Caskroom/steam/4.0/Steam.app'
+==> Removing App '/Applications/Steam.app'
+==> Dispatching zap stanza
+==> Trashing files:
+~/Library/LaunchAgents/com.valvesoftware.steamclean.plist
+~/Library/Preferences/com.valvesoftware.steam.helper.plist
+~/Library/Application Support/Steam/
+~/Library/Saved Application State/com.valvesoftware.steam.savedState/
+==> Removing all staged versions of Cask 'steam'
+Error: Unexpected method 'appcast' called on Cask teamviewer.
+Follow the instructions here:
+  https://github.com/Homebrew/homebrew-cask#reporting-bugs
+==> Implied `brew uninstall --cask teamviewer`
+==> Removing launchctl service com.teamviewer.desktop
+==> Removing launchctl service com.teamviewer.service
+==> Removing launchctl service com.teamviewer.Helper
+==> Removing launchctl service com.teamviewer.teamviewer
+==> Removing launchctl service com.teamviewer.teamviewer_desktop
+==> Removing launchctl service com.teamviewer.teamviewer_service
+==> Uninstalling packages with sudo; the password may be necessary:
+com.teamviewer.teamviewerAgent
+com.teamviewer.teamviewer
+com.teamviewer.teamviewerPriviledgedHelper
+com.teamviewer.teamviewerAuthPlugin
+com.teamviewer.teamviewerRestarter
+==> Removing files:
+/usr/local/Caskroom/teamviewer/15.10.5/teamviewer
+/Applications/TeamViewer.app
+==> Dispatching zap stanza
+==> Trashing files:
+/Library/Preferences/com.teamviewer.teamviewer.preferences.plist
+~/Library/Application Support/TeamViewer
+~/Library/Caches/com.teamviewer.TeamViewer
+~/Library/Cookies/com.teamviewer.TeamViewer.binarycookies
+~/Library/Logs/TeamViewer
+~/Library/Preferences/com.teamviewer.TeamViewer.plist
+~/Library/Preferences/com.teamviewer.teamviewer.preferences.Machine.plist
+~/Library/Preferences/com.teamviewer.teamviewer.preferences.plist
+~/Library/Saved Application State/com.teamviewer.TeamViewer.savedState
+==> Using sudo to gain ownership of path '/Library/Preferences/com.teamviewer.teamviewer.preferences.plist'
+Warning: The following files could not be trashed, please do so manually:
+/Library/Preferences/com.teamviewer.teamviewer.preferences.plist
+==> Removing all staged versions of Cask 'teamviewer'
+Error: Cask 'textual' is unreadable: undefined method 'after_colon' for an instance of Cask::DSL::Version
+Uninstalled 56 casks
+Uninstalling abseil... (778 files, 8.7MB)
+Uninstalling libpng... (28 files, 1.2MB)
+Uninstalling freetype... (68 files, 2.6MB)
+Uninstalling libunistring... (59 files, 5.6MB)
+Uninstalling gettext... (2,428 files, 27.0MB)
+Uninstalling fontconfig... (98 files, 1.2MB)
+Uninstalling pcre2... (244 files, 6.9MB)
+Uninstalling glib... (504 files, 35MB)
+Uninstalling xorgproto... (268 files, 3.9MB)
+Uninstalling libxau... (21 files, 96.4KB)
+Uninstalling libxdmcp... (12 files, 123.5KB)
+Uninstalling libxcb... (2,498 files, 7MB)
+Uninstalling libx11... (1,043 files, 6.8MB)
+Uninstalling libxext... (88 files, 439.5KB)
+Uninstalling libxrender... (13 files, 181.2KB)
+Uninstalling lzo... (31 files, 546.8KB)
+Uninstalling pixman... (11 files, 1.4MB)
+Uninstalling cairo... (53 files, 2.0MB)
+Uninstalling fribidi... (68 files, 531.5KB)
+Uninstalling jpeg-turbo... (47 files, 4.2MB)
+Uninstalling lz4... (24 files, 716.6KB)
+Uninstalling xz... (96 files, 2.3MB)
+Uninstalling zstd... (32 files, 2.4MB)
+Uninstalling libtiff... (488 files, 7.8MB)
+Uninstalling gdk-pixbuf... (151 files, 3.3MB)
+Uninstalling graphite2... (18 files, 235.6KB)
+Uninstalling icu4c@78... (279 files, 82.7MB)
+Uninstalling harfbuzz... (77 files, 12.1MB)
+Uninstalling icu4c@77... (277 files, 80MB)
+Uninstalling pango... (69 files, 3.1MB)
+Uninstalling librsvg... (21 files, 12.8MB)
+Uninstalling adwaita-icon-theme... (840 files, 12.7MB)
+Uninstalling ca-certificates... (4 files, 235.9KB)
+Uninstalling certifi... (38 files, 20.1KB)
+Uninstalling pycparser... (98 files, 1.8MB)
+Uninstalling cffi... (99 files, 1.7MB)
+Uninstalling openssl@3... (7,609 files, 36.3MB)
+Uninstalling cryptography... (332 files, 14.9MB)
+Uninstalling libsodium... (78 files, 1.1MB)
+Uninstalling libssh... (25 files, 1.3MB)
+Uninstalling libyaml... (10 files, 323.6KB)
+Uninstalling mpdecimal... (22 files, 558.6KB)
+Uninstalling readline... (56 files, 2.4MB)
+Uninstalling sqlite... (13 files, 4.9MB)
+Uninstalling python@3.14... (3,757 files, 65.5MB)
+Uninstalling tree... (9 files, 150.9KB)
+Uninstalling ansible... (35,959 files, 411.6MB)
+Uninstalling brotli... (33 files, 1.8MB)
+Uninstalling giflib... (20 files, 525.9KB)
+Uninstalling highway... (81 files, 8.7MB)
+Uninstalling imath... (50 files, 925.7KB)
+Uninstalling libdeflate... (17 files, 277.6KB)
+Uninstalling little-cms2... (23 files, 1.2MB)
+Uninstalling openjph... (25 files, 637.9KB)
+Uninstalling openexr... (212 files, 3.8MB)
+Uninstalling webp... (64 files, 2.5MB)
+Uninstalling jpeg-xl... (64 files, 53.3MB)
+Uninstalling libvmaf... (234 files, 7.3MB)
+Uninstalling aom... (28 files, 12.0MB)
+Uninstalling aribb24... (14 files, 185.4KB)
+Uninstalling dbus... (79 files, 1.6MB)
+Uninstalling libxfixes... (13 files, 101.1KB)
+Uninstalling libxi... (86 files, 688.4KB)
+Uninstalling libxtst... (23 files, 160.6KB)
+Uninstalling at-spi2-core... (203 files, 4MB)
+Uninstalling augeas... (493 files, 3.6MB)
+Uninstalling m4... (14 files, 755.2KB)
+Uninstalling autoconf... (71 files, 3.6MB)
+Uninstalling aws-sso-cli... (7 files, 15.9MB)
+Uninstalling rpds-py... (23 files, 1.9MB)
+Uninstalling aws-sso-util... (2,395 files, 108.6MB)
+Uninstalling aws-vault... (9 files, 27.4MB)
+Uninstalling python@3.13... (3,629 files, 62.6MB)
+Uninstalling awscli... (14,293 files, 139.1MB)
+Uninstalling babl... (74 files, 2.0MB)
+Uninstalling ncurses... (4,052 files, 9.6MB)
+Uninstalling bash... (172 files, 11.1MB)
+Uninstalling bdw-gc... (82 files, 1.6MB)
+Uninstalling boost... (16,220 files, 347.2MB)
+Uninstalling c-ares... (176 files, 945.4KB)
+Uninstalling certbot... (912 files, 6.3MB)
+Uninstalling chezmoi... (9 files, 33.8MB)
+Uninstalling chezscheme... (53 files, 5MB)
+Uninstalling cjson... (24 files, 183KB)
+Uninstalling cmake... (4,016 files, 63.7MB)
+Uninstalling ruby... (20,688 files, 52.8MB)
+Uninstalling cocoapods... (2,276 files, 17.7MB)
+Uninstalling convox... (6 files, 62.7MB)
+Uninstalling gmp... (21 files, 3.3MB)
+Uninstalling coreutils... (465 files, 8.8MB)
+Uninstalling cowsay... (62 files, 91.8KB)
+Uninstalling libnghttp2... (14 files, 735.9KB)
+Uninstalling libnghttp3... (20 files, 545.3KB)
+Uninstalling libngtcp2... (21 files, 1.2MB)
+Uninstalling libssh2... (201 files, 1.2MB)
+Uninstalling rtmpdump... (20 files, 542.1KB)
+Uninstalling curl... (551 files, 4.3MB)
+Uninstalling daemontools... (22 files, 844.7KB)
+Uninstalling dash-shell... (7 files, 210.2KB)
+Uninstalling dav1d... (16 files, 2.3MB)
+Uninstalling ddate... (5 files, 29.5KB)
+Uninstalling deno... (11 files, 154.4MB)
+Uninstalling direnv... (12 files, 11.8MB)
+Uninstalling doctl... (10 files, 25.8MB)
+Uninstalling docutils... (247 files, 2.3MB)
+Uninstalling double-conversion... (28 files, 227.3KB)
+Uninstalling fmt... (29 files, 1MB)
+Uninstalling gflags... (24 files, 330.9KB)
+Uninstalling glog... (22 files, 316.4KB)
+Uninstalling libevent... (57 files, 2MB)
+Uninstalling snappy... (19 files, 141.9KB)
+Uninstalling folly... (1,143 files, 29.3MB)
+Uninstalling fizz... (216 files, 4MB)
+Uninstalling wangle... (119 files, 3.4MB)
+Uninstalling xxhash... (28 files, 535.2KB)
+Uninstalling fbthrift... (1,135 files, 40.6MB)
+Uninstalling fb303... (56 files, 4.2MB)
+Uninstalling edencommon... (84 files, 1.7MB)
+Uninstalling elm... (5 files, 26.2MB)
+Uninstalling elm-format... (7 files, 9MB)
+Uninstalling entr... (8 files, 48.6KB)
+Uninstalling exercism... (10 files, 10.8MB)
+Uninstalling faac... (20 files, 345.5KB)
+Uninstalling faad2... (18 files, 541.5KB)
+Uninstalling fasd... (6 files, 44.8KB)
+Uninstalling fd... (15 files, 3.2MB)
+Uninstalling fdk-aac... (15 files, 3.3MB)
+Uninstalling libogg... (103 files, 497.6KB)
+Uninstalling flac... (40 files, 1.8MB)
+Uninstalling frei0r... (164 files, 2.5MB)
+Uninstalling libidn2... (80 files, 838.3KB)
+Uninstalling libtasn1... (63 files, 516.4KB)
+Uninstalling nettle... (96 files, 2.5MB)
+Uninstalling p11-kit... (33 files, 3.8MB)
+Uninstalling unbound... (59 files, 6MB)
+Uninstalling gnutls... (1,303 files, 10.8MB)
+Uninstalling lame... (27 files, 2.2MB)
+Uninstalling openjpeg... (512 files, 13.9MB)
+Uninstalling leptonica... (55 files, 6MB)
+Uninstalling libb2... (8 files, 242.4KB)
+Uninstalling libarchive... (65 files, 3.7MB)
+Uninstalling libunibreak... (19 files, 318.0KB)
+Uninstalling libass... (12 files, 652.5KB)
+Uninstalling libudfread... (13 files, 107.9KB)
+Uninstalling libbluray... (22 files, 786.9KB)
+Uninstalling libmicrohttpd... (26 files, 1.5MB)
+Uninstalling mbedtls@3... (198 files, 11.3MB)
+Uninstalling librist... (29 files, 558.4KB)
+Uninstalling libsamplerate... (32 files, 3MB)
+Uninstalling libvorbis... (157 files, 2.3MB)
+Uninstalling mpg123... (34 files, 1.6MB)
+Uninstalling opus... (16 files, 1MB)
+Uninstalling libsndfile... (55 files, 1.5MB)
+Uninstalling libsoxr... (29 files, 276.2KB)
+Uninstalling libvidstab... (25 files, 169.6KB)
+Uninstalling libvpx... (22 files, 5.5MB)
+Uninstalling opencore-amr... (17 files, 677.7KB)
+Uninstalling rav1e... (15 files, 52MB)
+Uninstalling rubberband... (15 files, 1.9MB)
+Uninstalling sdl2... (94 files, 6.4MB)
+Uninstalling speex... (25 files, 804.5KB)
+Uninstalling srt... (21 files, 4.5MB)
+Uninstalling svt-av1... (19 files, 5.5MB)
+Uninstalling tesseract... (75 files, 32.7MB)
+Uninstalling theora... (126 files, 2.6MB)
+Uninstalling x264... (12 files, 5.6MB)
+Uninstalling x265... (12 files, 36.5MB)
+Uninstalling xvid... (10 files, 1.2MB)
+Uninstalling zeromq... (85 files, 6.2MB)
+Uninstalling zimg... (28 files, 2.3MB)
+Uninstalling ffmpeg... (285 files, 55.5MB)
+Uninstalling ffmpeg@4... (277 files, 49.3MB)
+Uninstalling findutils... (30 files, 2.0MB)
+Uninstalling flyctl... (13 files, 66.8MB)
+Uninstalling fortune... (118 files, 3.4MB)
+Uninstalling fswatch... (50 files, 1.2MB)
+Uninstalling fzf... (19 files, 4.8MB)
+Uninstalling fzy... (8 files, 52.1KB)
+Uninstalling libavif... (22 files, 856.6KB)
+Uninstalling gd... (33 files, 1.3MB)
+Uninstalling gdrive... (8 files, 10.4MB)
+Uninstalling json-glib... (122 files, 1.4MB)
+Uninstalling gegl... (186 files, 14.3MB)
+Uninstalling gh... (221 files, 52.6MB)
+Uninstalling jbig2dec... (13 files, 375KB)
+Uninstalling libidn... (74 files, 967KB)
+Uninstalling ghostscript... (640 files, 128.1MB)
+Uninstalling git... (1,718 files, 57MB)
+Uninstalling git-filter-repo... (9 files, 362.7KB)
+Uninstalling git-subrepo... (13 files, 144.6KB)
+Uninstalling gsettings-desktop-schemas... (108 files, 5.8MB)
+Uninstalling glib-networking... (79 files, 706.3KB)
+Uninstalling libgpg-error... (50 files, 1.7MB)
+Uninstalling libassuan... (18 files, 517.9KB)
+Uninstalling libgcrypt... (24 files, 3.7MB)
+Uninstalling libksba... (19 files, 508.9KB)
+Uninstalling libusb... (23 files, 547.9KB)
+Uninstalling npth... (13 files, 118.6KB)
+Uninstalling pinentry... (13 files, 352.5KB)
+Uninstalling gnupg... (144 files, 13.7MB)
+Uninstalling pkgconf... (28 files, 376.5KB)
+Uninstalling gobject-introspection... (784 files, 7.1MB)
+Uninstalling graphene... (36 files, 1009.5KB)
+Uninstalling jasper... (45 files, 1.4MB)
+Uninstalling netpbm... (825 files, 7MB)
+Uninstalling gts... (26 files, 1.4MB)
+Uninstalling libtool... (76 files, 3.9MB)
+Uninstalling graphviz... (283 files, 6.6MB)
+Uninstalling protobuf... (364 files, 16.3MB)
+Uninstalling re2... (18 files, 1.2MB)
+Uninstalling grpc... (402 files, 33.3MB)
+Uninstalling hicolor-icon-theme... (8 files, 80.9KB)
+Uninstalling libepoxy... (10 files, 2.5MB)
+Uninstalling gtk+3... (749 files, 55.3MB)
+Uninstalling gtk4... (601 files, 61MB)
+Uninstalling libcuefile... (12 files, 201.6KB)
+Uninstalling python-packaging... (56 files, 498KB)
+Uninstalling python@3.12... (3,625 files, 62.8MB)
+Uninstalling libnice... (32 files, 776.3KB)
+Uninstalling libpsl... (16 files, 146.7KB)
+Uninstalling libreplaygain... (7 files, 48.3KB)
+Uninstalling libshout... (20 files, 357.6KB)
+Uninstalling libsoup... (125 files, 2MB)
+Uninstalling libusrsctp... (9 files, 545.4KB)
+Uninstalling musepack... (26 files, 641.2KB)
+Uninstalling orc... (47 files, 1003.5KB)
+Uninstalling py3cairo... (22 files, 960.0KB)
+Uninstalling pygobject3... (72 files, 1.6MB)
+Uninstalling srtp... (15 files, 374.3KB)
+Uninstalling utf8cpp... (15 files, 146.5KB)
+Uninstalling taglib... (138 files, 1.9MB)
+Uninstalling gstreamer... (1,314 files, 182.7MB)
+Uninstalling gtk+... (1,196 files, 59MB)
+Uninstalling guile... (862 files, 61.2MB)
+Uninstalling hexedit... (7 files, 109.9KB)
+Uninstalling hivemind... (5 files, 3.2MB)
+Uninstalling htop... (13 files, 330.8KB)
+Uninstalling httrack... (234 files, 4.5MB)
+Uninstalling hub... (64 files, 9.4MB)
+Uninstalling ibazel... (8 files, 8.5MB)
+Uninstalling libde265... (21 files, 1.3MB)
+Uninstalling shared-mime-info... (89 files, 4.7MB)
+Uninstalling libheif... (49 files, 6.3MB)
+Uninstalling liblqr... (114 files, 315.3KB)
+Uninstalling libomp... (9 files, 1.7MB)
+Uninstalling libraw... (74 files, 5.5MB)
+Uninstalling libultrahdr... (12 files, 1.9MB)
+Uninstalling libzip... (161 files, 740.2KB)
+Uninstalling imagemagick... (813 files, 27.6MB)
+Uninstalling jansson... (12 files, 256.7KB)
+Uninstalling jemalloc... (16 files, 2.7MB)
+Uninstalling jhead... (8 files, 162.7KB)
+Uninstalling oniguruma... (15 files, 1.4MB)
+Uninstalling jq... (20 files, 1MB)
+Uninstalling json-c... (34 files, 303.1KB)
+Uninstalling kerl... (10 files, 143.8KB)
+Uninstalling keychain... (8 files, 160.6KB)
+Uninstalling krb5... (163 files, 4.0MB)
+Uninstalling kubernetes-cli... (256 files, 64.3MB)
+Uninstalling lastpass-cli... (12 files, 234.7KB)
+Uninstalling lftp... (40 files, 3.5MB)
+Uninstalling libcbor... (36 files, 165KB)
+Uninstalling libev... (12 files, 454.8KB)
+Uninstalling libffi... (18 files, 705.9KB)
+Uninstalling libfido2... (566 files, 1.1MB)
+Uninstalling liblinear... (10 files, 247KB)
+Uninstalling libmypaint... (107 files, 997.3KB)
+Uninstalling libptytty... (11 files, 79.2KB)
+Uninstalling libtommath... (12 files, 422.0KB)
+Uninstalling lolcat... (260 files, 590.4KB)
+Uninstalling lua... (30 files, 654.5KB)
+Uninstalling mad... (16 files, 355.5KB)
+Uninstalling markdown... (3 files, 36.6KB)
+Uninstalling mas... (9 files, 3.3MB)
+Uninstalling md4c... (20 files, 264.9KB)
+Uninstalling mercurial... (665 files, 10.4MB)
+Uninstalling mkcert... (6 files, 3.9MB)
+Uninstalling mono... (3,431 files, 316.8MB)
+Uninstalling mtr... (13 files, 217.2KB)
+Uninstalling mvfst... (310 files, 7.3MB)
+Uninstalling mypaint-brushes... (403 files, 2.9MB)
+Uninstalling zlib... (14 files, 412.8KB)
+Uninstalling mysql... (333 files, 286.6MB)
+Uninstalling nghttp2... (17 files, 2.3MB)
+Uninstalling nmap... (844 files, 28.7MB)
+Uninstalling nuget... (5 files, 7.9MB)
+Uninstalling nvm... (10 files, 206.8KB)
+Uninstalling popt... (11 files, 173.8KB)
+Uninstalling rsync... (12 files, 1MB)
+Uninstalling opam... (56 files, 17.3MB)
+Uninstalling openjdk... (556 files, 371.4MB)
+Uninstalling openjdk@11... (674 files, 297.3MB)
+Uninstalling opusfile... (18 files, 336.6KB)
+Uninstalling utf8proc... (11 files, 751.8KB)
+Uninstalling tmux... (10 files, 1.2MB)
+Uninstalling overmind... (6 files, 4.4MB)
+Uninstalling parallel... (94 files, 5MB)
+Uninstalling pcre... (204 files, 5.8MB)
+Uninstalling postgresql@17... (3,822 files, 68.2MB)
+Uninstalling pre-commit... (329 files, 8.6MB)
+Uninstalling pstree... (6 files, 92KB)
+Uninstalling pulumi... (22 files, 317.2MB)
+Uninstalling pyenv... (1,394 files, 4.3MB)
+Uninstalling pyenv-virtualenv... (23 files, 87.6KB)
+Uninstalling qtbase... (3,979 files, 59.4MB)
+Uninstalling qcachegrind... (12 files, 1.7MB)
+Uninstalling qpdf... (119 files, 11.1MB)
+Uninstalling qrtool... (19 files, 3.7MB)
+Uninstalling ruby-build... (668 files, 370KB)
+Uninstalling rbenv... (36 files, 73.9KB)
+Uninstalling ripgrep... (14 files, 6.2MB)
+Uninstalling rlwrap... (47 files, 380.5KB)
+Uninstalling rustup... (27 files, 12.4MB)
+Uninstalling sox... (26 files, 1.9MB)
+Uninstalling sshs... (8 files, 2.0MB)
+Uninstalling tcl-tk... (3,158 files, 37.2MB)
+Uninstalling terminal-notifier... (12 files, 469.0KB)
+Uninstalling the_silver_searcher... (10 files, 121.7KB)
+Uninstalling thrift... (106 files, 6.9MB)
+Uninstalling todo-txt... (6 files, 62.6KB)
+Uninstalling tree-sitter... (11 files, 462.6KB)
+Uninstalling v8... (211 files, 62.7MB)
+Uninstalling vbindiff... (7 files, 81.3KB)
+Uninstalling watch... (11 files, 140.8KB)
+Uninstalling watchman... (26 files, 14.8MB)
+Uninstalling wget... (92 files, 4.5MB)
+Uninstalling wimlib... (65 files, 2.7MB)
+Uninstalling wxwidgets... (870 files, 28.2MB)
+Uninstalling yarn-completion... (5 files, 23.8KB)
+Uninstalling nomad... (7 files, 148.5MB)
+Uninstalling nomad-pack... (5 files, 70.2MB)
+Uninstalling packer... (5 files, 42.5MB)
+Uninstalling heroku... (25,924 files, 182.5MB)
+Uninstalling heroku-node... (6 files, 73.5MB)
+Uninstalling mongodb-database-tools... (15 files, 130.0MB)
+Uninstalled 335 formulae
+Untapping bazelbuild/tap...
+Untapped (35 files, 100.3KB).
+Untapping heroku/brew...
+Untapped 2 formulae (427 files, 521.7KB).
+Untapping railwaycat/emacsmacport...
+Untapped 4 casks and 2 formulae (602 files, 23.5MB).
+Untapping hashicorp/tap...
+Untapped 2 casks and 32 formulae (1,377 files, 2.0MB).
+Untapping mongodb/brew...
+Untapped 23 formulae (1,334 files, 981.3KB).
+Untapping goreleaser/tap...
+Untapped 5 casks and 6 formulae (808 files, 852.8KB).
+Untapping d12frosted/emacs-plus...
+Untapped 6 formulae (589 files, 140MB).
+Untapping github/gh...
+Untapped (29 files, 77.9KB).
+Removing: /Users/ijcd/Library/Caches/Homebrew/bash--5.3.3... (3.3MB)
+Removing: /Users/ijcd/Library/Caches/Homebrew/awscli--2.32.4... (20.7MB)
+Removing: /Users/ijcd/Library/Caches/Homebrew/flyctl--0.3.222... (22MB)
+Removing: /Users/ijcd/Library/Caches/Homebrew/gobject-introspection--1.86.0... (1.7MB)
+Removing: /Users/ijcd/Library/Caches/Homebrew/pulumi--3.207.0... (137.2MB)
+Removing: /Users/ijcd/Library/Caches/Homebrew/Cask/zen--1.17.9b.dmg... (183.5MB)
+Removing: /Users/ijcd/Library/Caches/Homebrew/Cask/visual-studio-code--1.106.2... (154.5MB)
+Removing: /Users/ijcd/Library/Caches/Homebrew/api-source/Homebrew/homebrew-cask/44c30354913f48a629300ce01e01ede58322a101/Cask/betterdisplay.rb... (1.9KB)
+Removing: /Users/ijcd/Library/Caches/Homebrew/bootsnap/c35182aa7b57258806d846321e210327d59f0100a18d445005a8a311039e4d27... (663 files, 5.4MB)
+Removing: /usr/local/lib/python3.12/site-packages/cryptography/__pycache__/__about__.cpython-312.pyc... (433B)
+Removing: /usr/local/lib/python3.12/site-packages/cryptography/__pycache__/__init__.cpython-312.pyc... (360B)
+Removing: /usr/local/lib/python3.12/site-packages/cryptography/__pycache__/exceptions.cpython-312.pyc... (2.3KB)
+Removing: /usr/local/lib/python3.12/site-packages/cryptography/__pycache__/utils.cpython-312.pyc... (6.5KB)
+Removing: /usr/local/lib/python3.12/site-packages/cryptography/hazmat/__pycache__/__init__.cpython-312.pyc... (224B)
+Removing: /usr/local/lib/python3.12/site-packages/cryptography/hazmat/__pycache__/_oid.cpython-312.pyc... (17.2KB)
+Removing: /usr/local/lib/python3.12/site-packages/cryptography/hazmat/backends/__pycache__/__init__.cpython-312.pyc... (474B)
+Removing: /usr/local/lib/python3.12/site-packages/cryptography/hazmat/backends/openssl/__pycache__/__init__.cpython-312.pyc... (340B)
+Activating home-manager configuration for ijcd
+Starting Home Manager activation
+Activating checkFilesChanged
+Activating checkLinkTargets
+Activating writeBoundary
+Creating new profile generation
+Activating installPackages
+Activating linkGeneration
+Creating home file links in /Users/ijcd
+Activating onFilesChange
+Activating setupLaunchAgents
+Activating setupMise
+mise ERROR error sending request
+mise ERROR client error (SendRequest)
+mise ERROR invalid HTTP version parsed
+mise ERROR Run with --verbose or MISE_VERBOSE=1 for more information
+mise ERROR HTTP status client error (400 Bad Request) for url (https://api.github.com/repos/oven-sh/bun/releases)
+mise ERROR Run with --verbose or MISE_VERBOSE=1 for more information
+mise ERROR HTTP status client error (400 Bad Request) for url (https://deno.com/versions.json)
+mise ERROR Run with --verbose or MISE_VERBOSE=1 for more information
+mise ERROR error sending request
+mise ERROR client error (SendRequest)
+mise ERROR invalid HTTP version parsed
+mise ERROR Run with --verbose or MISE_VERBOSE=1 for more information
+mise ERROR HTTP status client error (400 Bad Request) for url (https://api.github.com/repos/rust-lang/rust/releases)
+mise ERROR Run with --verbose or MISE_VERBOSE=1 for more information
+ijcd@my-macbook nix 

@@ -5,6 +5,9 @@
 * cross-machine history managment (https://atuin.sh/)
 * brew files
 * remove .zgen
+* aerospace tiling homemanager
+* clean up dot_local/bin (move to aliases/functions?)
+* fuzzy-find functions with fzf
 
 
 :( ijcd@bearcat:~/.dotfiles (main) [25-11-26 16:45:09] [dotfiles]

@@ -1,1 +1,0 @@
-ZSH=${HOME}/.zgen/robbyrussell/oh-my-zsh-master

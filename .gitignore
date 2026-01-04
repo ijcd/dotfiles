@@ -1,6 +1,30 @@
-/refs
-*.zwc
-logs
+# Chezmoi
+.chezmoiroot
 
+# Compiled files
+*.zwc
+
+# Logs
+logs/
+
+# macOS
+.DS_Store
+
+# Editor state
+*.swp
+*.swo
+*~
+
+# Claude Code
+.claude/
+
+# Secrets (legacy paths)
 /modules/gnupg/gnupg.symlink/*.gpg
 /modules/gnupg/gnupg.symlink/random_seed
+
+# Nix build outputs
+result
+result-*
+
+# Legacy refs
+/refs

@@ -1,0 +1,94 @@
+echo ZSH/ZSHRC
+
+###########################################
+### Zim
+###########################################
+
+ZIM_HOME=~/.zim
+ZIM_CONFIG_FILE=~/.config/zsh/zimrc
+GIT_TERMINAL_PROMPT=0  # Prevent git auth prompts during module install
+GIT_ASKPASS=""         # Disable askpass helper
+
+# Download zimfw if missing
+if [[ ! -e ${ZIM_HOME}/zimfw.zsh ]]; then
+  mkdir -p ${ZIM_HOME}
+  curl -fsSL https://raw.githubusercontent.com/zimfw/zimfw/master/zimfw.zsh -o ${ZIM_HOME}/zimfw.zsh
+fi
+
+# Install missing modules and initialize
+if [[ ! ${ZIM_HOME}/init.zsh -nt ${ZIM_CONFIG_FILE} ]]; then
+  source ${ZIM_HOME}/zimfw.zsh init -q
+fi
+
+source ${ZIM_HOME}/init.zsh
+
+###########################################
+### Home Manager Integrations
+###########################################
+
+# Source HM-generated zshrc for program integrations (starship, direnv, fzf, etc.)
+# HM writes to ~/.local/share/hm-zsh/, we source it for the init hooks
+if [[ -f ~/.local/share/hm-zsh/.zshrc ]]; then
+  source ~/.local/share/hm-zsh/.zshrc
+fi
+
+###########################################
+### Interactive
+###########################################
+
+: ${HOSTFILE=~/.ssh/known_hosts}             # complete hostnames from this file
+: ${INPUTRC=~/.inputrc}                      # readline config
+
+# ignore backups, CVS directories, python bytecode, vim swap files
+FIGNORE="~:CVS:#:.pyc:.swp:.swa:apache-solr-*"
+
+HISTFILE=$HOME/.zsh_history
+HISTSIZE=20000
+SAVEHIST=10000
+
+setopt HIST_IGNORE_DUPS HIST_IGNORE_SPACE HIST_REDUCE_BLANKS HIST_VERIFY SHARE_HISTORY
+
+###########################################
+#  Set up for starship custom.last_command
+###########################################
+
+# Track whether a command was run
+_starship_command_run=0
+
+starship_last_command_preexec() {
+  export STARSHIP_LAST_COMMAND="$1"
+  _starship_command_run=1
+}
+
+starship_last_command_precmd() {
+  # If no command was run (just pressed Enter), clear last command
+  if (( _starship_command_run == 0 )); then
+    export STARSHIP_LAST_COMMAND=""
+  fi
+  _starship_command_run=0
+}
+
+autoload -Uz add-zsh-hook
+add-zsh-hook preexec starship_last_command_preexec
+add-zsh-hook precmd starship_last_command_precmd
+
+###########################################
+#  Editor
+###########################################
+
+# EDITOR (PAGER handled by Zim's utility module)
+export EDITOR=zed
+export VISUAL=$EDITOR
+
+###########################################
+#  Misc
+###########################################
+
+# always use PASSIVE mode ftp
+: ${FTP_PASSIVE:=1}
+export FTP_PASSIVE
+
+
+
+# Source aliases
+source $ZDOTDIR/aliases.zsh

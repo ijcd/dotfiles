@@ -1,25 +1,16 @@
 _: {
+  # Zsh dotfiles managed by chezmoi (ZDOTDIR=~/.config/zsh)
+  # HM generates its config to a separate location, which we source for integrations
   programs.zsh = {
     enable = true;
-    enableCompletion = true;
-    autosuggestion.enable = true;
-    syntaxHighlighting.enable = true;
+    dotDir = ".local/share/hm-zsh";
 
-    shellAliases = {
-      la = "ls -la";
-      ".." = "cd ..";
-      "nix-switch" = "sudo darwin-rebuild switch --flake ~/.config/nix";
-    };
+    # Source chezmoi-managed zshenv (backed up to .mine by HM)
+    envExtra = ''
+      [[ -f "$HOME/.zshenv.mine" ]] && source "$HOME/.zshenv.mine"
+    '';
   };
 
-  programs.starship = {
-    enable = true;
-    settings = {
-      add_newline = false;
-      character = {
-        success_symbol = "[λ](bold green)";
-        error_symbol = "[λ](bold red)";
-      };
-    };
-  };
+  # Starship prompt (config managed by chezmoi, init via HM's zshrc)
+  programs.starship.enable = true;
 }

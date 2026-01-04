@@ -1,0 +1,25 @@
+# Zim modules
+# See: https://zimfw.sh/docs/modules/
+
+# Core
+zmodule environment    # Sets generic shell options and environment variables
+zmodule input          # Applies correct bindkeys for input events
+
+# Completion
+zmodule zsh-users/zsh-completions --fpath src  # Additional completions
+zmodule completion     # Enables and configures smart completions
+
+# Productivity
+zmodule git            # Git aliases and functions
+zmodule utility        # Utility aliases and functions (ls colors, grep, etc.)
+zmodule archive        # Archive extraction helpers
+
+# Directory navigation
+# zoxide init is handled manually (zoxide installed via nix/homebrew)
+
+# Prompt (using starship instead of Zim themes)
+# zmodule prompt
+
+# Syntax and suggestions (load last)
+zmodule zsh-users/zsh-autosuggestions
+zmodule zsh-users/zsh-syntax-highlighting
