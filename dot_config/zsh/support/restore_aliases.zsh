@@ -1,4 +1,6 @@
-echo Restoring aliases...
+# Restore aliases saved before module loading
+# This removes any aliases added by frameworks/modules
+
 unalias -m '*'
-eval $save_aliases
-unset save_aliases
+eval $_saved_aliases
+unset _saved_aliases

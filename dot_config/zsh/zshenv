@@ -2,8 +2,8 @@
 export ZDOTDIR=~/.config/zsh
 
 # Debug/profiling flags (set to 1 to enable)
-ZSH_DEBUG=1      # Per-file timing
-ZSH_PROFILE=0    # zprof function profiling
+# ZSH_DEBUG=1      # Per-file timing
+# ZSH_PROFILE=1    # zprof function profiling
 
 # Source debug utilities first (for file timing)
 source $ZDOTDIR/support/debug.zsh
