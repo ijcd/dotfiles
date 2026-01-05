@@ -12,9 +12,24 @@ umask 0022
 
 # SSH agent - only if not already in an SSH session
 if [[ -z "$SSH_CLIENT" ]]; then
-  # Load ssh-reagent function and try to find existing agent
   source $ZDOTDIR/functions/ssh-reagent
-  ssh-reagent 2>/dev/null || eval "$(keychain --eval --quiet id_rsa 2>/dev/null)"
+  case "$OSTYPE" in
+    darwin*)
+      # macOS: Use Keychain integration, fall back to ssh-reagent
+      if [[ -z "$SSH_AUTH_SOCK" ]] || ! ssh-add -l &>/dev/null; then
+        ssh-add --apple-use-keychain 2>/dev/null
+      fi
+      ssh-reagent 2>/dev/null
+      ;;
+    linux*)
+      # Linux: Use keychain tool, fall back to ssh-reagent
+      ssh-reagent 2>/dev/null || eval "$(keychain --eval --quiet id_rsa 2>/dev/null)"
+      ;;
+    *)
+      # Other: Just try ssh-reagent
+      ssh-reagent 2>/dev/null
+      ;;
+  esac
 fi
 
 ###########################################

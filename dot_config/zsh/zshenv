@@ -13,6 +13,9 @@ debug_file_start
 [[ -f /etc/profiles/per-user/$USER/etc/profile.d/hm-session-vars.sh ]] && \
   source /etc/profiles/per-user/$USER/etc/profile.d/hm-session-vars.sh
 
+# User binaries
+[[ -d ~/.local/bin ]] && path=(~/.local/bin $path)
+
 # the basics
 #: ${HOME=~}                                 # should always be set anyway
 #: ${LOGNAME=$(id -un)}                      # should also be set by environment
