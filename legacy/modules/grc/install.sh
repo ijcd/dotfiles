@@ -1,1 +1,0 @@
-echo "TODO: install grc from brew or warn"

@@ -1,7 +1,0 @@
-#!/bin/bash
-
-if [ -n "$1" ] ; then
-  exec find ${GOPATH//:/ } -name $1
-else
-  exec find ${GOPATH//:/ }
-fi
