@@ -1,8 +1,8 @@
 #!/bin/sh
-# Usage: sshenv <command>
+# Usage: ssh-with-agent <command>
 #
-# Setup environment for MacOS's built-in ssh-agent and execute
-# command. Useful when crontab commands require ssh-agent access
+# Setup environment for macOS's built-in ssh-agent and execute
+# command. Useful when cron jobs require ssh-agent access
 # for authentication.
 
 test $# -eq 0 && {
