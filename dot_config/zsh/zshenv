@@ -48,6 +48,14 @@ export MAILCHECK=0
 # Rsync stuff
 export RSYNC_RSH=ssh
 
+# Editor
+export EDITOR=vim
+export VISUAL=$EDITOR
+
+# FTP
+: ${FTP_PASSIVE:=1}
+export FTP_PASSIVE
+
 # Workflow Stuff
 export INBOX=~/Desktop/Inbox
 export OUTBOX=~/Desktop/Outbox

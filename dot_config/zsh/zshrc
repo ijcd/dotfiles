@@ -71,21 +71,5 @@ autoload -Uz add-zsh-hook
 add-zsh-hook preexec starship_last_command_preexec
 add-zsh-hook precmd starship_last_command_precmd
 
-###########################################
-#  Editor
-###########################################
-
-# EDITOR (PAGER handled by Zim's utility module)
-export EDITOR=zed
-export VISUAL=$EDITOR
-
-###########################################
-#  Misc
-###########################################
-
-# always use PASSIVE mode ftp
-: ${FTP_PASSIVE:=1}
-export FTP_PASSIVE
-
 debug_file_end
 debug_profile_stop
