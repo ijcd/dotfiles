@@ -26,6 +26,12 @@ zmodule ohmyzsh/ohmyzsh --root plugins/colored-man-pages
 # ESC ESC to prepend sudo to current/previous command
 zmodule ohmyzsh/ohmyzsh --root plugins/sudo
 
+# Zaw - interactive selection menus (Ctrl-X ;)
+zmodule zsh-users/zaw
+
+# bd - jump back to parent directory by name (e.g., bd src)
+zmodule tarrasch/zsh-bd
+
 # Syntax, suggestions, and history search (load last)
 zmodule zsh-users/zsh-autosuggestions
 zmodule zsh-users/zsh-history-substring-search
