@@ -1,4 +1,4 @@
-# Find a usable agent
+# Find a usable SSH agent
 function ssh-reagent () {
   for agent in ${TMPDIR}ssh-*/agent.*(N); do
     export SSH_AUTH_SOCK=$agent

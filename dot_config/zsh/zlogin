@@ -1,0 +1,59 @@
+###########################################
+#  Login Shell Setup
+###########################################
+
+debug_file_start
+
+# Disable core dumps
+ulimit -S -c 0
+
+# Default umask
+umask 0022
+
+# SSH agent - only if not already in an SSH session
+if [[ -z "$SSH_CLIENT" ]]; then
+  # Load ssh-reagent function and try to find existing agent
+  source $ZDOTDIR/functions/ssh-reagent
+  ssh-reagent 2>/dev/null || eval "$(keychain --eval --quiet id_rsa 2>/dev/null)"
+fi
+
+###########################################
+#  Login Greeting
+###########################################
+
+try_fortune() {
+  hash fortune 2>/dev/null && {
+    local _fortune=$(fortune -s -n 300)
+    _fortune=$(hash cowsay 2>/dev/null && echo "$_fortune" | cowsay || echo "$_fortune")
+    if hash lolcat 2>/dev/null; then
+      echo "$_fortune" | lolcat
+    else
+      echo "$_fortune"
+    fi
+    echo
+  }
+}
+
+try_ddate() {
+  hash ddate 2>/dev/null && {
+    if hash lolcat 2>/dev/null; then
+      ddate | lolcat
+    else
+      ddate
+    fi
+    echo
+  }
+}
+
+if [[ -o interactive && -o login ]]; then
+  try_fortune
+  try_ddate
+  uname -npsr
+  uptime
+fi
+
+# Show total startup time
+[[ -o interactive ]] && echo "Dotfiles evaluated in $(dotfiles_elapsed)"
+
+debug_file_end
+debug_summary

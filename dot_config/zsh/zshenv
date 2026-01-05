@@ -1,4 +1,17 @@
-echo ZSH/ZSHENV
+# Set ZDOTDIR for zsh config location
+export ZDOTDIR=~/.config/zsh
+
+# Debug/profiling flags (set to 1 to enable)
+ZSH_DEBUG=1      # Per-file timing
+ZSH_PROFILE=0    # zprof function profiling
+
+# Source debug utilities first (for file timing)
+source $ZDOTDIR/support/debug.zsh
+debug_file_start
+
+# Source HM session vars if available
+[[ -f /etc/profiles/per-user/$USER/etc/profile.d/hm-session-vars.sh ]] && \
+  source /etc/profiles/per-user/$USER/etc/profile.d/hm-session-vars.sh
 
 # the basics
 #: ${HOME=~}                                 # should always be set anyway
@@ -39,3 +52,5 @@ export PENDING=~/Desktop/Pending
 export I=$INBOX
 export O=$OUTBOX
 export P=$PENDING
+
+debug_file_end

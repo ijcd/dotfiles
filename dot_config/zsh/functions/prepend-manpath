@@ -1,0 +1,6 @@
+# Add directory to MANPATH if it exists
+# Usage: prepend-manpath /usr/local/share/man
+function prepend-manpath () {
+  local dir=$1
+  [[ -d $dir ]] && export MANPATH=$dir:$MANPATH
+}

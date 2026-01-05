@@ -1,0 +1,17 @@
+# Add directory to fpath and autoload all functions in it
+# Usage: autoload-fpath ~/my-functions
+function autoload-fpath () {
+  local dir=$1
+  local force=$2
+
+  if [[ -n $force ]]; then
+    fpath=($dir $fpath)
+  else
+    [[ -d $dir ]] && fpath=($dir $fpath)
+  fi
+
+  for func in $(find $dir -maxdepth 1 -type f); do
+    funcfile=$(basename $func)
+    autoload $funcfile
+  done
+}

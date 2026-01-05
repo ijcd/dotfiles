@@ -1,50 +1,93 @@
-ztrace_with_debug () {
-    echo "====================================================================="
-    echo zgen "$@"
+# Debug/profiling utilities for zsh startup
+#
+# Usage:
+#   ZSH_DEBUG=1 zsh          # Enable file timing
+#   ZSH_PROFILE=1 zsh        # Enable zprof profiling
+#
+# Add to each sourced file:
+#   debug_file_start
+#   ... file contents ...
+#   debug_file_end
 
-    declare -A binds
-    declare -A new_binds
+# Load datetime module for EPOCHREALTIME
+zmodload zsh/datetime
 
-    # collect initial binds into associative array
-    for map in $(bindkey -l) ; do
-        binds[$map]=$(bindkey -M $map)
-    done
+# Track start time for total elapsed calculation
+: ${_debug_dotfiles_start:=$EPOCHREALTIME}
 
-    zgen "$@"
+# Hash to store per-file start times
+typeset -gA _debug_file_times
 
-    # collect finished binds into associative array
-    for map in $(bindkey -l) ; do
-        new_binds[$map]=$(bindkey -M $map)
-    done
+# Array to store completed file stats for summary (file|elapsed|depth)
+typeset -ga _debug_file_stats
 
-    for map in $(bindkey -l) ; do
-        if ! diff -q <(echo $binds[$map]) <(echo $new_binds[$map]) >/dev/null
-        then
-            echo "---------------------------------------"
-            echo KEYMAP=$map
-            the_diff=$(diff -ud <(echo $binds) <(echo $new_binds))
-            echo $the_diff | grep -E '^(\+|-|\!)"'
-        fi
-    done
+# Current nesting depth
+: ${_debug_depth:=0}
+
+# Print to stderr with optional indentation
+_debug_print() {
+  local depth=${1:-$_debug_depth}
+  shift
+  printf "%$((depth * 4))s" "" >&2
+  printf "$@" >&2
 }
 
-ztrace_without_debug() {
-    zgen "$@";
+# Call at top of each file
+debug_file_start() {
+  [[ "$ZSH_DEBUG" == "1" ]] && {
+    local caller=${funcfiletrace[1]%:*}
+    local resolved=${caller:A}  # Resolve symlinks
+    _debug_file_times[$resolved]=$EPOCHREALTIME
+    _debug_print $_debug_depth ">>> %s\n" "$resolved"
+    (( _debug_depth++ ))
+  }
 }
 
-what_binds () {
-    for map in $(bindkey -l) ; do
-        if [ -n $1 ]
-        then
-            echo KEYMAP $map $1
-        fi
-        bindkey -M $map
+# Call at bottom of each file
+debug_file_end() {
+  [[ "$ZSH_DEBUG" == "1" ]] && {
+    local caller=${funcfiletrace[1]%:*}
+    local resolved=${caller:A}  # Resolve symlinks
+    local start=${_debug_file_times[$resolved]}
+    local elapsed=$(( EPOCHREALTIME - start ))
+    (( _debug_depth-- ))
+    _debug_print $_debug_depth "<<< %s [%.3fs]\n" "$resolved" "$elapsed"
+    # Store for summary: file|elapsed|depth
+    _debug_file_stats+=("$resolved|$elapsed|$_debug_depth")
+  }
+}
+
+# Print summary of all file timings
+debug_summary() {
+  [[ "$ZSH_DEBUG" == "1" ]] && {
+    _debug_print 0 "\n"
+    _debug_print 0 "=== Startup Timing Summary ===\n"
+    local entry file elapsed depth
+    for entry in "${_debug_file_stats[@]}"; do
+      file=${entry%%|*}
+      entry=${entry#*|}
+      elapsed=${entry%%|*}
+      depth=${entry#*|}
+      _debug_print "$depth" "%-50s [%.3fs]\n" "$file" "$elapsed"
     done
+    _debug_print 0 "\n"
+    _debug_print 0 "Total: %.3fs\n" $(( EPOCHREALTIME - _debug_dotfiles_start ))
+  }
 }
 
-# TODO: finish defining this and put this somewhere
-if [[ -n $ZGEN_DEBUG_BINDS ]]; then
-    # define ztrace with diffing
-else
-    ztrace() { zgen "$@"; }
-fi
+# Print total elapsed time since shell start
+dotfiles_elapsed() {
+  printf "%.2f seconds" $(( EPOCHREALTIME - _debug_dotfiles_start ))
+}
+
+# zprof-based profiling (function-level summary)
+debug_profile_start() {
+  [[ "$ZSH_PROFILE" == "1" ]] && zmodload zsh/zprof
+}
+
+debug_profile_stop() {
+  [[ "$ZSH_PROFILE" == "1" ]] && {
+    zprof
+    echo "Dotfiles evaluated in $(dotfiles_elapsed)"
+  }
+}

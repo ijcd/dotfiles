@@ -1,4 +1,5 @@
-echo ZSH/ZSHRC
+debug_file_start
+debug_profile_start
 
 ###########################################
 ### Zim
@@ -85,3 +86,6 @@ export VISUAL=$EDITOR
 # always use PASSIVE mode ftp
 : ${FTP_PASSIVE:=1}
 export FTP_PASSIVE
+
+debug_file_end
+debug_profile_stop

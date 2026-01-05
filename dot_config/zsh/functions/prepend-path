@@ -1,0 +1,12 @@
+# Add directory to PATH if it exists (prepend, so it takes priority)
+# Usage: prepend-path /usr/local/bin
+#        prepend-path /maybe/missing force   # add even if dir doesn't exist
+function prepend-path () {
+  local dir=$1
+  local force=$2
+  if [[ -n $force ]]; then
+    export PATH=$dir:$PATH
+  else
+    [[ -d $dir ]] && export PATH=$dir:$PATH
+  fi
+}

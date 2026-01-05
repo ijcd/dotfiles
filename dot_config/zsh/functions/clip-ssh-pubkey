@@ -1,0 +1,16 @@
+# Copy SSH public key to clipboard and display it
+# Usage: clip-ssh-pubkey           # uses ~/.ssh/id_rsa.pub
+#        clip-ssh-pubkey id_ed25519  # uses ~/.ssh/id_ed25519.pub
+function clip-ssh-pubkey () {
+  local keyname=${1:-id_rsa}
+  local keyfile=~/.ssh/${keyname}.pub
+
+  if [[ ! -f $keyfile ]]; then
+    echo "Key not found: $keyfile"
+    return 1
+  fi
+
+  pbcopy < $keyfile
+  cat $keyfile
+  echo "=> Public key copied to pasteboard."
+}

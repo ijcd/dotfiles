@@ -1,6 +1,0 @@
-export ZDOTDIR="${HOME}/.config/zsh"
-
-# Delegate the real work
-if [ -f "$ZDOTDIR/zshenv" ]; then
-  . "$ZDOTDIR/zshenv"
-fi

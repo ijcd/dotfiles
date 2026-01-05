@@ -1,0 +1,10 @@
+# Go up N directories (default: 1)
+# Usage: upd      # cd ..
+#        upd 3    # cd ../../..
+function upd () {
+  local num=${1:-1}
+  for x in $(seq 1 $num); do
+    cd ..
+  done
+  pwd
+}
