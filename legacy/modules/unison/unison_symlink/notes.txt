@@ -1,6 +1,0 @@
--perms 0
--auto
--force
--batch
-default.prf
-UNISONLOCALHOSTNAME

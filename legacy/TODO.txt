@@ -1,24 +1,9 @@
-1. It would be nice if we had something akin to emacs's use-package
-2. Should these various helpers be functions or scripts?
-3. How should the functions and scripts be organized given modules matter?
+ADDITIONS:
+1. fzf thingy that I can use to browse all these
+2. some kind of key binding that will remind me of all of it
+3. a banner at start up that talks about these things
 
-diff - look into using delta (or ressurrect mydiff-so-fancy)
-
-direnv - keep init but place somewhere
-dns - keep functions but move to my functions (dns-digall, dns-flush but improved)
-dotnet - is this needed?
-emacs - do we want this?
-erlang - keep
-highlighting - what is this? ZSH_HIGHLIGHT_MAXLENGTH
-irc - is IRC still a thing?
-kubernetes - just completions, do we need it here?
-misc - what are these random network scripts?
-networking - what are these helper scripts?
-osx - what are all of these helpers?
-postfix - little helper function
-postgres - we have the pg_stop and pg_start scripts -- it would be nice to have a way to run all my functions/script helpers in a way where I can also search for them and ask about help etc (maybe using fzf on top of a module format of some sort?)
-readline - do we keep this inputrc?
-rust - just adds a path, maybe this can stay in a module somehow?
-ssl - cert name helper
-unison - maybe archive this?
-vim - I think vierr is the only thing I use
+TODO:
+1. Do we have anything as a top-level dot file that can now go into .config?
+2. Move the brews to nix
+3. Move the nix machine-specific to general (where it makes sense)

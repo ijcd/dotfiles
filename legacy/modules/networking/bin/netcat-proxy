@@ -1,5 +1,0 @@
-#!/bin/bash
-# http://blog.hawkhost.com/2009/12/12/using-netcat-as-an-intercepting-proxy/
-PIPE=/tmp/$$-ncproxy-pipe
-mkfifo $PIPE
-nc -l $1 $2 < $PIPE | tee outgoing.log | nc $3 $4 | tee $PIPE incoming.log

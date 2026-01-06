@@ -1,0 +1,48 @@
+# ─────────────────────────────────────────────────────────────────────────────
+# Screen configuration
+# ─────────────────────────────────────────────────────────────────────────────
+# Useful when SSHing to older servers that have screen but not tmux.
+# For local use, prefer tmux (see ~/.tmux.conf).
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Prefix key: Ctrl+J (instead of Ctrl+A which conflicts with readline)
+# ─────────────────────────────────────────────────────────────────────────────
+escape ^Jj
+
+# ─────────────────────────────────────────────────────────────────────────────
+# General settings
+# ─────────────────────────────────────────────────────────────────────────────
+startup_message off             # Skip the GPL notice
+defscrollback 30000             # Big scrollback buffer
+autodetach on                   # Detach on hangup
+defutf8 on                      # UTF-8 by default
+defmonitor on                   # Monitor windows for activity
+vbell on                        # Visual bell instead of audio
+bell_msg "Bell in window %n"
+activity "Activity in window %n"
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Status line
+# ─────────────────────────────────────────────────────────────────────────────
+# Shows: hostname | date time | load | window list
+caption always "%{=b}%{G}%H %{W}| %D %Y-%m-%d %c %{W}| %l %{W}|%{-} %-w%{+b}[%n %t]%{-b}%+w"
+hardstatus alwayslastline
+
+# ─────────────────────────────────────────────────────────────────────────────
+# macOS clipboard integration
+# ─────────────────────────────────────────────────────────────────────────────
+# Ctrl+J b = copy screen buffer to macOS clipboard
+bind b eval "writebuf" "exec sh -c 'pbcopy < /tmp/screen-exchange'"
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Terminal fixes
+# ─────────────────────────────────────────────────────────────────────────────
+# Enable 256 colors
+term screen-256color
+termcapinfo xterm* 'Co#256:AB=\E[48;5;%dm:AF=\E[38;5;%dm'
+
+# Allow xterm scrollbar to work
+termcapinfo xterm* ti@:te@
+
+# Fix backspace
+termcapinfo xterm* 'bc@:bs@'

@@ -1,8 +1,0 @@
-include common
-
-root = /Users/ijcd
-root = ssh://ijcd@10.0.200.20//home/ijcd/
-
-# Paths to synchronize
-path = Maildir
-

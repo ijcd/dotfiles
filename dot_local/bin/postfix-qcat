@@ -1,0 +1,38 @@
+#!/bin/sh
+# postfix-qcat - Display a queued Postfix message by queue ID
+#
+# Usage: postfix-qcat <queue-id>
+#
+# Examples:
+#   postfix-qcat ABC123DEF
+#   postfix-qcat 4F2B1C    # partial ID works too
+#
+# To list queue IDs:
+#   mailq
+#   postqueue -p
+#
+# Requires root/sudo access to read the mail queue.
+
+set -e
+
+if [ -z "$1" ]; then
+  echo "Usage: postfix-qcat <queue-id>" >&2
+  echo "       Use 'mailq' to list queue IDs" >&2
+  exit 1
+fi
+
+if ! command -v postcat >/dev/null 2>&1; then
+  echo "postcat not found. Is Postfix installed?" >&2
+  exit 1
+fi
+
+queue_id="$1"
+queue_file=$(sudo find /var/spool/postfix -name "${queue_id}*" 2>/dev/null | head -n1)
+
+if [ -z "$queue_file" ]; then
+  echo "No queued message found matching: $queue_id" >&2
+  echo "Use 'mailq' to list current queue IDs" >&2
+  exit 1
+fi
+
+sudo postcat "$queue_file"

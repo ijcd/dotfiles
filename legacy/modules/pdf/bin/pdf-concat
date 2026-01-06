@@ -1,8 +1,0 @@
-#!/bin/sh
-cwd=`pwd`
-tmpdir=/tmp/$$.pdfconcat
-mkdir $tmpdir
-cp $* $tmpdir
-cd /tmp/$$.pdfconcat
-texexec --pdfarrange --result all.pdf *.pdf
-cp all.pdf $cwd

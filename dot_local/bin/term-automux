@@ -1,0 +1,77 @@
+#!/bin/sh
+# term-automux - Smart terminal multiplexer session manager
+#
+# Usage: term-automux [session-name]
+#
+# Behavior:
+#   - Attaches to existing session if one exists
+#   - Creates new session if none exists
+#   - Uses session name from argument, or "main" by default
+#   - Prefers tmux, falls back to screen
+#
+# Examples:
+#   term-automux           # Attach to or create "main" session
+#   term-automux work      # Attach to or create "work" session
+#   term-automux -l        # List sessions
+#
+# Designed for use in SSH sessions or local terminals.
+
+set -e
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Options
+# ─────────────────────────────────────────────────────────────────────────────
+
+case "${1:-}" in
+  -h|--help)
+    sed -n '2,/^$/p' "$0" | sed 's/^# //' | sed 's/^#//'
+    exit 0
+    ;;
+  -l|--list)
+    echo "=== tmux sessions ==="
+    tmux list-sessions 2>/dev/null || echo "(none)"
+    echo ""
+    echo "=== screen sessions ==="
+    screen -ls 2>/dev/null || echo "(none)"
+    exit 0
+    ;;
+esac
+
+SESSION="${1:-main}"
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Don't nest multiplexers
+# ─────────────────────────────────────────────────────────────────────────────
+
+if [ -n "$TMUX" ]; then
+  echo "Already inside tmux. Use 'tmux switch-client -t $SESSION' to switch." >&2
+  exit 1
+fi
+
+if [ "$TERM" = "screen" ] || [ "$TERM" = "screen-256color" ]; then
+  echo "Already inside screen. Detach first (Ctrl+J d) or use 'screen -x'." >&2
+  exit 1
+fi
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Try tmux first, fall back to screen
+# ─────────────────────────────────────────────────────────────────────────────
+
+if command -v tmux >/dev/null 2>&1; then
+  if tmux has-session -t "$SESSION" 2>/dev/null; then
+    echo "Attaching to tmux session: $SESSION"
+    exec tmux attach-session -t "$SESSION"
+  else
+    echo "Creating new tmux session: $SESSION"
+    exec tmux new-session -s "$SESSION"
+  fi
+elif command -v screen >/dev/null 2>&1; then
+  echo "tmux not found, using screen..."
+  # -xRR: attach to existing or create new, multi-attach allowed
+  exec screen -xRR "$SESSION"
+else
+  echo "Neither tmux nor screen found. Install one:" >&2
+  echo "  brew install tmux" >&2
+  echo "  nix-env -iA nixpkgs.tmux" >&2
+  exit 1
+fi

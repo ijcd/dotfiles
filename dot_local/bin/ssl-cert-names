@@ -1,0 +1,59 @@
+#!/bin/sh
+# ssl-cert-names - Show all domains covered by an SSL certificate
+#
+# Usage: ssl-cert-names <domain> [port]
+#
+# Connects to a server and displays the certificate's:
+#   - Common Name (CN)
+#   - Subject Alternative Names (SANs)
+#
+# Examples:
+#   ssl-cert-names google.com
+#   ssl-cert-names example.com 8443
+#
+# Useful for debugging certs, checking wildcard coverage, verifying installation.
+
+set -e
+
+if [ -z "$1" ]; then
+  echo "Usage: ssl-cert-names <domain> [port]" >&2
+  echo "       Defaults to port 443" >&2
+  exit 1
+fi
+
+domain="$1"
+port="${2:-443}"
+
+echo "Fetching certificate from ${domain}:${port}..."
+echo ""
+
+# Connect and get certificate
+cert=$(echo | openssl s_client -connect "${domain}:${port}" -servername "${domain}" 2>/dev/null)
+
+if ! echo "$cert" | grep -q "BEGIN CERTIFICATE"; then
+  echo "ERROR: Could not retrieve certificate from ${domain}:${port}" >&2
+  exit 1
+fi
+
+# Extract and parse certificate
+cert_text=$(echo "$cert" | openssl x509 -text -noout 2>/dev/null)
+
+# Common Name
+cn=$(echo "$cert_text" | grep "Subject:" | sed -n 's/.*CN *= *\([^,]*\).*/\1/p')
+echo "Common Name (CN):"
+echo "  ${cn:-<none>}"
+echo ""
+
+# Subject Alternative Names
+echo "Subject Alternative Names (SANs):"
+sans=$(echo "$cert_text" | grep -A1 "Subject Alternative Name:" | tail -1 | tr ',' '\n' | sed 's/^[[:space:]]*DNS://g' | sed 's/^[[:space:]]*/  /')
+if [ -n "$sans" ]; then
+  echo "$sans"
+else
+  echo "  <none>"
+fi
+echo ""
+
+# Validity
+echo "Validity:"
+echo "$cert_text" | grep -E "Not Before|Not After" | sed 's/^[[:space:]]*/  /'

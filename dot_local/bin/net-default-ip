@@ -1,0 +1,46 @@
+#!/bin/sh
+# net-default-ip - Print the IP address of the default network interface
+#
+# Usage: net-default-ip [interface]
+#
+# Arguments:
+#   interface  Optional. Specific interface to query.
+#              Defaults to the default route interface.
+#
+# Examples:
+#   $ net-default-ip
+#   192.168.1.100
+#
+#   $ net-default-ip en1
+#   10.0.0.50
+
+set -e
+
+case "$(uname -s)" in
+  Darwin)
+    iface="${1:-$(net-default-if)}"
+    if [ -z "$iface" ]; then
+      echo "Could not determine default interface" >&2
+      exit 1
+    fi
+    ipconfig getifaddr "$iface" 2>/dev/null || {
+      echo "No IP address on interface: $iface" >&2
+      exit 1
+    }
+    ;;
+  Linux)
+    iface="${1:-$(net-default-if)}"
+    if [ -z "$iface" ]; then
+      echo "Could not determine default interface" >&2
+      exit 1
+    fi
+    ip -4 addr show dev "$iface" 2>/dev/null | grep -oE 'inet [0-9.]+' | awk '{print $2; exit}' || {
+      echo "No IP address on interface: $iface" >&2
+      exit 1
+    }
+    ;;
+  *)
+    echo "Unsupported OS: $(uname -s)" >&2
+    exit 1
+    ;;
+esac

@@ -1,3 +1,0 @@
-function pfcat {
-  sudo postcat $(sudo find /var/spool/postfix -name $1 | head -n1)
-}

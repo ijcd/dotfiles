@@ -17,12 +17,13 @@
       mise # node, deno, bun, rust, python, etc.
 
       # misc
-      nil
-      biome
-      nixfmt-rfc-style
-      yt-dlp
-      ffmpeg
-      ollama
+      nil                # nix LSP
+      biome              # JS/TS linter/formatter
+      nixfmt-rfc-style   # nix formatter
+      yt-dlp             # youtube downloader
+      ffmpeg             # video/audio processing
+      ollama             # local LLMs
+      poppler_utils      # pdfunite, pdftotext, etc.
 
       # fonts
       nerd-fonts.fira-code

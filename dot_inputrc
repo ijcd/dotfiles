@@ -1,0 +1,77 @@
+# Readline configuration
+# Affects: bash, psql, python/irb/node REPLs, and other readline-based tools
+# (Does NOT affect zsh, which uses ZLE)
+
+# ─────────────────────────────────────────────────────────────
+# Completion behavior
+# ─────────────────────────────────────────────────────────────
+
+# Case-insensitive completion
+set completion-ignore-case on
+
+# Show completions immediately when ambiguous (no double-tab)
+set show-all-if-ambiguous on
+
+# Show completions if no common prefix can be added
+set show-all-if-unmodified on
+
+# Add trailing slash to symlinked directories
+set mark-symlinked-directories on
+
+# Don't complete hidden files unless pattern starts with dot
+set match-hidden-files off
+
+# Show file type indicators (like ls -F)
+set visible-stats on
+
+# Color completions by file type (like ls --color)
+set colored-stats on
+
+# Color the common prefix in completions
+set colored-completion-prefix on
+
+# Show all completions at once (no paging)
+set page-completions off
+
+# Ask before showing more than N completions
+set completion-query-items 200
+
+# Smart completion: consider text after cursor
+set skip-completed-text on
+
+# ─────────────────────────────────────────────────────────────
+# History
+# ─────────────────────────────────────────────────────────────
+
+# Up/Down arrows search history by prefix (type "git" then up = prev git cmd)
+"\e[A": history-search-backward
+"\e[B": history-search-forward
+
+# ─────────────────────────────────────────────────────────────
+# Editing
+# ─────────────────────────────────────────────────────────────
+
+# Alt+Delete: delete word forward
+"\e[3;3~": kill-word
+
+# Ctrl+Left/Right: move by word
+"\e[1;5C": forward-word
+"\e[1;5D": backward-word
+
+# ─────────────────────────────────────────────────────────────
+# UTF-8 / Encoding
+# ─────────────────────────────────────────────────────────────
+
+set input-meta on
+set output-meta on
+set convert-meta off
+
+# ─────────────────────────────────────────────────────────────
+# Misc
+# ─────────────────────────────────────────────────────────────
+
+# No bell
+set bell-style none
+
+# Faster paste (don't re-display each character)
+set enable-bracketed-paste on

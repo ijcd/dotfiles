@@ -36,6 +36,9 @@ fi
 # Tool hooks (fallback for non-HM systems, skips if already initialized)
 source $ZDOTDIR/tools.zsh
 
+# Syntax highlighting performance - skip lines over 300 chars
+export ZSH_HIGHLIGHT_MAXLENGTH=300
+
 ###########################################
 ### Interactive
 ###########################################

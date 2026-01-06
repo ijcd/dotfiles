@@ -1,40 +1,77 @@
 debug_file_start
 
+# ─────────────────────────────────────────────────────────────────────────────
 # Tool initialization - conditional hooks for CLI tools
-# These check if the tool exists AND if it hasn't already been initialized
-# (e.g., by Home Manager), to avoid double-init.
+# ─────────────────────────────────────────────────────────────────────────────
+# These run shell hooks for various tools. Each checks:
+#   1. Is the tool installed?
+#   2. Has it already been initialized (e.g., by Home Manager)?
+# This allows the same dotfiles to work with or without Home Manager.
 
-# direnv - auto-load .envrc files
+# direnv - automatically load/unload .envrc files when entering directories
+# Useful for per-project environment variables (API keys, PATH modifications)
+# https://direnv.net
 if (( $+commands[direnv] )) && ! (( $+functions[_direnv_hook] )); then
   eval "$(direnv hook zsh)"
 fi
 
-# zoxide - smart cd
+# zoxide - smarter cd that learns your habits ("z foo" jumps to ~/projects/foo)
+# Replaces autojump/z/fasd
+# https://github.com/ajeetdsouza/zoxide
 if (( $+commands[zoxide] )) && ! (( $+functions[__zoxide_z] )); then
   eval "$(zoxide init zsh)"
 fi
 
-# starship - prompt
+# starship - fast, customizable prompt written in Rust
+# Config lives at ~/.config/starship.toml
+# https://starship.rs
 if (( $+commands[starship] )) && [[ -z "$STARSHIP_SESSION_KEY" ]]; then
   eval "$(starship init zsh)"
 fi
 
-# fzf - fuzzy finder key bindings and completion
+# fzf - fuzzy finder for files, history, etc.
+# Adds: Ctrl+R (history), Ctrl+T (files), Alt+C (cd)
+# https://github.com/junegunn/fzf
 if (( $+commands[fzf] )) && ! (( $+functions[fzf-history-widget] )); then
   eval "$(fzf --zsh 2>/dev/null)" || {
-    # Fallback for older fzf versions
+    # Fallback for older fzf versions that don't have --zsh
     [[ -f ~/.fzf.zsh ]] && source ~/.fzf.zsh
   }
 fi
 
-# kubectl - kubernetes CLI completion
+# ─────────────────────────────────────────────────────────────────────────────
+# Shell completions for CLI tools
+# ─────────────────────────────────────────────────────────────────────────────
+
+# kubectl - Kubernetes CLI
+# Adds tab completion for kubectl commands, resources, namespaces, etc.
 if (( $+commands[kubectl] )) && ! (( $+functions[_kubectl] )); then
   source <(kubectl completion zsh)
 fi
 
-# dotnet - global tools path
+# kops - Kubernetes Operations (cluster provisioning on AWS)
+# Only useful if you create/manage K8s clusters on AWS
+if (( $+commands[kops] )) && ! (( $+functions[_kops] )); then
+  source <(kops completion zsh)
+fi
+
+# ─────────────────────────────────────────────────────────────────────────────
+# PATH additions for language-specific tool directories
+# ─────────────────────────────────────────────────────────────────────────────
+# These are where language toolchains install user binaries.
+# The toolchain itself may come from nix/mise, but user-installed
+# packages (e.g., "cargo install", "dotnet tool install -g") go here.
+
+# dotnet - .NET global tools (e.g., dotnet-ef, dotnet-outdated)
+# Installed via: dotnet tool install -g <tool>
 if (( $+commands[dotnet] )) && [[ -d ~/.dotnet/tools ]]; then
   path+=(~/.dotnet/tools)
+fi
+
+# rust/cargo - Cargo-installed binaries (e.g., cargo-watch, ripgrep if installed via cargo)
+# Installed via: cargo install <crate>
+if [[ -d ~/.cargo/bin ]]; then
+  path+=(~/.cargo/bin)
 fi
 
 debug_file_end

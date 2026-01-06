@@ -1,0 +1,99 @@
+#!/bin/sh
+# pgsql-server - Start/stop/manage local PostgreSQL server
+#
+# Usage: pgsql-server <command>
+#
+# Commands:
+#   start    Start the PostgreSQL server
+#   stop     Stop the PostgreSQL server
+#   restart  Restart the PostgreSQL server
+#   status   Check if PostgreSQL is running
+#   log      Tail the PostgreSQL log file
+#
+# Examples:
+#   pgsql-server start
+#   pgsql-server status
+#   pgsql-server log
+#
+# Data directory is auto-detected from common locations, or set PGDATA.
+
+set -e
+
+# Find PostgreSQL data directory
+find_pgdata() {
+  # Use PGDATA if set
+  if [ -n "$PGDATA" ] && [ -d "$PGDATA" ]; then
+    echo "$PGDATA"
+    return
+  fi
+
+  # Common locations (check in order)
+  for dir in \
+    /opt/homebrew/var/postgres \
+    /opt/homebrew/var/postgresql@*/data \
+    /usr/local/var/postgres \
+    /usr/local/var/postgresql@*/data \
+    ~/.local/share/postgres \
+    ~/.postgres/data \
+    /var/lib/postgresql/*/main
+  do
+    # shellcheck disable=SC2086
+    for d in $dir; do
+      if [ -d "$d" ] && [ -f "$d/PG_VERSION" ]; then
+        echo "$d"
+        return
+      fi
+    done
+  done
+
+  echo ""
+}
+
+PGDATA=$(find_pgdata)
+LOGFILE="${PGDATA}/server.log"
+
+if [ -z "$PGDATA" ]; then
+  echo "Could not find PostgreSQL data directory." >&2
+  echo "Set PGDATA environment variable or install PostgreSQL." >&2
+  exit 1
+fi
+
+echo "Data directory: $PGDATA"
+echo "Log file:       $LOGFILE"
+echo ""
+
+case "${1:-status}" in
+  start)
+    echo "Starting PostgreSQL..."
+    pg_ctl -D "$PGDATA" -l "$LOGFILE" start
+    echo "Done. Use 'pgsql-server log' to view logs."
+    ;;
+  stop)
+    echo "Stopping PostgreSQL..."
+    pg_ctl -D "$PGDATA" stop -s -m fast
+    echo "Stopped."
+    ;;
+  restart)
+    echo "Restarting PostgreSQL..."
+    pg_ctl -D "$PGDATA" -l "$LOGFILE" restart -s -m fast
+    echo "Done. Use 'pgsql-server log' to view logs."
+    ;;
+  status)
+    echo "Checking status..."
+    pg_ctl -D "$PGDATA" status || echo "PostgreSQL is not running."
+    ;;
+  log)
+    if [ -f "$LOGFILE" ]; then
+      echo "Tailing log (Ctrl+C to stop)..."
+      echo ""
+      tail -f "$LOGFILE"
+    else
+      echo "Log file not found: $LOGFILE" >&2
+      exit 1
+    fi
+    ;;
+  *)
+    echo "Usage: pgsql-server {start|stop|restart|status|log}" >&2
+    exit 1
+    ;;
+esac

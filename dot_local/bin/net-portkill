@@ -1,0 +1,51 @@
+#!/bin/sh
+# net-portkill - Kill process(es) listening on a port
+#
+# Usage: net-portkill <port>
+#
+# Examples:
+#   net-portkill 3000    # Kill whatever is listening on port 3000
+#   net-portkill 8080    # Free up port 8080
+#
+# Requires sudo on macOS (lsof needs it to see all processes).
+
+set -e
+
+if [ -z "$1" ]; then
+  echo "Usage: net-portkill <port>" >&2
+  exit 1
+fi
+
+port="$1"
+
+case "$(uname -s)" in
+  Darwin)
+    # macOS: lsof to find PIDs, then kill
+    pids=$(sudo lsof -t -iTCP:"$port" -sTCP:LISTEN 2>/dev/null)
+    ;;
+  Linux)
+    # Linux: lsof or ss/fuser
+    if command -v lsof >/dev/null 2>&1; then
+      pids=$(lsof -t -iTCP:"$port" -sTCP:LISTEN 2>/dev/null)
+    elif command -v ss >/dev/null 2>&1; then
+      pids=$(ss -tlnp "sport = :$port" 2>/dev/null | grep -oP 'pid=\K\d+' | sort -u)
+    else
+      echo "Requires lsof or ss" >&2
+      exit 1
+    fi
+    ;;
+  *)
+    echo "Unsupported OS: $(uname -s)" >&2
+    exit 1
+    ;;
+esac
+
+if [ -z "$pids" ]; then
+  echo "No process listening on port $port"
+  exit 0
+fi
+
+echo "Killing process(es) on port $port: $pids"
+echo "$pids" | xargs kill
+
+echo "Done."
