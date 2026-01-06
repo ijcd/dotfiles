@@ -1,0 +1,30 @@
+#!/bin/sh
+# docker-bash - Open interactive shell in a container
+#
+# Usage: docker-bash <container-name-or-id> [shell]
+#
+# Opens an interactive shell in the container.
+# Tries bash first, falls back to sh (for alpine images).
+# Accepts container name patterns (resolved via docker-spec).
+#
+# Examples:
+#   docker-bash nginx         # tries bash, then sh
+#   docker-bash web-app zsh   # use specific shell
+
+set -e
+
+if [ -z "$1" ]; then
+  echo "Usage: docker-bash <container-name-or-id> [shell]" >&2
+  exit 1
+fi
+
+id=$(docker-spec "$1")
+shell="${2:-bash}"
+
+# Try requested shell, fall back to sh
+if docker exec "$id" which "$shell" >/dev/null 2>&1; then
+  exec docker exec -it "$id" "$shell"
+else
+  echo "Note: $shell not found, using sh" >&2
+  exec docker exec -it "$id" sh
+fi

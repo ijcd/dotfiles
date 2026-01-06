@@ -1,4 +1,0 @@
-docker-clean() {
-    docker-clean-procs
-    docker-clean-images
-}

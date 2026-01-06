@@ -7,3 +7,4 @@ TODO:
 1. Do we have anything as a top-level dot file that can now go into .config?
 2. Move the brews to nix
 3. Move the nix machine-specific to general (where it makes sense)
+4. Clean up the bin directory to be more namespacey

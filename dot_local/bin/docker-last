@@ -1,0 +1,29 @@
+#!/bin/sh
+# docker-last - Run the most recently created image
+#
+# Usage: docker-last [docker-run-args...]
+#
+# Finds the most recently created image and runs it interactively.
+# Useful after building an image to quickly test it.
+#
+# Examples:
+#   docker-last                    # Run with default entrypoint
+#   docker-last sh                 # Run with sh shell
+#   docker-last --rm               # Run and remove when done
+#   docker-last -p 8080:80         # Run with port mapping
+
+set -e
+
+# Get most recent image ID (skip header, get first result)
+last_image=$(docker images -q | head -1)
+
+if [ -z "$last_image" ]; then
+  echo "No images found" >&2
+  exit 1
+fi
+
+# Show which image we're running
+image_info=$(docker images --format '{{.Repository}}:{{.Tag}} ({{.ID}})' | head -1)
+echo "Running: $image_info"
+
+exec docker run -it "$@" "$last_image"

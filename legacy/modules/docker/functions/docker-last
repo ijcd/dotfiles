@@ -1,5 +1,0 @@
-docker-last() {
-    last_image=$(docker images | head -n2 | tail -n1 | awk '{print $3}')
-    echo $last_image
-    docker run -ti $last_image "$@"
-}

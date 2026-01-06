@@ -1,0 +1,14 @@
+#!/bin/sh
+# docker-clean-procs - Remove all stopped containers
+#
+# Usage: docker-clean-procs
+#
+# Removes all containers that are not currently running.
+# Equivalent to: docker container prune -f
+#
+# Use docker-clean-images to also remove dangling images.
+
+set -e
+
+echo "Removing stopped containers..."
+docker container prune -f

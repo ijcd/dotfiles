@@ -1,0 +1,23 @@
+#!/bin/sh
+# docker-exec - Execute command in a container
+#
+# Usage: docker-exec <container-name-or-id> <command> [args...]
+#
+# Shortcut for: docker exec -it <container> <command>
+# Accepts container name patterns (resolved via docker-spec).
+#
+# Examples:
+#   docker-exec nginx cat /etc/nginx/nginx.conf
+#   docker-exec postgres psql -U postgres
+#   docker-exec web-app sh    # if bash isn't available
+
+set -e
+
+if [ -z "$1" ] || [ -z "$2" ]; then
+  echo "Usage: docker-exec <container-name-or-id> <command> [args...]" >&2
+  exit 1
+fi
+
+spec="$1"; shift
+id=$(docker-spec "$spec")
+exec docker exec -it "$id" "$@"

@@ -1,0 +1,23 @@
+#!/bin/sh
+# docker-clean-images - Remove dangling (untagged) images
+#
+# Usage: docker-clean-images [-a]
+#
+# Without flags: removes only dangling images (<none>:<none>)
+# With -a flag:  removes all unused images (not just dangling)
+#
+# Equivalent to: docker image prune -f [-a]
+#
+# Examples:
+#   docker-clean-images      # Remove dangling images only
+#   docker-clean-images -a   # Remove all unused images
+
+set -e
+
+if [ "$1" = "-a" ]; then
+  echo "Removing all unused images..."
+  docker image prune -af
+else
+  echo "Removing dangling images..."
+  docker image prune -f
+fi

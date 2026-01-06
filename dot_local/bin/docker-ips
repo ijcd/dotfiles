@@ -1,0 +1,31 @@
+#!/bin/sh
+# docker-ips - Show IP addresses of running containers
+#
+# Usage: docker-ips [container-name-or-id]
+#
+# Without arguments, shows IPs of all running containers.
+# With argument, shows IP of specific container.
+#
+# Output format: IP_ADDRESS  CONTAINER_NAME  CONTAINER_ID
+#
+# Examples:
+#   docker-ips              # List all container IPs
+#   docker-ips nginx        # Show IP of nginx container
+
+set -e
+
+if [ -n "$1" ]; then
+  # Single container
+  id=$(docker-spec "$1")
+  docker inspect --format='{{range .NetworkSettings.Networks}}{{.IPAddress}}{{end}}' "$id"
+else
+  # All containers
+  containers=$(docker ps -q)
+  if [ -z "$containers" ]; then
+    echo "No running containers" >&2
+    exit 0
+  fi
+  echo "$containers" | xargs -n 1 docker inspect \
+    --format='{{range .NetworkSettings.Networks}}{{.IPAddress}}{{end}} {{ .Name }} {{ .Id }}' \
+    2>/dev/null | sed 's|^ */||' | column -t
+fi

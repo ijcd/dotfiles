@@ -1,0 +1,34 @@
+#!/bin/sh
+# docker-spec - Resolve container name/pattern to container ID
+#
+# Usage: docker-spec <name-or-pattern>
+#
+# Looks up a container by name pattern and returns its ID.
+# If no match found, returns the input (assumes it's already an ID).
+# Warns if multiple containers match the pattern.
+#
+# Used by other docker-* scripts for flexible container targeting.
+#
+# Examples:
+#   docker-spec nginx        # Returns ID of container named "nginx"
+#   docker-spec web          # Returns ID of container with "web" in name
+#   docker-spec abc123       # Returns "abc123" if no container matches
+
+set -e
+
+if [ -z "$1" ]; then
+  echo "Usage: docker-spec <name-or-pattern>" >&2
+  exit 1
+fi
+
+spec="$1"
+matches=$(docker ps -aqf "name=$spec" 2>/dev/null)
+count=$(echo "$matches" | grep -c . 2>/dev/null || echo 0)
+
+if [ "$count" -gt 1 ]; then
+  echo "Warning: $count containers match '$spec', using first:" >&2
+  docker ps -f "name=$spec" --format '  {{.Names}} ({{.ID}})' >&2
+fi
+
+id=$(echo "$matches" | head -1)
+echo "${id:-$spec}"
