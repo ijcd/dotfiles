@@ -1,0 +1,30 @@
+# EditorConfig: https://editorconfig.org
+root = true
+
+# Defaults for all files
+[*]
+end_of_line = lf
+insert_final_newline = true
+trim_trailing_whitespace = true
+charset = utf-8
+indent_style = space
+indent_size = 2
+
+# 4-space languages
+[*.{py,java,scala,elm,go,rs}]
+indent_size = 4
+
+# Tab-based (Makefile, Go)
+[Makefile]
+indent_style = tab
+
+[*.go]
+indent_style = tab
+
+# Markdown - preserve trailing whitespace (line breaks)
+[*.{md,markdown}]
+trim_trailing_whitespace = false
+
+# Git
+[*.{diff,patch}]
+trim_trailing_whitespace = false

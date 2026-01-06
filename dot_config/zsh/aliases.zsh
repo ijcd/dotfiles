@@ -12,6 +12,10 @@ alias zln="noglob zmv -L"
 alias la="ls -la";
 alias ..="cd ..";
 
+# print PATH/FPATH as lines (zsh $path array)
+alias path='print -l $path'
+alias fpath='print -l $fpath'
+
 # all history
 alias hh='history 1'
 
@@ -27,9 +31,10 @@ alias fn='find . -name'
 # ripgrep (ignore)
 alias rgi="rg --no-ignore"
 
-# skip the function/git diff
+# diff variants
 alias ddiff="/usr/bin/diff"
 alias udiff="/usr/bin/diff -urN"
+alias gdiff="git diff --no-index --color-words"
 
 # Lock the screen (when going AFK)
 alias afk='osascript -e "tell application \"System Events\" to keystroke \"q\" using {control down, command down}"'
@@ -98,3 +103,11 @@ alias -g thisbranch:thisbranch='$(git rev-parse --abbrev-ref HEAD)':'$(git rev-p
 # alias zz='fasd_cd -d -i' # cd with interactive selection
 # alias j='fasd_cd -d'     # muscle memory
 # alias jj='fasd_cd -d -i' # cd with interactive selection
+
+###############################
+# Debian
+###############################
+alias acs="apt-cache search"
+alias acsh="apt-cache show"
+alias acp="apt-cache policy"
+alias agi="apt-get install"

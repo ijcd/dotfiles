@@ -1,0 +1,55 @@
+#!/bin/sh
+# dns-flush - Flush the local DNS cache
+#
+# Usage: dns-flush
+#
+# Supports:
+#   - macOS (all modern versions)
+#   - Linux with systemd-resolved
+#   - Linux with nscd
+#   - Linux with dnsmasq
+
+set -e
+
+case "$(uname -s)" in
+  Darwin)
+    echo "Flushing macOS DNS cache..."
+    sudo dscacheutil -flushcache
+    sudo killall -HUP mDNSResponder 2>/dev/null || true
+    echo "DNS cache flushed."
+    ;;
+
+  Linux)
+    echo "Flushing Linux DNS cache..."
+    flushed=0
+
+    # systemd-resolved (most common on modern distros)
+    if command -v resolvectl >/dev/null 2>&1; then
+      sudo resolvectl flush-caches && flushed=1
+    elif command -v systemd-resolve >/dev/null 2>&1; then
+      sudo systemd-resolve --flush-caches && flushed=1
+    fi
+
+    # nscd (name service cache daemon)
+    if command -v nscd >/dev/null 2>&1 && pgrep -x nscd >/dev/null 2>&1; then
+      sudo nscd -i hosts && flushed=1
+    fi
+
+    # dnsmasq (common on some setups)
+    if pgrep -x dnsmasq >/dev/null 2>&1; then
+      sudo killall -HUP dnsmasq && flushed=1
+    fi
+
+    if [ "$flushed" -eq 1 ]; then
+      echo "DNS cache flushed."
+    else
+      echo "No known DNS cache service found." >&2
+      echo "Your system may not cache DNS locally." >&2
+    fi
+    ;;
+
+  *)
+    echo "Unsupported OS: $(uname -s)" >&2
+    exit 1
+    ;;
+esac

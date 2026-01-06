@@ -52,6 +52,9 @@ export RSYNC_RSH=ssh
 export EDITOR=vim
 export VISUAL=$EDITOR
 
+# Erlang/Elixir - persistent shell history in erl/iex
+export ERL_AFLAGS="-kernel shell_history enabled"
+
 # FTP
 : ${FTP_PASSIVE:=1}
 export FTP_PASSIVE

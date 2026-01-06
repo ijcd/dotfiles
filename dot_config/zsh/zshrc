@@ -33,6 +33,9 @@ if [[ -f ~/.local/share/hm-zsh/.zshrc ]]; then
   source ~/.local/share/hm-zsh/.zshrc
 fi
 
+# Tool hooks (fallback for non-HM systems, skips if already initialized)
+source $ZDOTDIR/tools.zsh
+
 ###########################################
 ### Interactive
 ###########################################

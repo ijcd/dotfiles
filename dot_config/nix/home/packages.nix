@@ -11,6 +11,7 @@
       ripgrep
       gh
       zoxide
+      delta
 
       # programming languages
       mise # node, deno, bun, rust, python, etc.

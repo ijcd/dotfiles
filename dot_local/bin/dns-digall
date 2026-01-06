@@ -1,0 +1,21 @@
+#!/bin/sh
+# dns-digall - Query all DNS record types for a domain
+#
+# Usage: dns-digall <domain>
+#
+# Examples:
+#   dns-digall example.com
+#   dns-digall google.com
+#
+# Note: Many DNS servers no longer respond to ANY queries for security
+# reasons (RFC 8482). You may get incomplete results. For thorough
+# enumeration, query specific record types individually.
+
+set -e
+
+if [ -z "$1" ]; then
+  echo "Usage: dns-digall <domain>" >&2
+  exit 1
+fi
+
+dig +nocmd "$1" any +multiline +noall +answer
