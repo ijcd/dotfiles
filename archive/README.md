@@ -47,3 +47,112 @@ workstations. It predates the modern web and most of today's developers.
 Some files transcend utility. This is 30 years of computing history in 200
 lines. The applications are gone, the workstations are recycled, but the
 config remains - a time capsule from when "the cloud" meant the weather.
+
+---
+
+## Email Infrastructure (2000s)
+
+Server-side email processing from the era of self-hosted mail.
+
+### Files
+
+| File | Description |
+|------|-------------|
+| `pinerc-2000s` | Alpine/Pine email client configuration |
+| `procmailrc-2000s` | Procmail filtering rules |
+| `procmail-2000s/` | Supporting filter includes |
+
+### What it did
+
+This was infrastructure for running your own email:
+
+- **Pine/Alpine**: Terminal-based email client from University of Washington.
+  The spiritual ancestor of many email conventions we still use today.
+
+- **Procmail**: Server-side mail filtering that ran on every incoming message.
+  Rules would sort mail into folders, forward copies, and filter spam.
+
+- **CRM114**: The "Controllable Regex Mutilator" - a statistical spam filter
+  that was cutting-edge in its day. It learned from your mail to distinguish
+  spam from ham using Bayesian classification.
+
+### The setup
+
+```
+Incoming mail → Procmail → CRM114 spam check → Sort to folders
+                    ↓
+              Forward copy to Gmail (backup)
+```
+
+Mail was sorted by:
+- Whitelist (trusted senders)
+- Killfile (blocked senders)
+- Mailing lists (auto-sorted by List-Id header)
+- Spam score (CRM114 classification)
+
+### Historical context
+
+This predates Gmail's dominance. Running your own mail server meant:
+- Full control over your email
+- Learning procmail's arcane recipe syntax
+- Battling spam with tools like SpamAssassin, CRM114, and bogofilter
+- Actually reading RFCs to debug delivery issues
+
+Today, even email enthusiasts typically use Fastmail or Gmail rather than
+self-hosting. The spam problem alone makes it impractical for individuals.
+
+---
+
+## Ruby Development (2010s)
+
+A comprehensive Ruby/Rails development environment from the peak Rails era.
+
+### Files
+
+| File/Directory | Description |
+|----------------|-------------|
+| `ruby-2010s/irbrc` | IRB config with Pry fallback, helpers, Rails integration |
+| `ruby-2010s/pryrc` | Pry debugger aliases |
+| `ruby-2010s/pry/` | Elaborate Pry config with Solarized colors |
+| `ruby-2010s/gemrc` | Gem install options (skip docs) |
+| `ruby-2010s/railsrc` | Rails console helpers (SQL toggling) |
+| `ruby-2010s/rdebugrc` | ruby-debug settings |
+| `ruby-2010s/bin/` | ctags-ruby, zeus helpers, gem finders |
+| `ruby-2010s/functions/` | Shell helpers for gems, bundler, cucumber |
+
+### What it did
+
+This was a full Ruby development workflow:
+
+- **RVM/rbenv**: Ruby version managers (now use mise/asdf)
+- **Zeus**: Rails preloader for fast test runs (dead, was replaced by Spring)
+- **Pry**: Enhanced REPL that replaced IRB for many (still used)
+- **Wirble**: IRB colorizer (obsolete, IRB has colors now)
+- **TextMate**: The editor of choice (`gemmate` opened gems in it)
+
+### The workflow
+
+```
+rvm use 2.1.0           # Switch Ruby version
+bundle install          # Install gems
+zeus start              # Preload Rails in background
+zeus rspec spec/        # Fast test runs
+binding.pry             # Drop into debugger
+```
+
+### Historical context
+
+This was peak Ruby/Rails (2008-2015):
+- Rails was "the" web framework
+- GitHub, Twitter, Shopify all ran on Rails
+- "Convention over configuration" was revolutionary
+- DHH was posting inflammatory blog posts
+- RailsConf was the conference to attend
+
+The ecosystem has matured significantly. Modern Ruby (3.1+) has:
+- Built-in IRB improvements (colors, autocomplete)
+- Built-in `debug` gem replacing pry-byebug
+- Bundler built into Ruby
+- No need for complex preloaders
+
+A minimal `~/.irbrc` for history is all that's needed now.

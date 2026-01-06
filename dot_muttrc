@@ -1,0 +1,126 @@
+# ─────────────────────────────────────────────────────────────────────────────
+# Mutt configuration
+# ─────────────────────────────────────────────────────────────────────────────
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Identity
+# ─────────────────────────────────────────────────────────────────────────────
+set realname = "Ian Duggan"
+set from = "ian@ianduggan.net"
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Gmail IMAP
+# ─────────────────────────────────────────────────────────────────────────────
+set imap_user = "ianduggan@gmail.com"
+
+# Password: use one of these methods (uncomment one):
+# Option 1: macOS Keychain
+#set imap_pass = `security find-generic-password -s gmail-mutt -w`
+# Option 2: pass (password-store)
+#set imap_pass = `pass email/gmail-mutt`
+# Option 3: GPG-encrypted file
+#set imap_pass = `gpg -d ~/.mutt/password.gpg 2>/dev/null`
+
+set folder = "imaps://imap.gmail.com:993"
+set spoolfile = "+INBOX"
+set postponed = "+[Gmail]/Drafts"
+set record = "+[Gmail]/Sent Mail"
+set trash = "+[Gmail]/Trash"
+
+# Gmail handles sent mail, don't save locally
+set copy = no
+
+# ─────────────────────────────────────────────────────────────────────────────
+# SMTP (sending)
+# ─────────────────────────────────────────────────────────────────────────────
+set smtp_url = "smtps://ianduggan@gmail.com@smtp.gmail.com:465/"
+# Use same password method as IMAP above
+#set smtp_pass = `security find-generic-password -s gmail-mutt -w`
+set smtp_authenticators = "gssapi:login"
+set ssl_starttls = yes
+set ssl_force_tls = yes
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Local cache (faster operation)
+# ─────────────────────────────────────────────────────────────────────────────
+set header_cache = ~/.mutt/cache/headers
+set message_cachedir = ~/.mutt/cache/bodies
+set certificate_file = ~/.mutt/certificates
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Behavior
+# ─────────────────────────────────────────────────────────────────────────────
+set move = no                          # Don't move read mail to mstrstrbox
+set delete = yes                       # Don't ask when deleting
+set quit = ask-yes                     # Confirm quit
+set wait_key = no                      # Don't wait for key after shell command
+set timeout = 30                       # Check for new mail every 30 seconds
+set mail_check = 60                    # Minimum time between mailbox scans
+set beep_new = yes                     # Beep on new mail
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Composing
+# ─────────────────────────────────────────────────────────────────────────────
+set editor = "$EDITOR"
+set edit_headers = yes                 # Edit headers in editor
+set include = yes                      # Include message in reply
+set forward_quote = yes                # Quote forwarded message
+set text_flowed = yes                  # Better line wrapping
+set sig_dashes = yes                   # Add "-- " before signature
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Display
+# ─────────────────────────────────────────────────────────────────────────────
+set date_format = "%Y-%m-%d %H:%M"
+set index_format = "%4C %Z %D %-20.20L %s"
+set sort = threads
+set sort_aux = reverse-last-date-received
+set pager_index_lines = 10             # Show index in pager
+set pager_context = 3                  # Lines of context in pager
+set pager_stop = yes                   # Don't go to next message at end
+set markers = no                       # No + on wrapped lines
+set tilde = yes                        # Show ~ on empty lines
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Sidebar (if compiled with sidebar support)
+# ─────────────────────────────────────────────────────────────────────────────
+#set sidebar_visible = yes
+#set sidebar_width = 25
+#set sidebar_format = "%B%?F? [%F]?%* %?N?%N/?%S"
+#bind index,pager B sidebar-toggle-visible
+#bind index,pager \Cp sidebar-prev
+#bind index,pager \Cn sidebar-next
+#bind index,pager \Co sidebar-open
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Key bindings (vim-like)
+# ─────────────────────────────────────────────────────────────────────────────
+bind pager j next-line
+bind pager k previous-line
+bind pager g top
+bind pager G bottom
+bind index g first-entry
+bind index G last-entry
+bind index,pager R group-reply
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Colors (works on 256-color terminals)
+# ─────────────────────────────────────────────────────────────────────────────
+color normal     default default
+color indicator  black   cyan
+color status     white   blue
+color tree       cyan    default
+color error      red     default
+color message    green   default
+color attachment magenta default
+color search     black   yellow
+color quoted     cyan    default
+color quoted1    yellow  default
+color quoted2    green   default
+color hdrdefault cyan    default
+color header     yellow  default "^(From|Subject):"
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Local overrides
+# ─────────────────────────────────────────────────────────────────────────────
+source `[ -f ~/.muttrc.local ] && echo ~/.muttrc.local || echo /dev/null`
