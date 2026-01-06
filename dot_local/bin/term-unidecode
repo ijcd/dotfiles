@@ -1,0 +1,22 @@
+#!/bin/sh
+# term-unidecode - Decode Unicode escape sequences
+#
+# Usage: term-unidecode <escaped-string>
+#
+# Decodes \x{ABCD} style Unicode escape sequences to actual characters.
+# Useful for converting escaped Unicode back to readable text.
+#
+# Examples:
+#   term-unidecode '\x{00F1}'           # ñ
+#   term-unidecode '\x{1F600}'          # 😀
+#   term-unidecode 'caf\x{00E9}'        # café
+
+if [ -z "$1" ]; then
+  echo "Usage: term-unidecode <escaped-string>" >&2
+  exit 1
+fi
+
+perl -e "binmode(STDOUT, ':utf8'); print \"$*\""
+
+# Print newline unless piping to another program
+[ -t 1 ] && echo

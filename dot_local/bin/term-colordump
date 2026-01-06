@@ -1,0 +1,26 @@
+#!/bin/sh
+# term-colordump - Display all 256 ANSI colors
+#
+# Usage: term-colordump
+#
+# Shows how each ANSI color code (0-255) renders in your terminal.
+# Useful for testing terminal color support and picking colors for prompts.
+#
+# Example output:
+#   000 001 002 ... (each in its respective color)
+
+printf "How each ANSI color is displayed on your terminal:\n\n"
+
+i=0
+row=0
+while [ $i -lt 256 ]; do
+  newrow=$((i / 10))
+  [ $newrow -ne $row ] && printf "\n"
+  row=$newrow
+  printf "\033[48;5;%dm %03d \033[0m" $i $i
+  i=$((i + 1))
+done
+
+printf '\n\n'
+printf 'Usage: "\\033[48;5;NUMm" for background, "\\033[38;5;NUMm" for foreground\n'
+printf 'Example: \\033[38;5;196mRED TEXT\\033[0m = \033[38;5;196mRED TEXT\033[0m\n'

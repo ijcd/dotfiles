@@ -1,0 +1,82 @@
+#!/bin/sh
+# term-colored - Generate ANSI escape codes for colors
+#
+# Usage: term-colored <color> [modifier] [bgcolor]
+#
+# Outputs the ANSI escape sequence for the specified color combination.
+# Useful for building colored output in scripts.
+#
+# Colors:    black, red, green, yellow, blue, magenta, cyan, white, reset
+# Modifiers: normal, bold, underline, blinking
+# Bgcolor:   black, red, green, yellow, blue, magenta, cyan, white
+#
+# Examples:
+#   term-colored red                    # Red text
+#   term-colored green bold             # Bold green text
+#   term-colored white normal blue      # White on blue background
+#   echo "$(term-colored red)ERROR$(term-colored reset): failed"
+
+if [ -z "$1" ]; then
+  cat >&2 <<'EOF'
+Usage: term-colored <color> [modifier] [bgcolor]
+
+Colors:    black, red, green, yellow, blue, magenta, cyan, white, reset
+Modifiers: normal, bold, underline, blinking
+Bgcolor:   black, red, green, yellow, blue, magenta, cyan, white
+
+Examples:
+  term-colored red
+  term-colored green bold
+  term-colored white normal blue
+  echo "$(term-colored red)ERROR$(term-colored reset): failed"
+EOF
+  exit 1
+fi
+
+color="$1"
+modifier="$2"
+bgcolor="$3"
+
+# Foreground color
+case "$color" in
+  reset)   cnum=0 ;;
+  black)   cnum=30 ;;
+  red)     cnum=31 ;;
+  green)   cnum=32 ;;
+  yellow)  cnum=33 ;;
+  blue)    cnum=34 ;;
+  magenta) cnum=35 ;;
+  cyan)    cnum=36 ;;
+  white)   cnum=37 ;;
+  *) echo "Unknown color: $color" >&2; exit 1 ;;
+esac
+
+# Background color
+case "$bgcolor" in
+  black)   bgcnum=40 ;;
+  red)     bgcnum=41 ;;
+  green)   bgcnum=42 ;;
+  yellow)  bgcnum=43 ;;
+  blue)    bgcnum=44 ;;
+  magenta) bgcnum=45 ;;
+  cyan)    bgcnum=46 ;;
+  white)   bgcnum=47 ;;
+  "")      bgcnum="" ;;
+  *) echo "Unknown bgcolor: $bgcolor" >&2; exit 1 ;;
+esac
+
+# Modifier
+case "$modifier" in
+  normal|"") mnum="" ;;
+  bold)      mnum=1 ;;
+  underline) mnum=4 ;;
+  blinking)  mnum=5 ;;
+  *) echo "Unknown modifier: $modifier" >&2; exit 1 ;;
+esac
+
+# Build escape sequence
+seq="$cnum"
+[ -n "$mnum" ] && seq="${mnum};${seq}"
+[ -n "$bgcnum" ] && seq="${seq};${bgcnum}"
+
+printf '\033[%sm' "$seq"

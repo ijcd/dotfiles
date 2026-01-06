@@ -1,0 +1,22 @@
+#!/bin/sh
+# term-codepoint - Get Unicode code point for a character
+#
+# Usage: term-codepoint <character>
+#
+# Prints the Unicode code point (U+XXXX) for the given character.
+# Useful for debugging Unicode issues or finding character codes.
+#
+# Examples:
+#   term-codepoint ñ      # U+00F1
+#   term-codepoint 😀     # U+1F600
+#   term-codepoint ©      # U+00A9
+
+if [ -z "$1" ]; then
+  echo "Usage: term-codepoint <character>" >&2
+  exit 1
+fi
+
+perl -e "use utf8; print sprintf('U+%04X', ord(\"$*\"))"
+
+# Print newline unless piping to another program
+[ -t 1 ] && echo
