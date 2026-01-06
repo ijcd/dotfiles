@@ -1,0 +1,11 @@
+#!/bin/sh
+# git-cleanup-whitespace - Remove whitespace-only changes from working tree
+#
+# Usage: git-cleanup-whitespace [files...]
+#
+# Reverts whitespace-only changes while keeping content changes.
+
+git diff HEAD -w "$@" >/tmp/patch.$$
+git diff | patch -R -p1
+patch -p1 </tmp/patch.$$
+rm -f /tmp/patch.$$

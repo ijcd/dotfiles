@@ -1,0 +1,6 @@
+# ─────────────────────────────────────────────────────────────────────────────
+# Git attributes
+# ─────────────────────────────────────────────────────────────────────────────
+
+# Xcode project files - treat as binary, use union merge strategy
+*.pbxproj binary merge=union

@@ -1,0 +1,30 @@
+#!/bin/sh
+# git-up - Pull with a nice log of what changed
+#
+# Usage: git-up [pull-args...]
+#        git-reup [pull-args...]
+#
+# Like git-pull but shows a short log of changes after merging.
+# When invoked as git-reup, runs git pull --rebase.
+
+set -e
+
+PULL_ARGS="$@"
+
+# when invoked as git-reup, run as `git pull --rebase'
+test "$(basename $0)" = "git-reup" &&
+    PULL_ARGS="--rebase $PULL_ARGS"
+
+git pull $PULL_ARGS
+
+# show diffstat if rebasing (git-pull only does this when merging)
+test "$(basename $0)" = "git-reup" && {
+    echo "Diff:"
+    git --no-pager diff --color --stat HEAD@{1}.. |
+        sed 's/^/ /'
+}
+
+# show abbreviated commit log of what was just merged
+echo "Log:"
+git log --color --pretty=oneline --abbrev-commit HEAD@{1}.. |
+    sed 's/^/  /'

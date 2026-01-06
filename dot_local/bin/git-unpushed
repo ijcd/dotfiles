@@ -1,0 +1,9 @@
+#!/bin/sh
+# git-unpushed - Show diff of commits not yet pushed
+#
+# Usage: git-unpushed
+#
+# Shows the diff of everything you haven't pushed yet.
+
+branch=$(git rev-parse --abbrev-ref HEAD)
+git diff origin/$branch..HEAD

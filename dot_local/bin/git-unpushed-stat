@@ -1,0 +1,18 @@
+#!/bin/sh
+# git-unpushed-stat - Show stat of commits not yet pushed
+#
+# Usage: git-unpushed-stat
+#
+# Shows the diffstat and commit count of unpushed changes.
+
+branch=$(git rev-parse --abbrev-ref HEAD)
+count=$(git rev-list --count HEAD origin/$branch...HEAD)
+
+if [ "$count" -eq "1" ]; then
+    s=''
+else
+    s='s'
+fi
+
+git diff --stat origin/$branch..HEAD
+echo " $count commit$s total"

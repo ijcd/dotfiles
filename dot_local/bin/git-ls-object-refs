@@ -1,0 +1,29 @@
+#!/bin/sh
+# git-ls-object-refs - Find all references to an object
+#
+# Usage: git-ls-object-refs <object>
+#
+# Find references to <object> SHA1 in refs, commits, and trees.
+# Useful for debugging missing or orphaned objects.
+
+o="$1"
+
+if [ -z "$o" ]; then
+    echo "Usage: git-ls-object-refs <object>" >&2
+    exit 1
+fi
+
+set +e
+
+git log --all --pretty=oneline --decorate | grep "$o" |
+    sed 's|^\([0-9a-f]\{40\}\)|commit referenced from at least one ref: \1|'
+
+for ref in $(git for-each-ref --format='%(refname)'); do
+    (git rev-list "$ref" | grep "$o") 2>&1 |
+        sed "s|^[0-9a-f]\{40\}$|commit referenced from $ref|"
+done
+
+for p in $(git rev-list --all); do
+    (git ls-tree -r "$p" | grep "$o") 2>&1 |
+        sed "s|^|object referenced from tree of commit $p:\n|"
+done

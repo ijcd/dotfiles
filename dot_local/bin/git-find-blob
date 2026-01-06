@@ -1,0 +1,36 @@
+#!/usr/bin/env ruby -w
+# git-find-blob - Find large files in git history
+#
+# Usage: git-find-blob [<head>] [<threshold_mb>]
+#
+# Finds files in git history larger than threshold (default 0.1 MB).
+# Useful for identifying large files that may be bloating the repo.
+#
+# Examples:
+#   git-find-blob              # Find files > 0.1 MB in HEAD
+#   git-find-blob HEAD 1.0     # Find files > 1 MB in HEAD
+#   git-find-blob main 0.5     # Find files > 0.5 MB in main branch
+
+head, threshold = ARGV
+head ||= 'HEAD'
+KB = 1024
+MB = KB ** 2
+threshold = (threshold || 0.1).to_f * MB
+
+big_files = {}
+
+IO.popen("git rev-list #{head}", 'r') do |rev_list|
+  rev_list.each_line do |commit|
+    commit.chomp!
+    for object in `git ls-tree -zrl #{commit}`.split("\0")
+      bits, type, sha, size, path = object.split(/\s+/, 5)
+      size = size.to_i
+      big_files[sha] = [path, size, commit] if size >= threshold
+    end
+  end
+end
+
+big_files.each do |sha, (path, size, commit)|
+  where = `git show -s #{commit} --format='%h: %cr'`.chomp
+  puts "%4.1fM\t%s\t(%s)" % [size.to_f / MB, path, where]
+end

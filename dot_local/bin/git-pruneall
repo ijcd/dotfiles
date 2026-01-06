@@ -1,0 +1,18 @@
+#!/bin/sh
+# git-pruneall - Prune stale refs from all remotes
+#
+# Usage: git-pruneall [<remote>...]
+#
+# Prune branches from specified remotes, or all remotes when no remote
+# is specified.
+
+set -e
+
+REMOTES="$@"
+
+test -z "$REMOTES" && REMOTES=$(git remote)
+
+for remote in $REMOTES; do
+    echo "pruning: $remote"
+    git remote prune "$remote" || true
+done

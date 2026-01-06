@@ -1,0 +1,43 @@
+# git-find-branch - Find git branch without forking
+#
+# Usage: git-find-branch
+#
+# Sets the $git_branch variable to the current branch name (prefixed with
+# a space for easy prompt integration). This is much faster than calling
+# `git branch` or `git rev-parse` since it reads .git/HEAD directly without
+# spawning any processes.
+#
+# Results:
+#   $git_branch = " main"       - on a branch
+#   $git_branch = " (detached)" - detached HEAD state
+#   $git_branch = " (unknown)"  - .git/HEAD exists but empty
+#   $git_branch = ""            - not in a git repository
+#
+# Example prompt usage:
+#   PROMPT='%~${git_branch} $ '
+#   precmd() { git-find-branch }
+#
+# Note: If you're using Starship or a Zim git module, they handle branch
+# display already. This function is useful for custom prompts or scripts
+# where you need fast branch detection.
+#
+# Credit: http://aaroncrane.co.uk/2009/03/git_branch_prompt/
+
+function git-find-branch () {
+  local dir=. head
+  until [ "$dir" -ef / ]; do
+    if [ -f "$dir/.git/HEAD" ]; then
+      head=$(< "$dir/.git/HEAD")
+      if [[ $head == ref:\ refs/heads/* ]]; then
+        git_branch=" ${head##*/}"
+      elif [[ $head != '' ]]; then
+        git_branch=' (detached)'
+      else
+        git_branch=' (unknown)'
+      fi
+      return
+    fi
+    dir="../$dir"
+  done
+  git_branch=''
+}

@@ -1,0 +1,32 @@
+#!/bin/sh
+# git-find-object - Find which repo contains an object
+#
+# Usage: git-find-object <id> <repo>...
+#
+# Writes first <repo> that includes object <id>. Useful when trying to
+# locate a missing object across multiple repositories.
+#
+# Examples:
+#   git-find-object deadbee /repos/*.git
+
+sha="$1"
+shift
+
+[ "$sha" = "--help" ] && {
+    sed -n 's/^# //p' "$0" | head -10
+    exit 2
+}
+
+[ -z "$sha" ] && {
+    echo "Usage: git-find-object <id> <repo>..." >&2
+    exit 1
+}
+
+for dir in "$@"; do
+    (cd "$dir" && git cat-file -e $sha 2>/dev/null) && {
+        echo "$dir"
+        exit 0
+    }
+done
+
+exit 1

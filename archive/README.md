@@ -2,7 +2,61 @@
 
 Historical configuration files preserved for posterity.
 
-## mit-1995-Xresources
+These are dotfiles built up over a few decades of Unix use, starting with zsh
+in 1995. What began as scattered `.rc` files became an elaborate module system,
+then zgen + oh-my-zsh + prezto, and has now evolved into chezmoi + nix-darwin +
+Home Manager + Zim.
+
+The configs here have been retired but are worth keeping for reference,
+nostalgia, or the occasional resurrection.
+
+---
+
+## The Original Dotfiles System (2010s)
+
+The previous incarnation used a custom module system with zgen:
+
+```
+~/.dotfiles/
+├── modules/           # Topic-based organization
+│   ├── git/          # gitconfig, aliases, scripts
+│   ├── ruby/         # irbrc, pryrc, gemrc
+│   ├── zsh/          # zshrc.symlink, prompts
+│   └── ...
+├── local/            # Less organized recent additions
+└── dotfiles          # Installation script
+```
+
+Each module could have:
+- `*.symlink` files → symlinked to `~/.filename`
+- `bin/` → added to PATH
+- `functions/` → added to fpath
+- `*.zsh` → sourced at startup
+
+This worked well but required manual symlink management. Chezmoi handles this
+better, and nix-darwin + Home Manager provide declarative system configuration.
+
+### Tools from that era (retired)
+
+| Tool | Replaced by |
+|------|-------------|
+| zgen | Zim (faster, simpler) |
+| prezto modules | Zim modules |
+| oh-my-zsh modules | Zim modules + custom |
+| custom module loader | chezmoi |
+| manual symlinks | chezmoi |
+| Brewfile | nix-darwin |
+
+### Inspiration (still good)
+
+- [yadr](https://github.com/skwp/dotfiles)
+- [rtomayko](https://github.com/rtomayko/dotfiles)
+- [mathiasbynens](https://github.com/mathiasbynens/dotfiles)
+- [sorin-ionescu](https://github.com/sorin-ionescu/dotfiles)
+
+---
+
+## MIT 1995 - Xresources
 
 X Window System resource file from my undergraduate days at MIT, circa 1995.
 
@@ -156,3 +210,14 @@ The ecosystem has matured significantly. Modern Ruby (3.1+) has:
 - No need for complex preloaders
 
 A minimal `~/.irbrc` for history is all that's needed now.
+
+---
+
+## Zsh Tips (Still Useful)
+
+Some things from the old setup that remain useful:
+
+- **zmv**: `zmv '(*).txt' '$1.md'` - powerful bulk rename
+- **fzf**: ctrl-r for history, ctrl-t for files
+- **zsh plugins**: https://github.com/unixorn/awesome-zsh-plugins
+- **zsh tricks**: http://reasoniamhere.com/2014/01/11/outrageously-useful-tips-to-master-your-z-shell/

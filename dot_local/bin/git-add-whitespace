@@ -1,0 +1,10 @@
+#!/bin/sh
+# git-add-whitespace - Stage all changes except whitespace-only changes
+#
+# Usage: git-add-whitespace
+#
+# Stages all changes but then unstages whitespace-only changes,
+# leaving only meaningful content changes staged.
+
+git add -A
+git diff --cached -w | git apply --cached -R

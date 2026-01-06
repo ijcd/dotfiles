@@ -1,0 +1,14 @@
+#!/bin/sh
+# git-object-deflate - Deflate a loose git object
+#
+# Usage: git-object-deflate <file>
+#
+# Deflates a loose object file and writes to standard output.
+# Useful for inspecting raw git object contents.
+
+if [ -z "$1" ]; then
+    echo "Usage: git-object-deflate <file>" >&2
+    exit 1
+fi
+
+exec perl -MCompress::Zlib -e 'undef $/; print uncompress(<>)' "$1"

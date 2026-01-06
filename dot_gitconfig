@@ -1,0 +1,273 @@
+# ─────────────────────────────────────────────────────────────────────────────
+# Git configuration
+# ─────────────────────────────────────────────────────────────────────────────
+
+[user]
+    name = Ian Duggan
+    # No email here! Use includeIf or per-repo config.
+    # This prevents accidentally committing with wrong identity.
+    useConfigOnly = true
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Per-directory identity (uncomment and customize as needed)
+# ─────────────────────────────────────────────────────────────────────────────
+# [includeIf "gitdir:~/work/"]
+#     path = ~/.gitconfig-work
+# [includeIf "gitdir:~/personal/"]
+#     path = ~/.gitconfig-personal
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Core settings
+# ─────────────────────────────────────────────────────────────────────────────
+[core]
+    editor = vim
+    autocrlf = false
+    excludesfile = ~/.gitignore
+    attributesfile = ~/.gitattributes
+    whitespace = space-before-tab,indent-with-non-tab,trailing-space
+    # Make `git rebase` safer on macOS
+    trustctime = false
+    # Use delta for beautiful diffs
+    pager = delta
+
+[init]
+    defaultBranch = main
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Delta (diff viewer)
+# ─────────────────────────────────────────────────────────────────────────────
+[interactive]
+    diffFilter = delta --color-only
+
+[delta]
+    navigate = true
+    line-numbers = true
+    syntax-theme = Dracula
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Colors
+# ─────────────────────────────────────────────────────────────────────────────
+[color]
+    ui = true
+
+[color "diff"]
+    meta = 11
+    frag = magenta bold
+    commit = yellow bold
+    old = red bold
+    new = green bold
+    whitespace = red reverse
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Merge / Diff tools
+# ─────────────────────────────────────────────────────────────────────────────
+[merge]
+    summary = true
+    verbosity = 1
+    tool = opendiff
+
+[diff]
+    mnemonicprefix = true
+    renamelimit = 0
+    tool = opendiff
+
+[mergetool]
+    prompt = false
+    keepBackup = false
+
+[difftool]
+    prompt = false
+
+# opendiff (FileMerge - built into macOS via Xcode)
+[mergetool "opendiff"]
+    cmd = opendiff "$LOCAL" "$REMOTE" -ancestor "$BASE" -merge "$MERGED"
+    trustExitCode = true
+
+[difftool "opendiff"]
+    cmd = opendiff "$LOCAL" "$REMOTE"
+
+# VSCode
+[mergetool "vscode"]
+    cmd = code --wait --merge "$REMOTE" "$LOCAL" "$BASE" "$MERGED"
+    trustExitCode = true
+
+[difftool "vscode"]
+    cmd = code --wait --diff "$LOCAL" "$REMOTE"
+
+# Meld (install via: brew install meld)
+[mergetool "meld"]
+    cmd = meld "$LOCAL" "$BASE" "$REMOTE" --output "$MERGED"
+    trustExitCode = true
+
+[difftool "meld"]
+    cmd = meld "$LOCAL" "$REMOTE"
+
+# vimdiff
+[mergetool "vimdiff"]
+    cmd = vim -d "$LOCAL" "$REMOTE" "$MERGED"
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Other settings
+# ─────────────────────────────────────────────────────────────────────────────
+[push]
+    default = simple
+
+[branch]
+    autosetupmerge = true
+
+[apply]
+    whitespace = fix
+
+[rerere]
+    # Remember conflict resolutions
+    enabled = true
+
+[filter "lfs"]
+    process = git-lfs filter-process
+    required = true
+    clean = git-lfs clean -- %f
+    smudge = git-lfs smudge -- %f
+
+[help]
+    # Open git help in browser
+    browser = open
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Aliases
+# ─────────────────────────────────────────────────────────────────────────────
+[alias]
+    # ─────────────────────────────────────────────────────────────────────────
+    # Add / Stage
+    # ─────────────────────────────────────────────────────────────────────────
+    # Stage all changes (new, modified, deleted) in one go
+    addremove = !git add -u "${@:-.}" && git add "${@:-.}" && git status
+    ar = !git addremove
+
+    # ─────────────────────────────────────────────────────────────────────────
+    # Branch
+    # ─────────────────────────────────────────────────────────────────────────
+    b = branch -vv
+    branches = branch -a
+    co = checkout
+    nb = checkout -b
+
+    # Show recently worked-on branches
+    recent-branches = !git for-each-ref --count=15 --sort=-committerdate refs/heads/ --format='%(refname:short)'
+
+    # Delete branches already merged to main/master/dev
+    delete-merged = "!git branch --merged | grep -Ev '(^\\*|master|main|dev)' | xargs git branch -d"
+    dm = delete-merged
+
+    # ─────────────────────────────────────────────────────────────────────────
+    # Commit
+    # ─────────────────────────────────────────────────────────────────────────
+    amend = commit --amend
+
+    # ─────────────────────────────────────────────────────────────────────────
+    # Log - various formats
+    # ─────────────────────────────────────────────────────────────────────────
+    # Compact graph view
+    l = log --graph --date=short
+    ll = log --pretty=oneline -n 20 --graph --abbrev-commit
+
+    # Pretty graph with colors
+    lg = log --graph --pretty=format:'%Cred%h%Creset -%C(yellow)%d%Creset %s %Cgreen(%cs) %C(bold blue)<%an>%Creset' --abbrev-commit
+
+    # Compact with relative dates
+    ls = log --pretty=format:'%Cred%h%Creset -%C(yellow)%d%Creset %s %Cgreen(%cr) %C(bold blue)<%an>%Creset' --abbrev-commit
+
+    # One commit per line
+    log1 = log --pretty=oneline
+
+    # Full/detailed commit info
+    logf = log --pretty=full
+    logff = log --pretty=fuller
+
+    # Show which files changed in each commit
+    changes = log --pretty=format:"%h %cr %cn %Cgreen%s%Creset" --name-status
+
+    # Compact format
+    short = log --pretty=format:"%h %cr %cn %Cgreen%s%Creset"
+
+    # For generating changelogs/release notes
+    changelog = log --pretty=format:" * %s"
+
+    # No colors (for piping)
+    shortnocolor = log --pretty=format:"%h %cr %cn %s"
+
+    # Show the most recent commit
+    top = log -1
+
+    # ─────────────────────────────────────────────────────────────────────────
+    # Search / Find
+    # ─────────────────────────────────────────────────────────────────────────
+    # Find which branches contain a specific commit
+    #   Usage: git search-branch <commit>
+    search-branch = "!f() { git branch -a --contains $1; }; f"
+
+    # Find which tags contain a specific commit
+    #   Usage: git search-tag <commit>
+    search-tag = "!f() { git describe --always --contains $1; }; f"
+
+    # Find commits that changed specific code (searches diffs)
+    #   Usage: git search-code <string>
+    search-code = "!f() { git log --pretty=format:'%C(yellow)%h %Cblue%ad %Creset%s%Cgreen [%cn] %Cred%d' --decorate --date=short -S$1; }; f"
+
+    # Find commits by message text
+    #   Usage: git search-msg <text>
+    search-msg = "!f() { git log --pretty=format:'%C(yellow)%h %Cblue%ad %Creset%s%Cgreen [%cn] %Cred%d' --decorate --date=short --grep=$1; }; f"
+
+    # ─────────────────────────────────────────────────────────────────────────
+    # Reset / Undo
+    # ─────────────────────────────────────────────────────────────────────────
+    # Unstage files (opposite of git add)
+    unstage = reset HEAD
+
+    # Undo last commit but keep changes staged
+    uncommit = reset --soft HEAD^
+
+    # ─────────────────────────────────────────────────────────────────────────
+    # Stash
+    # ─────────────────────────────────────────────────────────────────────────
+    # Create a named snapshot (stash + immediately apply it back)
+    snapshot = !git stash save "snapshot: $(date)" && git stash apply "stash@{0}"
+    snapshots = !git stash list --grep snapshot
+
+    # ─────────────────────────────────────────────────────────────────────────
+    # Tracking (ignore local changes to tracked files)
+    # ─────────────────────────────────────────────────────────────────────────
+    # Ignore local changes to a tracked file
+    #   Usage: git ignore-tracked <file>
+    ignore-tracked = update-index --assume-unchanged
+
+    # Stop ignoring local changes
+    #   Usage: git unignore-tracked <file>
+    unignore-tracked = update-index --no-assume-unchanged
+
+    # ─────────────────────────────────────────────────────────────────────────
+    # Navigation
+    # ─────────────────────────────────────────────────────────────────────────
+    # Print the repo root directory
+    root = rev-parse --show-toplevel
+
+    # ─────────────────────────────────────────────────────────────────────────
+    # Merge conflicts
+    # ─────────────────────────────────────────────────────────────────────────
+    # List files with unresolved merge conflicts
+    unmerged = !git --no-pager diff --name-only --diff-filter=U
+
+    # ─────────────────────────────────────────────────────────────────────────
+    # Merge tool picker (Option B: default + override)
+    # ─────────────────────────────────────────────────────────────────────────
+    # Pick merge tool interactively via fzf
+    #   Usage: git mt-pick
+    mt-pick = "!f() { \
+        tool=$(printf 'opendiff\\nvscode\\nmeld\\nvimdiff' | fzf --prompt='Merge tool: '); \
+        [ -n \"$tool\" ] && git mergetool --tool=\"$tool\"; \
+    }; f"
+
+    # Quick-switch default merge tool
+    mt-set-opendiff = "!git config merge.tool opendiff"
+    mt-set-vscode = "!git config merge.tool vscode"
+    mt-set-meld = "!git config merge.tool meld"
+    mt-set-vimdiff = "!git config merge.tool vimdiff"

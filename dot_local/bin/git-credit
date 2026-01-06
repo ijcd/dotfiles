@@ -1,0 +1,16 @@
+#!/bin/sh
+# git-credit - Credit an author on the latest commit
+#
+# Usage: git credit <name> <email>
+#
+# A quick way to change the author attribution on the latest commit.
+#
+# Examples:
+#   git credit "Zach Holman" zach@example.com
+
+if [ -z "$1" ] || [ -z "$2" ]; then
+    echo "Usage: git credit <name> <email>" >&2
+    exit 1
+fi
+
+git commit --amend --author "$1 <$2>" -C HEAD
