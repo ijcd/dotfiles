@@ -1,0 +1,33 @@
+#!/bin/sh
+# macos-unquarantine - Remove Gatekeeper quarantine from downloaded files
+#
+# Usage: macos-unquarantine <file-or-directory>...
+#
+# When you download files from the internet, macOS marks them with quarantine
+# attributes. This can cause "app is damaged" or "unidentified developer"
+# warnings. This script removes those attributes.
+#
+# Examples:
+#   macos-unquarantine ~/Downloads/SomeApp.app
+#   macos-unquarantine *.dmg
+#
+# Attributes removed:
+#   - com.apple.quarantine (the main Gatekeeper flag)
+#   - com.apple.metadata:kMDItemWhereFroms (download URL)
+#   - com.apple.metadata:kMDItemDownloadedDate (download timestamp)
+
+set -e
+
+if [ -z "$1" ]; then
+  echo "Usage: macos-unquarantine <file-or-directory>..." >&2
+  exit 1
+fi
+
+for file in "$@"; do
+  echo "Removing quarantine: $file"
+  xattr -r -d com.apple.quarantine "$file" 2>/dev/null || true
+  xattr -r -d com.apple.metadata:kMDItemWhereFroms "$file" 2>/dev/null || true
+  xattr -r -d com.apple.metadata:kMDItemDownloadedDate "$file" 2>/dev/null || true
+done
+
+echo "Done."
