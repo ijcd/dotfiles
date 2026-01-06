@@ -1,0 +1,50 @@
+#!/bin/sh
+# vi-err - Open file at line number from error format
+#
+# Usage: vi-err <file:line>
+#
+# Opens a file at a specific line number, parsing the common error output
+# format used by compilers, linters, and other tools.
+#
+# If the file path doesn't exist, searches for it by basename under the
+# current directory.
+#
+# Examples:
+#   vi-err src/main.c:42           # Open src/main.c at line 42
+#   vi-err ./lib/foo.rb:127        # Open foo.rb at line 127
+#   vi-err config.py:15            # Searches for config.py if not found
+#
+# Workflow:
+#   $ make 2>&1 | grep error
+#   src/parser.c:89: error: expected ';'
+#   $ vi-err src/parser.c:89       # Jump right to the error
+
+set -e
+
+if [ -z "$1" ] || ! echo "$1" | grep -q ':'; then
+  echo "Usage: vi-err <file:line>" >&2
+  echo "       Opens file at the specified line number" >&2
+  exit 1
+fi
+
+file=$(echo "$1" | cut -d: -f1)
+line=$(echo "$1" | cut -d: -f2)
+
+if [ -z "$file" ] || [ -z "$line" ]; then
+  echo "Usage: vi-err <file:line>" >&2
+  exit 1
+fi
+
+# If file doesn't exist, search for it by basename
+if [ ! -f "$file" ]; then
+  found=$(find . -name "$(basename "$file")" -type f 2>/dev/null | head -1)
+  if [ -n "$found" ]; then
+    echo "Found: $found"
+    file="$found"
+  else
+    echo "File not found: $file" >&2
+    exit 1
+  fi
+fi
+
+exec "${EDITOR:-vi}" "$file" "+$line"
