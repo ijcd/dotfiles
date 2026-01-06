@@ -104,6 +104,12 @@ alias -g thisbranch:thisbranch='$(git rev-parse --abbrev-ref HEAD)':'$(git rev-p
 # alias j='fasd_cd -d'     # muscle memory
 # alias jj='fasd_cd -d -i' # cd with interactive selection
 
+############
+# emacs
+############
+alias emacs-start='emacs --daemon'
+alias emacs-stop='emacsclient -e "(kill-emacs)"'
+
 ###############################
 # Debian
 ###############################

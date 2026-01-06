@@ -1,3 +1,0 @@
-stop-emacs () {
-    emacsclient -e '(kill-emacs)'
-}

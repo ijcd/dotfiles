@@ -1,0 +1,85 @@
+#!/bin/sh
+# emacs-merge - Git merge tool using Emacs ediff
+#
+# Usage: emacs-merge <local> <base> <remote>
+#
+# A three-way merge tool that tries automatic merge first, then falls
+# back to Emacs ediff for manual conflict resolution.
+#
+# To configure as your git mergetool:
+#   git config --global merge.tool emacs-merge
+#   git config --global mergetool.emacs-merge.cmd 'emacs-merge "$LOCAL" "$BASE" "$REMOTE"'
+#   git config --global mergetool.emacs-merge.trustExitCode true
+#
+# Order of operations:
+#   1. Try `merge` command (RCS merge)
+#   2. Try `diff3 -m` (GNU diff3)
+#   3. Fall back to Emacs ediff (uses emacsclient if daemon running)
+#
+# Note: If you use magit inside emacs, you probably won't need this -
+# magit's built-in smerge/ediff is more convenient.
+
+set -e
+
+LOCAL="$1"
+BASE="$2"
+OTHER="$3"
+
+if [ -z "$LOCAL" ] || [ -z "$BASE" ] || [ -z "$OTHER" ]; then
+  echo "Usage: emacs-merge <local> <base> <remote>" >&2
+  exit 1
+fi
+
+BACKUP="$LOCAL.orig"
+
+cleanup() {
+  rm -f "$BACKUP"
+}
+
+restore() {
+  cp "$BACKUP" "$LOCAL"
+}
+
+# Back up our file
+cp "$LOCAL" "$BACKUP"
+
+# Attempt automatic merge with `merge`
+if command -v merge >/dev/null 2>&1; then
+  if merge "$LOCAL" "$BASE" "$OTHER" 2>/dev/null; then
+    cleanup
+    exit 0
+  fi
+  restore
+fi
+
+# Attempt automatic merge with `diff3`
+if command -v diff3 >/dev/null 2>&1; then
+  if diff3 -m "$BACKUP" "$BASE" "$OTHER" > "$LOCAL"; then
+    cleanup
+    exit 0
+  fi
+  restore
+fi
+
+# Ediff elisp command
+EDIFF_CMD="(ediff-merge-with-ancestor \"$BACKUP\" \"$OTHER\" \"$BASE\" nil \"$LOCAL\")"
+
+# Try emacsclient first (faster, uses your config)
+if emacsclient -n --eval "t" >/dev/null 2>&1; then
+  echo "Using emacsclient (daemon running)..."
+  if emacsclient -c --eval "$EDIFF_CMD"; then
+    cleanup
+    exit 0
+  fi
+  restore
+fi
+
+# Fall back to launching emacs directly
+echo "Starting emacs for merge..."
+if emacs --eval "$EDIFF_CMD"; then
+  cleanup
+  exit 0
+fi
+
+echo "emacs-merge: failed to merge files" >&2
+exit 1
