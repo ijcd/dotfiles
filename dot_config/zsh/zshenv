@@ -1,6 +1,10 @@
 # Set ZDOTDIR for zsh config location
 export ZDOTDIR=~/.config/zsh
 
+# XDG-style locations for tools that need env vars
+export INPUTRC=~/.config/readline/inputrc
+export IRBRC=~/.config/irb/irbrc
+
 # Debug/profiling flags (set to 1 to enable)
 # ZSH_DEBUG=1      # Per-file timing
 # ZSH_PROFILE=1    # zprof function profiling
