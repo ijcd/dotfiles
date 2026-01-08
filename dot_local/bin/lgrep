@@ -1,6 +1,18 @@
 #!/bin/sh
-# Usage: lgrep [<options>] <pattern>
-# Shorthand for: grep --line-buffer <options> <pattern>
-# This is useful when using grep in a pipeline with tail -f or
-# where buffering would delay output.
-exec grep --line-buffer "$@"
+# lgrep - Line-buffered grep for live output
+#
+# Usage: lgrep [options] <pattern>
+#
+# Runs grep with --line-buffered to prevent output buffering.
+# Essential when using grep in pipelines with tail -f or other
+# streaming commands where buffering would delay output.
+#
+# Examples:
+#   tail -f /var/log/syslog | lgrep error
+#   some-command | lgrep -i warning
+#   docker logs -f container | lgrep exception
+#
+# Without line buffering, grep may wait to accumulate a full buffer
+# before outputting, causing delays in real-time log monitoring.
+
+exec grep --line-buffered "$@"

@@ -99,74 +99,25 @@
   ];
 
   homebrew.brews = [
+    # ─────────────────────────────────────────────────────────────────────────
+    # Docker (better via brew on macOS for socket/VM integration)
+    # ─────────────────────────────────────────────────────────────────────────
     "docker"
     "colima"
 
-    ############################################
-    ## GROUP A: “You definitely installed these”
-    ## High-certainty tools you actively use
-    ############################################
+    # ─────────────────────────────────────────────────────────────────────────
+    # macOS-specific tools
+    # ─────────────────────────────────────────────────────────────────────────
+    "mas"              # Mac App Store CLI
 
-    "ripgrep" # lightning-fast search; you explicitly mentioned installing manually
-    "fd" # modern find; you definitely use this
-    "fzf" # fuzzy finder; core of your CLI workflow
-    "jq" # essential for JSON in scripts (heavy usage in your workflows)
-    "gh" # GitHub CLI; used across repos & automation
-    "git" # core version-control
-    "git-filter-repo" # you’ve used it when rewriting histories
-    "git-subrepo" # used for subtree/subrepo workflows
-    "direnv" # you use Nix + direnv heavily
-    "tmux" # core productivity tool for terminals
-    "watch" # used for dev loops + monitoring
-    "htop" # for process inspection
-    "gdrive" # you use extensively for business ops + exports
-    "ibazel" # matches your Bazel experiments
-    "doctl" # DigitalOcean CLI (you used DO before)
-    "flyctl" # Fly.io deployments during Phoenix projects
-    "exercism" # you use Exercism for skill sharpening
-    "chezmoi" # used for dotfile mgmt experiments
-    "mkcert" # needed for local HTTPS dev
-    "mas" # Mac App Store CLI (you use it)
-    "rsync" # essential sync tool you definitely use
-    "wget" # classic CLI downloader
-    "curl" # but consider replacing with nixpkgs curl
-    "keychain" # ssh-agent integration on macOS
-    "watchman" # used for dev file watching (e.g., Phoenix/Elixir)
-
-    ##################################################
-    ## GROUP B: “You likely installed these directly”
-    ## Fit your cloud/infra/devops/tooling footprint
-    ##################################################
-
-    "ansible" # automation/orchestration used in prior ops
-    "awscli" # near-certain given your AWS background
-    "aws-vault" # you’ve used extensively for AWS session mgmt
-    "aws-sso-cli" # matches your SSO setup
-    "aws-sso-util" # also used by you
-    "deno" # you evaluated deno during tooling experiments
-    "pulumi" # you’ve used Pulumi for infra coding
-    "kubernetes-cli" # essential for any k8s work; you’ve used before
-    "nmap" # networking diagnostic tool you used
-    "mtr" # advanced network debugging
-    "postgresql@17" # local dev DB; fits your Phoenix + Ash workflows
-    "mysql" # needed occasionally for migrations or vendor data
-    "cmake" # needed for building C libs; highly likely
-    "graphviz" # used for visualization + dependency graphs
-
-    ########################################################
-    ## GROUP C: “You might want these; optional keepers”
-    ## Tools you *sometimes* use or that appear in your stack
-    ########################################################
-
-    "coreutils" # GNU core tools; very common in dev setups
-    "imagemagick" # used for automation scripts + media ops
-    "sqlite" # universally used in dev work
-    "readline" # required for Python/Ruby build dependencies
-    "tree" # simple file-tree viewer; you probably want it
-    "overmind" # Procfile manager; fits your Phoenix multi-process use
-    "hivemind" # Procfile launcher, often paired with overmind
-    "sox" # audio conversion tool; useful in some scripts
-    "vbindiff" # binary diff viewer; you’ve used before
+    # ─────────────────────────────────────────────────────────────────────────
+    # Tools not in nixpkgs (or brew version preferred)
+    # ─────────────────────────────────────────────────────────────────────────
+    "git-subrepo"      # subtree/subrepo workflows
+    "gdrive"           # Google Drive CLI; used for business ops + exports
+    "ibazel"           # Bazel file watcher
+    "aws-sso-cli"      # AWS SSO helper
+    "aws-sso-util"     # AWS SSO utilities
   ];
 
   # Install apps from AppStore (https://discourse.nixos.org/t/nix-darwin-homebrew-masapps-is-hanging/60828)

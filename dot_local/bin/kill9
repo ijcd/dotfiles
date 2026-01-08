@@ -1,2 +1,17 @@
-#!/bin/bash
+#!/bin/sh
+# kill9 - Shortcut for kill -9 (SIGKILL)
+#
+# Usage: kill9 <pid>...
+#
+# Forcefully kills processes. Use when processes don't respond to
+# normal termination signals.
+#
+# Examples:
+#   kill9 1234              # Kill process 1234
+#   kill9 1234 5678         # Kill multiple processes
+#   pgrep -f myapp | xargs kill9   # Kill all matching processes
+#
+# Warning: SIGKILL cannot be caught or ignored. The process gets no
+# chance to clean up. Use kill (SIGTERM) first when possible.
+
 exec kill -9 "$@"

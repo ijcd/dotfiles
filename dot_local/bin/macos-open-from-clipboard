@@ -1,0 +1,23 @@
+#!/bin/sh
+# macos-open-from-clipboard - Open URL or path from clipboard
+#
+# Usage: macos-open-from-clipboard
+#
+# Opens whatever is in the clipboard (URL, file path, etc.) using macOS `open`.
+# Useful for quickly opening links copied from chat, email, etc.
+#
+# Examples:
+#   # Copy a URL, then:
+#   macos-open-from-clipboard
+#
+# Requirements: macOS (uses pbpaste and open)
+
+set -e
+
+content=$(pbpaste)
+if [ -z "$content" ]; then
+  echo "Clipboard is empty" >&2
+  exit 1
+fi
+
+exec open "$content"

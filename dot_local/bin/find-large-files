@@ -1,1 +1,22 @@
-find .  -type f -size +1M -exec ls -lh {} \;
+#!/bin/sh
+# find-large-files - Find files larger than a threshold
+#
+# Usage: find-large-files [path] [size]
+#
+# Finds files larger than the specified size (default: 1M) and lists
+# them with their sizes in human-readable format.
+#
+# Arguments:
+#   path    Directory to search (default: current directory)
+#   size    Minimum file size (default: 1M). Use K, M, G suffixes.
+#
+# Examples:
+#   find-large-files                    # Files > 1M in current dir
+#   find-large-files /var/log           # Files > 1M in /var/log
+#   find-large-files . 100M             # Files > 100M in current dir
+#   find-large-files ~/Downloads 500M   # Files > 500M in Downloads
+
+path="${1:-.}"
+size="${2:-1M}"
+
+find "$path" -type f -size +"$size" -exec ls -lh {} \;

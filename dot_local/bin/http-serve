@@ -1,0 +1,19 @@
+#!/bin/sh
+# http-serve - Start a simple HTTP server in current directory
+#
+# Usage: http-serve [port]
+#
+# Starts a Python HTTP server serving files from the current directory.
+# Default port is 8000.
+#
+# Examples:
+#   http-serve         # Serve on port 8000
+#   http-serve 3000    # Serve on port 3000
+#
+# Then open http://localhost:8000 in your browser.
+
+set -e
+
+port="${1:-8000}"
+echo "Serving current directory at http://localhost:$port"
+exec python3 -m http.server "$port"

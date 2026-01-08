@@ -2,30 +2,117 @@
 {
   home = {
     packages = with pkgs; [
-      # dev tools
+      # ─────────────────────────────────────────────────────────────────────────
+      # Core CLI tools
+      # ─────────────────────────────────────────────────────────────────────────
+      coreutils          # GNU core utilities
       curl
+      wget
+      rsync
+      tree
+      htop
+      watch
+      jq                 # JSON processor
+
+      # ─────────────────────────────────────────────────────────────────────────
+      # Search & navigation
+      # ─────────────────────────────────────────────────────────────────────────
+      ripgrep            # fast grep
+      fd                 # fast find
+      fzf                # fuzzy finder
+      zoxide             # smart cd
+
+      # ─────────────────────────────────────────────────────────────────────────
+      # Editors & terminal
+      # ─────────────────────────────────────────────────────────────────────────
       vim
       tmux
-      htop
-      tree
-      ripgrep
-      gh
-      zoxide
-      delta
 
-      # programming languages
-      mise # node, deno, bun, rust, python, etc.
+      # ─────────────────────────────────────────────────────────────────────────
+      # Git & version control
+      # ─────────────────────────────────────────────────────────────────────────
+      git
+      gh                 # GitHub CLI
+      delta              # better git diffs
+      git-filter-repo    # history rewriting
 
-      # misc
-      nil                # nix LSP
-      biome              # JS/TS linter/formatter
-      nixfmt-rfc-style   # nix formatter
-      yt-dlp             # youtube downloader
+      # ─────────────────────────────────────────────────────────────────────────
+      # Dev environment
+      # ─────────────────────────────────────────────────────────────────────────
+      direnv             # per-directory env vars
+      mise               # polyglot version manager (node, rust, python, etc.)
+      chezmoi            # dotfile manager
+      mkcert             # local HTTPS certs
+      watchman           # file watcher
+
+      # ─────────────────────────────────────────────────────────────────────────
+      # Cloud & infrastructure
+      # ─────────────────────────────────────────────────────────────────────────
+      awscli2            # AWS CLI v2
+      aws-vault          # AWS credential management
+      doctl              # DigitalOcean CLI
+      flyctl             # Fly.io CLI
+      pulumi-bin         # Infrastructure as code
+      kubectl            # Kubernetes CLI
+      ansible            # Automation/orchestration
+
+      # ─────────────────────────────────────────────────────────────────────────
+      # Databases
+      # ─────────────────────────────────────────────────────────────────────────
+      postgresql_17      # PostgreSQL 17
+      mysql84            # MySQL 8.4
+      sqlite             # SQLite
+
+      # ─────────────────────────────────────────────────────────────────────────
+      # Build tools & compilers
+      # ─────────────────────────────────────────────────────────────────────────
+      cmake
+      readline
+
+      # ─────────────────────────────────────────────────────────────────────────
+      # Network tools
+      # ─────────────────────────────────────────────────────────────────────────
+      nmap               # network scanner
+      mtr                # traceroute + ping
+
+      # ─────────────────────────────────────────────────────────────────────────
+      # Process managers
+      # ─────────────────────────────────────────────────────────────────────────
+      overmind           # Procfile manager
+      hivemind           # Procfile runner
+
+      # ─────────────────────────────────────────────────────────────────────────
+      # Media & graphics
+      # ─────────────────────────────────────────────────────────────────────────
+      imagemagick        # image manipulation
       ffmpeg             # video/audio processing
-      ollama             # local LLMs
-      poppler_utils      # pdfunite, pdftotext, etc.
+      yt-dlp             # youtube downloader
+      sox                # audio processing
+      graphviz           # graph visualization
+      poppler_utils      # PDF utilities
 
-      # fonts
+      # ─────────────────────────────────────────────────────────────────────────
+      # Nix tooling
+      # ─────────────────────────────────────────────────────────────────────────
+      nil                # Nix LSP
+      nixfmt-rfc-style   # Nix formatter
+
+      # ─────────────────────────────────────────────────────────────────────────
+      # Other dev tools
+      # ─────────────────────────────────────────────────────────────────────────
+      biome              # JS/TS linter/formatter
+      exercism           # coding exercises
+      vbindiff           # binary diff viewer
+      keychain           # SSH agent helper
+
+      # ─────────────────────────────────────────────────────────────────────────
+      # AI & LLMs
+      # ─────────────────────────────────────────────────────────────────────────
+      ollama             # local LLMs
+
+      # ─────────────────────────────────────────────────────────────────────────
+      # Fonts
+      # ─────────────────────────────────────────────────────────────────────────
       nerd-fonts.fira-code
       nerd-fonts.fira-mono
     ];

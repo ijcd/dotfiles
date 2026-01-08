@@ -1,0 +1,24 @@
+#!/bin/sh
+# macos-mutefor - Mute audio for a specified duration
+#
+# Usage: macos-mutefor <seconds>
+#
+# Mutes the system audio, waits for the specified number of seconds,
+# then unmutes. Useful for temporarily silencing notifications during
+# screen sharing, presentations, etc.
+#
+# Examples:
+#   macos-mutefor 30      # Mute for 30 seconds
+#   macos-mutefor 300     # Mute for 5 minutes
+#   macos-mutefor 3600    # Mute for 1 hour
+#
+# Requirements: macOS (uses osascript)
+
+set -e
+
+if [ -z "$1" ]; then
+  echo "Usage: macos-mutefor <seconds>" >&2
+  exit 1
+fi
+
+osascript -e "set volume with output muted" -e "delay $1" -e "set volume without output muted"

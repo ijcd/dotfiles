@@ -1,3 +1,0 @@
-#!/usr/bin/env bash
-
-osascript -e "set volume with output muted" -e "delay $1" -e "set volume without output muted"

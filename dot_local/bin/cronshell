@@ -1,3 +1,60 @@
-#!/bin/bash
+#!/bin/sh
+# cronshell - Start a shell with cron's environment
+#
+# Usage: cronshell [shell-args...]
+#
+# Starts a clean shell with only the environment variables that cron
+# would have. Useful for debugging cron jobs that fail due to missing
+# environment variables (PATH, etc.).
+#
+# On first run, automatically creates ~/.cronenv by adding a temporary
+# cron job, waiting for it to run, then removing it.
+#
+# Examples:
+#   cronshell                    # Interactive shell with cron's env
+#   cronshell -c 'echo $PATH'    # Check what PATH cron sees
+#   cronshell -c 'which ruby'    # Check if ruby is in cron's PATH
+
+set -e
+
+CRONENV="$HOME/.cronenv"
+
+# Auto-create .cronenv if it doesn't exist
+if [ ! -f "$CRONENV" ]; then
+  echo "Creating ~/.cronenv (this takes up to 60 seconds)..."
+
+  # Save current crontab
+  crontab -l > /tmp/cronshell-backup.$$ 2>/dev/null || true
+
+  # Add temporary job to capture environment
+  (crontab -l 2>/dev/null || true; echo "* * * * * env > $CRONENV") | crontab -
+
+  # Wait for the job to run (cron runs at the start of each minute)
+  echo "Waiting for cron to run..."
+  timeout=70
+  while [ ! -f "$CRONENV" ] && [ $timeout -gt 0 ]; do
+    sleep 1
+    timeout=$((timeout - 1))
+    printf "."
+  done
+  echo
+
+  # Restore original crontab
+  if [ -s /tmp/cronshell-backup.$$ ]; then
+    crontab /tmp/cronshell-backup.$$
+  else
+    crontab -r 2>/dev/null || true
+  fi
+  rm -f /tmp/cronshell-backup.$$
+
+  if [ ! -f "$CRONENV" ]; then
+    echo "Error: cron did not run. Is cron enabled?" >&2
+    exit 1
+  fi
+
+  echo "Created ~/.cronenv"
+fi
+
 cd ~
-exec env -i - env - $(cat ~/.cronenv) $(cat ~/.cronenv | grep ^SHELL= | sed 's/^SHELL=//') --noprofile --norc
+shell=$(grep ^SHELL= "$CRONENV" 2>/dev/null | sed 's/^SHELL=//' || echo "/bin/sh")
+exec env -i $(cat "$CRONENV") "${shell:-/bin/sh}" --noprofile --norc "$@"

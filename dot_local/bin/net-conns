@@ -1,0 +1,26 @@
+#!/bin/sh
+# net-conns - Show network connections
+#
+# Usage: net-conns [-l] [lsof options...]
+#
+# Shows network connections using lsof. By default shows all TCP/UDP connections.
+# With -l flag, shows only listening ports.
+#
+# Options:
+#   -l    Show only listening TCP ports
+#
+# Examples:
+#   net-conns              # Show all network connections
+#   net-conns -l           # Show listening ports only
+#   net-conns -i :8080     # Show connections on port 8080
+#
+# Note: Requires sudo for full information
+
+set -e
+
+if [ "$1" = "-l" ]; then
+  shift
+  exec sudo lsof -P -iTCP -sTCP:LISTEN "$@"
+else
+  exec sudo lsof -Pi "$@"
+fi

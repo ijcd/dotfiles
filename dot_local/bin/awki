@@ -1,8 +1,22 @@
-#!/bin/bash
+#!/bin/sh
+# awki - Print specific awk field (column)
+#
+# Usage: awki <field_number>
+#    or: awk1, awk2, ... awk9 (symlinks)
+#
+# Prints the Nth field from whitespace-delimited input.
+# Equivalent to: awk '{print $N}'
+#
+# Examples:
+#   echo "a b c" | awk2        # Prints: b
+#   ls -l | awk5               # Prints file sizes
+#   ps aux | awki 2            # Prints PIDs
+#
+# The symlinks awk1-awk9 are shortcuts for awki 1-9.
 
-i=$(basename $0 | sed 's/^awk//')
+i=$(basename "$0" | sed 's/^awk//')
 
-if [ $i == i ] ; then
+if [ "$i" = "i" ]; then
   i=$1
 fi
 

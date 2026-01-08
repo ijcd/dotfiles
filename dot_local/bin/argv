@@ -1,10 +1,21 @@
 #!/bin/sh
-# Usage: argv <args>
-# Dump arguments
+# argv - Debug script arguments
+#
+# Usage: argv [args...]
+#
+# Prints each argument on its own line with its position number.
+# Useful for debugging shell scripts and understanding how arguments
+# are being parsed/split.
+#
+# Examples:
+#   argv foo bar baz        # Shows: 1: foo, 2: bar, 3: baz
+#   argv "foo bar" baz      # Shows: 1: foo bar, 2: baz
+#   argv $variable          # Debug word splitting
+
 set -e
+
 count=0
-for a in "$@"
-do
-  count=$(( count + 1 ))
+for a in "$@"; do
+  count=$((count + 1))
   echo "$count: $a"
 done

@@ -1,0 +1,28 @@
+#!/bin/sh
+# proc-kill - Interactive process killer using fzf
+#
+# Usage: proc-kill [signal]
+#
+# Shows a list of processes using fzf. Select one or more (with Tab) and
+# press Enter to kill them. Press Escape to cancel.
+#
+# Arguments:
+#   signal    Signal number to send (default: 9 for SIGKILL)
+#
+# Examples:
+#   proc-kill        # Kill with SIGKILL (default)
+#   proc-kill 15     # Kill with SIGTERM
+#   proc-kill 2      # Kill with SIGINT
+#
+# Requirements: fzf
+
+set -e
+
+signal="${1:-9}"
+
+pid=$(ps -ef | sed 1d | fzf -m --header='Select process(es) to kill (Tab=multi, Enter=kill, Esc=cancel)' | awk '{print $2}')
+
+if [ -n "$pid" ]; then
+  echo "$pid" | xargs kill -"$signal"
+  echo "Killed: $pid"
+fi

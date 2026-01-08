@@ -1,7 +1,19 @@
-#!/usr/bin/perl
+#!/bin/sh
+# rot13 - ROT13 encoder/decoder
+#
+# Usage: rot13 [file...]
+#        echo "text" | rot13
+#
+# Applies ROT13 substitution cipher - rotates letters by 13 positions.
+# Since the alphabet has 26 letters, applying ROT13 twice returns
+# the original text (it's its own inverse).
+#
+# Examples:
+#   echo "Hello" | rot13           # Output: Uryyb
+#   echo "Uryyb" | rot13           # Output: Hello
+#   rot13 secret.txt               # Decode/encode a file
+#
+# Historically used to hide spoilers, puzzle answers, or offensive
+# content in plain sight on Usenet and forums.
 
-while (<>) {
-  y/A-Za-z/N-ZA-Mn-za-m/;
-  print;
-}
-
+tr 'A-Za-z' 'N-ZA-Mn-za-m'

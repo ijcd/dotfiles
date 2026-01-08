@@ -1,6 +1,27 @@
 #!/bin/sh
-# usage: trunc FILE...
-# truncate files
-for f in "$@" ; do
-  cat < /dev/null > "$f"
+# trunc - Truncate files to zero length
+#
+# Usage: trunc <file>...
+#
+# Empties files without deleting them. Preserves file permissions,
+# ownership, and inode. Useful for clearing log files while processes
+# still have them open.
+#
+# Examples:
+#   trunc app.log              # Clear a log file
+#   trunc *.log                # Clear all log files
+#   trunc /var/log/myapp.log   # Clear system log (may need sudo)
+#
+# Unlike rm + touch, truncating keeps the file handle valid for
+# processes that already have the file open.
+
+set -e
+
+if [ $# -eq 0 ]; then
+  echo "Usage: trunc <file>..." >&2
+  exit 1
+fi
+
+for f in "$@"; do
+  : > "$f"
 done

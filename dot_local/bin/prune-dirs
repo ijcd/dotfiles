@@ -1,5 +1,25 @@
 #!/bin/sh
+# prune-dirs - Remove empty directories recursively
+#
 # Usage: prune-dirs <path>...
-# Remove empty directories under and including <path>s.
+#
+# Finds and removes all empty directories under the given paths,
+# working from the deepest level up. Safe operation - only removes
+# directories that are completely empty.
+#
+# Examples:
+#   prune-dirs .              # Clean empty dirs in current directory
+#   prune-dirs ~/Downloads    # Clean empty dirs in Downloads
+#   prune-dirs dir1 dir2      # Clean multiple directory trees
+#
+# Use case: After moving/deleting files, clean up the empty
+# directory structure left behind.
 
-find "$@" -type d -empty -depth | xargs rmdir
+set -e
+
+if [ $# -eq 0 ]; then
+  echo "Usage: prune-dirs <path>..." >&2
+  exit 1
+fi
+
+find "$@" -type d -empty -depth -delete
