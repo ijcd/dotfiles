@@ -39,9 +39,10 @@
     diffFilter = delta --color-only
 
 [delta]
+    features = diff-so-fancy
     navigate = true
     line-numbers = true
-    syntax-theme = Dracula
+    dark = true
 
 # ─────────────────────────────────────────────────────────────────────────────
 # Colors
