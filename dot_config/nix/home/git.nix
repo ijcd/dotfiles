@@ -1,36 +1,10 @@
-{ primaryUser, ... }:
+{ ... }:
 {
-  programs.git = {
-    enable = true;
-    userName = "YOUR_NAME"; # TODO replace
-    userEmail = "YOUR_EMAIL"; # TODO replace
+  # Git config is managed by chezmoi (~/.config/git/config)
+  # We just ensure git and related tools are installed via packages.nix
+  #
+  # Don't use programs.git here - it would generate a config that
+  # conflicts with the chezmoi-managed one.
 
-    lfs.enable = true;
-
-    ignores = [ "**/.DS_STORE" ];
-
-    delta = {
-      enable = true;
-      options = {
-        navigate = true;
-        line-numbers = true;
-        syntax-theme = "Dracula";
-      };
-    };
-
-    extraConfig = {
-      github = {
-        user = primaryUser;
-      };
-      init = {
-        defaultBranch = "main";
-      };
-      merge = {
-        conflictstyle = "diff3";
-      };
-      diff = {
-        colorMoved = "default";
-      };
-    };
-  };
+  programs.git.enable = false;
 }

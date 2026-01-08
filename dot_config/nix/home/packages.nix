@@ -20,6 +20,7 @@
       ripgrep            # fast grep
       fd                 # fast find
       fzf                # fuzzy finder
+      fdupes             # duplicate file finder
       zoxide             # smart cd
 
       # ─────────────────────────────────────────────────────────────────────────

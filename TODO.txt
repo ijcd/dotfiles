@@ -5,6 +5,4 @@ ADDITIONS:
 4. an agent that watches what I am doing and makes suggestions for scripts/aliases I already have, a discoverability agent of sorts
 
 TODO:
-4. Clean up the bin directory to be more namespacey
-5. Move gitconfig setup to nix
 6. How will discoverability work for the git aliases vs scripts -- does that push it one way or the other?
