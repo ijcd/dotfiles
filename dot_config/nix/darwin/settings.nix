@@ -16,15 +16,38 @@
         DisableConsoleAccess = true;
       };
 
-      finder = {
-        AppleShowAllFiles = true; # hidden files
-        AppleShowAllExtensions = true; # file extensions
-        _FXShowPosixPathInTitle = true; # title bar full path
-        ShowPathbar = true; # breadcrumb nav at bottom
-        ShowStatusBar = true; # file count & disk space
+      # Dock
+      dock = {
+        autohide = true;
+        tilesize = 110;
+        mru-spaces = false;  # Don't rearrange spaces by recent use
       };
 
+      # Finder
+      finder = {
+        AppleShowAllFiles = true;          # hidden files
+        AppleShowAllExtensions = true;     # file extensions
+        _FXShowPosixPathInTitle = true;    # title bar full path
+        ShowPathbar = true;                # breadcrumb nav at bottom
+        ShowStatusBar = true;              # file count & disk space
+        FXPreferredViewStyle = "Nlsv";     # list view
+      };
+
+      # Trackpad
+      trackpad = {
+        Clicking = true;  # tap to click
+      };
+
+      # Keyboard & Global
       NSGlobalDomain = {
+        # Keyboard repeat
+        KeyRepeat = 2;
+        InitialKeyRepeat = 25;
+
+        # Scrolling
+        "com.apple.swipescrolldirection" = false;  # traditional scrolling
+
+        # Disable auto-corrections
         NSAutomaticSpellingCorrectionEnabled = false;
         NSAutomaticCapitalizationEnabled = false;
         NSAutomaticPeriodSubstitutionEnabled = false;
