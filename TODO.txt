@@ -1,5 +1,0 @@
-ADDITIONS:
-1. fzf thingy that I can use to browse all these
-2. some kind of key binding that will remind me of all of it
-3. a banner at start up that talks about these things
-4. an agent that watches what I am doing and makes suggestions for scripts/aliases I already have, a discoverability agent of sorts
