@@ -65,6 +65,18 @@ if [[ -o interactive && -o login ]]; then
   try_ddate
   uname -npsr
   uptime
+  echo
+  # Custom commands quick reference
+  cat <<'EOF'
+┌─────────────────────────────────────────────────────────┐
+│  Quick Reference                                        │
+├─────────────────────────────────────────────────────────┤
+│  Ctrl+/        Browse all commands (fzf)                │
+│  my-help       Show command cheatsheet                  │
+│  my-commands   Browse scripts/aliases with fzf          │
+│  git commands  List all git aliases & scripts           │
+└─────────────────────────────────────────────────────────┘
+EOF
 fi
 
 # Show total startup time

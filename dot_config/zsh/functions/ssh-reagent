@@ -1,16 +1,16 @@
 # Find a usable SSH agent
-# Usage: ssh-reagent [-v]
-#   -v  Verbose: show agent info when found
+# Usage: ssh-reagent [-q]
+#   -q  Quiet: don't show agent info when found
 function ssh-reagent () {
-  local verbose=0
-  [[ "$1" == "-v" ]] && verbose=1
+  local quiet=0
+  [[ "$1" == "-q" ]] && quiet=1
 
   for agent in ${TMPDIR}ssh-*/agent.*(N); do
     # Only use sockets owned by us
     [[ -O $agent ]] || continue
     export SSH_AUTH_SOCK=$agent
     if ssh-add -l &>/dev/null; then
-      if (( verbose )); then
+      if (( ! quiet )); then
         echo "Found working SSH Agent:"
         ssh-add -l
       fi

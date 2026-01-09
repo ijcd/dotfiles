@@ -271,3 +271,16 @@
     mt-set-vscode = "!git config merge.tool vscode"
     mt-set-meld = "!git config merge.tool meld"
     mt-set-vimdiff = "!git config merge.tool vimdiff"
+
+    # ─────────────────────────────────────────────────────────────────────────
+    # Help / Discoverability
+    # ─────────────────────────────────────────────────────────────────────────
+    # List all custom git commands (aliases + scripts)
+    #   Usage: git commands
+    commands = "!f() { \
+        echo '=== Aliases ===' && \
+        git config --get-regexp '^alias\\.' | sed 's/alias\\./  /' | sort; \
+        echo && echo '=== Scripts (git-*) ===' && \
+        find ~/.local/bin -maxdepth 1 -name 'git-*' -type f 2>/dev/null | \
+        xargs -n1 basename | sed 's/^/  /' | sort; \
+    }; f"

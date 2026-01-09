@@ -1,0 +1,104 @@
+#!/bin/sh
+# my-commands - Browse and run custom commands with fzf
+#
+# Usage: my-commands [filter]
+#
+# Interactive browser for all your custom scripts, git commands, and
+# shell aliases. Select one to see its help/source, press Enter to
+# copy to clipboard or run.
+#
+# Keybindings:
+#   Enter     Copy command to clipboard
+#   Ctrl-X    Execute the command
+#   Ctrl-E    Edit the script (if it's a file)
+#   Ctrl-R    Reload the list
+#   ?         Toggle preview
+#
+# Examples:
+#   my-commands           # Browse everything
+#   my-commands git       # Filter to git commands
+#   my-commands docker    # Filter to docker commands
+
+set -e
+
+# Gather all commands into a list with categories
+gather_commands() {
+  # Scripts in ~/.local/bin (files with shebangs, excluding symlinks)
+  find ~/.local/bin -maxdepth 1 -type f 2>/dev/null | while read -r script; do
+    # Skip if not a script (check for shebang)
+    head -1 "$script" 2>/dev/null | grep -q '^#!' || continue
+    name=$(basename "$script")
+    # Get description from line 2 (after shebang)
+    desc=$(sed -n '2s/^# *\([^-].*\)/\1/p' "$script" 2>/dev/null | head -c 60)
+    printf "[script]  %-28s %s\n" "$name" "$desc"
+  done
+
+  # Git aliases (use -z for null-separated output to handle multi-line values)
+  git config -z --get-regexp '^alias\.' 2>/dev/null | tr '\0' '\n' | grep '^alias\.' | while read -r line; do
+    name=$(echo "$line" | sed 's/alias\.\([^ ]*\).*/\1/')
+    cmd=$(echo "$line" | sed 's/alias\.[^ ]* //' | tr '\n' ' ' | head -c 50)
+    printf "[git]     %-28s %s\n" "git $name" "$cmd"
+  done
+
+  # Shell aliases (if in interactive shell context)
+  if [ -n "$ZSH_VERSION" ] || [ -n "$BASH_VERSION" ]; then
+    alias 2>/dev/null | while read -r line; do
+      name=$(echo "$line" | sed "s/=.*//" | sed "s/^alias //")
+      cmd=$(echo "$line" | sed "s/[^=]*='//" | sed "s/'$//" | head -c 50)
+      printf "[alias]   %-28s %s\n" "$name" "$cmd"
+    done 2>/dev/null || true
+  fi
+}
+
+# Preview function - show help or source
+preview_cmd() {
+  cmd="$1"
+  type=$(echo "$cmd" | awk '{print $1}' | tr -d '[]')
+  name=$(echo "$cmd" | awk '{print $2}')
+
+  case "$type" in
+    script)
+      script="$HOME/.local/bin/$name"
+      if [ -f "$script" ]; then
+        echo "=== $script ==="
+        head -50 "$script"
+      fi
+      ;;
+    git)
+      gitcmd=$(echo "$cmd" | awk '{print $3}')
+      # Check if it's a script
+      if [ -f "$HOME/.local/bin/git-$gitcmd" ]; then
+        echo "=== ~/.local/bin/git-$gitcmd ==="
+        head -50 "$HOME/.local/bin/git-$gitcmd"
+      else
+        echo "=== Git Alias ==="
+        git config --get "alias.$gitcmd"
+      fi
+      ;;
+    alias)
+      echo "=== Shell Alias ==="
+      alias "$name" 2>/dev/null || echo "(alias definition)"
+      ;;
+  esac
+}
+
+export -f preview_cmd 2>/dev/null || true
+
+# Main
+filter="${1:-}"
+
+gather_commands | sort | fzf \
+  --query="$filter" \
+  --header="Enter=copy | Ctrl-X=run | Ctrl-E=edit | ?=preview" \
+  --preview='cmd={}; type=$(echo "$cmd" | awk "{print \$1}" | tr -d "[]"); name=$(echo "$cmd" | awk "{print \$2}");
+    case "$type" in
+      script) [ -f "$HOME/.local/bin/$name" ] && head -50 "$HOME/.local/bin/$name" ;;
+      git) gitcmd=$(echo "$cmd" | awk "{print \$3}"); [ -f "$HOME/.local/bin/git-$gitcmd" ] && head -50 "$HOME/.local/bin/git-$gitcmd" || git config --get "alias.$gitcmd" ;;
+      *) echo "No preview" ;;
+    esac' \
+  --preview-window=right:50%:wrap \
+  --bind='enter:execute-silent(echo {} | awk "{print \$2}" | pbcopy)+abort' \
+  --bind='ctrl-x:execute(cmd=$(echo {} | awk "{print \$2}"); eval "$cmd")+abort' \
+  --bind='ctrl-e:execute(name=$(echo {} | awk "{print \$2}"); [ -f "$HOME/.local/bin/$name" ] && ${EDITOR:-vim} "$HOME/.local/bin/$name")' \
+  --bind='ctrl-r:reload(eval "$(cat "$0")")' \
+  --bind='?:toggle-preview'

@@ -40,6 +40,21 @@ add-zsh-hook preexec starship_last_command_preexec
 add-zsh-hook precmd starship_last_command_precmd
 
 ###########################################
+# Custom command browser (my-commands / my-help)
+###########################################
+
+# Load the my-help function
+source $ZDOTDIR/functions/my-help
+
+# Ctrl+/ - Launch my-commands browser
+zle -N _my-commands-widget
+bindkey "^_" _my-commands-widget  # Ctrl+/ sends ^_
+
+# Ctrl+? - Show quick help
+zle -N _my-help-widget
+bindkey "^[?" _my-help-widget  # Alt+? for help (Ctrl+Shift+/ on some terminals)
+
+###########################################
 # Keybinding utilities (optional)
 ###########################################
 

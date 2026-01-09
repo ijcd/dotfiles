@@ -1,0 +1,68 @@
+# my-help - Show quick reference of custom commands
+#
+# Usage: my-help
+#    or: Press Ctrl+/ in the terminal (if keybinding is set up)
+#
+# Shows a quick cheatsheet of your most useful custom commands.
+
+function my-help() {
+  cat <<'EOF'
+╭─────────────────────────────────────────────────────────────────────╮
+│                        CUSTOM COMMANDS                               │
+╰─────────────────────────────────────────────────────────────────────╯
+
+  my-commands          Browse ALL commands with fzf (Ctrl+/)
+  my-help              Show this help
+
+─── Git ──────────────────────────────────────────────────────────────
+  git commands         List all git aliases and scripts
+  git lg               Pretty log graph
+  git up               Pull with rebase + prune
+  git incoming/outgoing  Show commits to pull/push
+  git track            Track all remote branches
+  git prune-merged-branches  Clean up merged branches
+
+─── Docker ───────────────────────────────────────────────────────────
+  docker-bash <c>      Shell into container
+  docker-ips           Show container IPs
+  docker-clean-*       Cleanup commands
+
+─── Network ──────────────────────────────────────────────────────────
+  net-conns [-l]       Show connections (-l for listening)
+  net-portkill <port>  Kill process on port
+  dns-flush            Flush DNS cache
+
+─── Files ────────────────────────────────────────────────────────────
+  find-large-files     Find files > 1M
+  fdupes -r <dir>      Find duplicate files
+  prune-dirs           Remove empty directories
+
+─── Process ──────────────────────────────────────────────────────────
+  proc-kill            Interactive process killer (fzf)
+  kill9 <pid>          Force kill
+
+─── Terminal ─────────────────────────────────────────────────────────
+  http-serve [port]    Start HTTP server (default: 8000)
+  ppeek                Debug pipeline (tee to stderr)
+  lgrep                Line-buffered grep for tail -f
+
+─── macOS ────────────────────────────────────────────────────────────
+  macos-mutefor <sec>  Mute audio temporarily
+  macos-open-from-clipboard  Open URL from clipboard
+  macos-unquarantine   Remove quarantine from app
+
+EOF
+}
+
+# Widget for zle (keybinding support)
+function _my-help-widget() {
+  my-help
+  zle reset-prompt
+}
+
+# Widget for my-commands
+function _my-commands-widget() {
+  BUFFER=""
+  zle accept-line
+  my-commands
+}

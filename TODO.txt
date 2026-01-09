@@ -3,6 +3,3 @@ ADDITIONS:
 2. some kind of key binding that will remind me of all of it
 3. a banner at start up that talks about these things
 4. an agent that watches what I am doing and makes suggestions for scripts/aliases I already have, a discoverability agent of sorts
-
-TODO:
-6. How will discoverability work for the git aliases vs scripts -- does that push it one way or the other?
