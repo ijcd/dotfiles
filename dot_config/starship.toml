@@ -3,12 +3,12 @@ add_newline = true
 
 format = """
 ${status}\
-${os}\
 ${username}${hostname}${directory}\
 ${time}\
-${custom.last_command}\
-${all}
-"""
+${custom.last_cmd}\
+${duration}
+(${all}
+)$character"""
 
 [status]
 disabled = false
@@ -116,6 +116,9 @@ disabled = true
 disabled = false
 
 [shell]
+disabled = true
+
+[line_break]
 disabled = true
 
 [shlvl]
