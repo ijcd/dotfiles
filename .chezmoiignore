@@ -39,7 +39,8 @@ work
 .aws                              # Credentials - don't commit
 .aws-sso                          # Credentials - don't commit
 .cache                            # Cache
-.claude                           # Local AI state
+.claude/*                         # Local AI state
+!.claude/CLAUDE.md                # Track global claude instructions
 .claude.json*                     # Local AI state
 .cups                             # Printer state
 .docker                           # Docker credentials/state

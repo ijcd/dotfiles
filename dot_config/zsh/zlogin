@@ -61,6 +61,17 @@ try_ddate() {
 }
 
 if [[ -o interactive && -o login ]]; then
+  # Warn if nix isn't working
+  if [[ ! -d /nix/store ]] || ! command -v nix &>/dev/null; then
+    echo
+    echo '┌─────────────────────────────────────────────────────────┐'
+    echo '│  ⚠️  NIX NOT AVAILABLE                                   │'
+    echo '│  /nix may not be mounted. Many tools will be missing.   │'
+    echo '│  Try: sudo launchctl kickstart -k system/org.nixos.nix-daemon │'
+    echo '└─────────────────────────────────────────────────────────┘'
+    echo
+  fi
+
   try_fortune
   try_ddate
   uname -npsr

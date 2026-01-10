@@ -1,0 +1,3 @@
+1. Lots of ideas in here: https://github.com/croissong/system/blob/master/nix-config/hm/env.nix
+2. Shell history sharing (is mine even working?) https://atuin.sh/
+3. Linear for working on projects via an MCP server (https://linear.app/switch)
