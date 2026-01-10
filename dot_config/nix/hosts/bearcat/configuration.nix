@@ -113,6 +113,7 @@
     # ─────────────────────────────────────────────────────────────────────────
     # Tools not in nixpkgs (or brew version preferred)
     # ─────────────────────────────────────────────────────────────────────────
+    "mise"             # version manager (nix version broken on x86_64-darwin, nixpkgs#427748)
     "git-subrepo"      # subtree/subrepo workflows
     "gdrive"           # Google Drive CLI; used for business ops + exports
     "ibazel"           # Bazel file watcher
