@@ -6,7 +6,7 @@ ${status}\
 ${username}${hostname}${directory}\
 ${time}\
 ${custom.last_cmd}\
-${duration}
+${cmd_duration}
 (${all}
 )$character"""
 
