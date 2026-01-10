@@ -82,6 +82,8 @@ if [[ -o interactive && -o login ]]; then
 ┌─────────────────────────────────────────────────────────┐
 │  Quick Reference                                        │
 ├─────────────────────────────────────────────────────────┤
+│  z foo         Jump to dir matching "foo"               │
+│  zi            Interactive dir picker (fzf)             │
 │  Ctrl+/        Browse all commands (fzf)                │
 │  my-help       Show command cheatsheet                  │
 │  my-commands   Browse scripts/aliases with fzf          │
