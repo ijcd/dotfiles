@@ -44,9 +44,9 @@ tags
 .elixir_ls/
 
 # ─────────────────────────────────────────────────────────────────────────────
-# direnv
+# direnv (allow .envrc to be committed, ignore .envrc.local for secrets)
 # ─────────────────────────────────────────────────────────────────────────────
-.envrc
+.envrc.local
 
 # ─────────────────────────────────────────────────────────────────────────────
 # Archives (prefer unpacked source)
