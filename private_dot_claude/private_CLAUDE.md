@@ -38,7 +38,8 @@ were added or bugs were fixed.
 
 ## Git
 
-- When creating branches, prefix them with ijcd/ to indicate they come from me. 
+- When creating branches, prefix them with ijcd/ to indicate they come from me.
+- Do not add "Generated with Claude Code" or Co-Authored-By lines to commit messages. 
 
 ## Plans
 
