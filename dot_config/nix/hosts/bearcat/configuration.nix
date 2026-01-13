@@ -50,6 +50,7 @@
     "claude-code" # Claude-based CLI / code assistant (terminal integration)
     "dash" # offline API/documentation browser
     "ghostty" # fast GPU-accelerated terminal emulator
+    "kitty" # GPU-accelerated terminal emulator
     "livebook" # Elixir Livebook notebooks for data/ML/prototyping
     "ngrok" # secure public tunnels to local dev servers
     "pgadmin4" # PostgreSQL admin GUI
