@@ -5,6 +5,7 @@
     ./git.nix
     ./shell.nix
     ./mise.nix
+    ./direnv.nix
   ];
 
   home = {

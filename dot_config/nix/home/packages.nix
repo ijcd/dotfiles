@@ -40,7 +40,7 @@
       # ─────────────────────────────────────────────────────────────────────────
       # Dev environment
       # ─────────────────────────────────────────────────────────────────────────
-      direnv             # per-directory env vars
+      # direnv - managed by programs.direnv in direnv.nix
       mise               # polyglot version manager (node, rust, python, etc.)
       chezmoi            # dotfile manager
       mkcert             # local HTTPS certs

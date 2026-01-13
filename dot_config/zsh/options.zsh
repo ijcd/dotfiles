@@ -25,6 +25,10 @@ setopt NO_FLOW_CONTROL          # Disable Ctrl-S/Ctrl-Q flow control
 
 # Safety
 setopt IGNORE_EOF               # Don't exit on Ctrl-D (require 'exit')
+setopt NO_CLOBBER               # Prevent > from overwriting files (use >| to force)
+setopt RM_STAR_WAIT             # 10 sec wait before rm * or rm path/*
+setopt NO_RM_STAR_SILENT        # Prompt before rm with star patterns
+setopt HIST_VERIFY              # Show history expansion before executing
 
 # Performance reporting
 REPORTTIME=2                    # Show time for commands taking >2 seconds
