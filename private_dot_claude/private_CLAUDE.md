@@ -39,7 +39,8 @@ were added or bugs were fixed.
 ## Git
 
 - When creating branches, prefix them with ijcd/ to indicate they come from me.
-- Do not add "Generated with Claude Code" or Co-Authored-By lines to commit messages. 
+- Do not add "Generated with Claude Code" or Co-Authored-By lines to commit messages.
+- After each commit, show the commit message and --stat output inline in the response (not just as tool output). 
 
 ## Plans
 
