@@ -11,6 +11,7 @@
       rsync
       tree
       htop
+      pstree             # process tree viewer
       watch
       jq                 # JSON processor
 
