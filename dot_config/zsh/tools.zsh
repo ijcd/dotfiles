@@ -22,6 +22,37 @@ if (( $+commands[zoxide] )) && ! (( $+functions[__zoxide_z] )); then
   eval "$(zoxide init zsh)"
 fi
 
+# j - zoxide jump with tab completion (replaces fasd's j)
+function j() {
+    zi "$@"
+}
+function _j() {
+    # Only complete at end of line
+    [[ "${#words[@]}" -eq "${CURRENT}" ]] || return 0
+
+    local -a dirs
+
+    if [[ "${#words[@]}" -eq 2 && -z "${words[2]}" ]]; then
+        # j<space><TAB> - show top zoxide dirs
+        dirs=(${(f)"$(zoxide query -l 2>/dev/null | head -15)"})
+        if (( ${#dirs} )); then
+            compstate[insert]=menu
+            compstate[list]=list
+            _wanted directories expl 'zoxide' compadd -M '' -U -o nosort -a dirs
+        fi
+    elif [[ "${#words[@]}" -ge 2 && -n "${words[-1]}" ]]; then
+        # j foo<TAB> - query zoxide with foo, show matches
+        dirs=(${(f)"$(zoxide query -l -- ${words[2,-1]} 2>/dev/null | head -15)"})
+        if (( ${#dirs} )); then
+            # Force menu selection, no partial completion
+            compstate[insert]=menu
+            compstate[list]=list
+            _wanted directories expl 'zoxide' compadd -M '' -U -o nosort -a dirs
+        fi
+    fi
+}
+compdef _j j
+
 # starship - fast, customizable prompt written in Rust
 # Config lives at ~/.config/starship.toml
 # https://starship.rs

@@ -50,6 +50,9 @@ alias afk='osascript -e "tell application \"System Events\" to keystroke \"q\" u
 # Change directory to the selected directory using fd and fzf
 alias ff='cd $(fd --type d | fzf)'
 
+# zoxide (muscle memory from fasd/autojump days)
+# j is a function (not alias) so completions work - see tools.zsh
+
 # todos
 alias todos-show="rg -n '(TODO|FIXME|XXX|HACK)'"
 alias todos-pick="rg -n '(TODO|FIXME|XXX|HACK)' | \
