@@ -22,19 +22,29 @@ if (( $+commands[zoxide] )) && ! (( $+functions[__zoxide_z] )); then
   eval "$(zoxide init zsh)"
 fi
 
-# zoxide tab completion for j/z/zi - complete from frecency database
+# j - wrapper for zi (interactive zoxide) with tab completion
+# Gives fasd-like UX: j foo<TAB> completes from db, j foo<ENTER> opens fzf
 function j() {
     zi "$@"
 }
+
+# Tab completion for zoxide commands - completes from frecency database
+# instead of local dirs (why use z/zi if you want cd-style completion?)
 function _zoxide_complete() {
+    # Only complete when cursor is at end of line
     [[ "${#words[@]}" -eq "${CURRENT}" ]] || return 0
 
     local -a dirs expl
+    # Query zoxide db - works with or without args (empty args = all entries)
     dirs=(${(f)"$(zoxide query -l -- ${words[2,-1]} 2>/dev/null | head -15)"})
 
     if (( ${#dirs} )); then
+        # Force menu selection (no common-prefix completion)
         compstate[insert]=menu
         compstate[list]=list
+        # -M '': ignore global matcher-list styles
+        # -U: don't filter (zoxide already did)
+        # -o nosort: preserve frecency order
         _wanted directories expl 'zoxide' compadd -M '' -U -o nosort -a dirs
     fi
 }
