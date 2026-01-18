@@ -26,32 +26,19 @@ fi
 function j() {
     zi "$@"
 }
-function _j() {
-    # Only complete at end of line
+function _zoxide_complete() {
     [[ "${#words[@]}" -eq "${CURRENT}" ]] || return 0
 
-    local -a dirs
+    local -a dirs expl
+    dirs=(${(f)"$(zoxide query -l -- ${words[2,-1]} 2>/dev/null | head -15)"})
 
-    if [[ "${#words[@]}" -eq 2 && -z "${words[2]}" ]]; then
-        # j<space><TAB> - show top zoxide dirs
-        dirs=(${(f)"$(zoxide query -l 2>/dev/null | head -15)"})
-        if (( ${#dirs} )); then
-            compstate[insert]=menu
-            compstate[list]=list
-            _wanted directories expl 'zoxide' compadd -M '' -U -o nosort -a dirs
-        fi
-    elif [[ "${#words[@]}" -ge 2 && -n "${words[-1]}" ]]; then
-        # j foo<TAB> - query zoxide with foo, show matches
-        dirs=(${(f)"$(zoxide query -l -- ${words[2,-1]} 2>/dev/null | head -15)"})
-        if (( ${#dirs} )); then
-            # Force menu selection, no partial completion
-            compstate[insert]=menu
-            compstate[list]=list
-            _wanted directories expl 'zoxide' compadd -M '' -U -o nosort -a dirs
-        fi
+    if (( ${#dirs} )); then
+        compstate[insert]=menu
+        compstate[list]=list
+        _wanted directories expl 'zoxide' compadd -M '' -U -o nosort -a dirs
     fi
 }
-compdef _j j z zi
+compdef _zoxide_complete j z zi
 
 # starship - fast, customizable prompt written in Rust
 # Config lives at ~/.config/starship.toml
