@@ -22,7 +22,7 @@ if (( $+commands[zoxide] )) && ! (( $+functions[__zoxide_z] )); then
   eval "$(zoxide init zsh)"
 fi
 
-# j - zoxide jump with tab completion (replaces fasd's j)
+# zoxide tab completion for j/z/zi - complete from frecency database
 function j() {
     zi "$@"
 }
@@ -51,7 +51,7 @@ function _j() {
         fi
     fi
 }
-compdef _j j
+compdef _j j z zi
 
 # starship - fast, customizable prompt written in Rust
 # Config lives at ~/.config/starship.toml
