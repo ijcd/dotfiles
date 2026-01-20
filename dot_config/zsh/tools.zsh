@@ -22,9 +22,15 @@ if (( $+commands[zoxide] )) && ! (( $+functions[__zoxide_z] )); then
   eval "$(zoxide init zsh)"
 fi
 
-# j - alias for zi (interactive zoxide) with tab completion
-# Gives fasd-like UX: j foo<TAB> completes from db, j foo<ENTER> opens fzf
-alias j='zi'
+# j - smart zoxide jump with tab completion
+# Full path (from completion) -> cd directly, partial query -> open fzf
+function j() {
+    if [[ -d "$1" ]]; then
+        cd "$1"
+    else
+        zi "$@"
+    fi
+}
 
 # Tab completion for zoxide commands - completes from frecency database
 # instead of local dirs (why use z/zi if you want cd-style completion?)
