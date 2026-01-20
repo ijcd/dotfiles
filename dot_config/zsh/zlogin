@@ -17,9 +17,8 @@ if [[ -o interactive && -z "$SSH_CLIENT" ]]; then
     darwin*)
       # macOS: Use Keychain integration, fall back to ssh-reagent
       if [[ -z "$SSH_AUTH_SOCK" ]] || ! ssh-add -l &>/dev/null; then
-        ssh-add --apple-use-keychain 2>/dev/null
+        ssh-add --apple-use-keychain 2>/dev/null || ssh-reagent
       fi
-      ssh-reagent
       ;;
     linux*)
       # Linux: Use keychain tool, fall back to ssh-reagent
