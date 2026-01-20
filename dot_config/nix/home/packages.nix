@@ -54,7 +54,6 @@
       aws-vault          # AWS credential management
       doctl              # DigitalOcean CLI
       flyctl             # Fly.io CLI
-      pulumi-bin         # Infrastructure as code
       kubectl            # Kubernetes CLI
       ansible            # Automation/orchestration
 
