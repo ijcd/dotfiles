@@ -96,6 +96,7 @@
       # ─────────────────────────────────────────────────────────────────────────
       # Nix tooling
       # ─────────────────────────────────────────────────────────────────────────
+      devenv             # reproducible dev environments
       nil                # Nix LSP
       nixfmt-rfc-style   # Nix formatter
       nvd                # Nix version diff (compare system generations)

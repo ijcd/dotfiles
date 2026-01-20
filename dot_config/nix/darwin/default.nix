@@ -23,6 +23,16 @@
       ];
       # disabled due to https://github.com/NixOS/nix/issues/7273
       # auto-optimise-store = true;
+
+      # devenv/cachix binary caches
+      extra-substituters = [
+        "https://devenv.cachix.org"
+        "https://cachix.cachix.org"
+      ];
+      extra-trusted-public-keys = [
+        "devenv.cachix.org-1:w1cLUi8dv3hnoSPGAuibQv+f9TZLr6cv/Hm9XgU50cw="
+        "cachix.cachix.org-1:eWNHQldwUO7G2VkjpnjDbWwy4KQ/HNxht7H4SSoMckM="
+      ];
     };
     enable = false; # using determinate installer
   };
