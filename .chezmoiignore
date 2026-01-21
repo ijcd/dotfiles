@@ -41,6 +41,7 @@ work
 .cache                            # Cache
 .claude/*                         # Local AI state
 !.claude/CLAUDE.md                # Track global claude instructions
+!.claude/settings.json            # Track plugin config
 .claude.json*                     # Local AI state
 .cups                             # Printer state
 .docker                           # Docker credentials/state
