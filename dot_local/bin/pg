@@ -40,15 +40,80 @@ fi
 #-----------------------------------------------------------
 
 is_running() {
-  pg_isready -h localhost -q 2>/dev/null
+  # Check via socket (auth-independent, handles stale socket)
+  pg_isready -h "$DATA_DIR" -q 2>/dev/null
 }
 
-not_running() {
-  ! is_running
+not_running() { ! is_running; }
+
+log_exists() { [ -f "$LOG_FILE" ]; }
+
+# Get current log size in bytes
+log_size() {
+  log_exists && wc -c < "$LOG_FILE" || echo 0
 }
 
-log_exists() {
-  [ -f "$LOG_FILE" ]
+# Print new log content since given byte offset
+print_new_logs() {
+  local since=$1
+  local now
+  now=$(log_size)
+  if [ "$now" -gt "$since" ]; then
+    printf "\n"
+    tail -c +"$((since + 1))" "$LOG_FILE"
+    echo "$now"  # Return new position
+  else
+    echo "$since"
+  fi
+}
+
+# Wait for condition with countdown and incremental log output
+# Usage: wait_with_logs <condition> <timeout> <action> <success> <failure>
+wait_with_logs() {
+  local condition=$1
+  local timeout=$2
+  local action=$3
+  local success_msg=$4
+  local fail_msg=$5
+
+  local log_pos elapsed=0
+  log_pos=$(log_size)
+
+  while [ $elapsed -lt "$timeout" ]; do
+    if $condition; then
+      printf "\r\033[K${GREEN}✓ %s (%ds)${NC}\n" "$success_msg" "$elapsed"
+      return 0
+    fi
+
+    printf "\r\033[K⏳ %s... %ds remaining" "$action" "$((timeout - elapsed))"
+    log_pos=$(print_new_logs "$log_pos")
+
+    sleep 1
+    elapsed=$((elapsed + 1))
+  done
+
+  printf "\r\033[K${RED}✗ %s${NC}\n" "$fail_msg"
+  return 1
+}
+
+# Wait for log file to appear (up to 2.5s)
+wait_for_log() {
+  local attempts=0
+  while [ $attempts -lt 5 ] && ! log_exists; do
+    sleep 0.5
+    attempts=$((attempts + 1))
+  done
+}
+
+# Start the launchd service
+start_service() {
+  launchctl kickstart -k "gui/$(id -u)/$SERVICE_LABEL" 2>/dev/null ||
+    launchctl bootstrap "gui/$(id -u)" "$HOME/Library/LaunchAgents/$SERVICE_LABEL.plist" 2>/dev/null
+}
+
+# Stop the launchd service (bootout required due to KeepAlive)
+stop_service() {
+  launchctl bootout "gui/$(id -u)/$SERVICE_LABEL" 2>/dev/null || true
 }
 
 #-----------------------------------------------------------
@@ -58,108 +123,39 @@ log_exists() {
 cmd_start() {
   if is_running; then
     echo -e "${YELLOW}PostgreSQL is already running${NC}"
-    exit 0
+    return 0
   fi
 
-  # Try to start the service
-  if ! launchctl kickstart -k "gui/$(id -u)/$SERVICE_LABEL" 2>/dev/null; then
-    if ! launchctl bootstrap "gui/$(id -u)" "$HOME/Library/LaunchAgents/$SERVICE_LABEL.plist" 2>/dev/null; then
-      echo -e "${RED}Failed to start service. Try: darwin-rebuild switch${NC}"
-      exit 1
-    fi
+  if ! start_service; then
+    echo -e "${RED}Failed to start service. Try: darwin-rebuild switch${NC}"
+    return 1
   fi
 
-  # Wait for log file (up to 2.5s)
-  local wait_log=0
-  while [ $wait_log -lt 5 ] && ! log_exists; do
-    sleep 0.5
-    wait_log=$((wait_log + 1))
-  done
-
-  # Track log position for incremental output
-  local log_size=0
-  if log_exists; then
-    log_size=$(wc -c < "$LOG_FILE")
-  fi
-
-  # Poll with countdown and incremental log output
-  local elapsed=0
-  while [ $elapsed -lt $START_TIMEOUT ]; do
-    if is_running; then
-      printf "\r\033[K${GREEN}✓ PostgreSQL is ready (${elapsed}s)${NC}\n"
-      exit 0
-    fi
-
-    # Show countdown (in place)
-    local remaining=$((START_TIMEOUT - elapsed))
-    printf "\r\033[K⏳ Starting PostgreSQL... ${remaining}s remaining"
-
-    # Show new log lines
-    if log_exists; then
-      local new_size=$(wc -c < "$LOG_FILE")
-      if [ "$new_size" -gt "$log_size" ]; then
-        printf "\n"
-        tail -c +$((log_size + 1)) "$LOG_FILE"
-        log_size=$new_size
-      fi
-    fi
-
-    sleep 1
-    elapsed=$((elapsed + 1))
-  done
-
-  printf "\r\033[K${RED}✗ PostgreSQL failed to start within ${START_TIMEOUT}s${NC}\n"
-  echo "Check logs: pg log"
-  exit 1
+  wait_for_log
+  wait_with_logs is_running "$START_TIMEOUT" \
+    "Starting PostgreSQL" \
+    "PostgreSQL is ready" \
+    "PostgreSQL failed to start within ${START_TIMEOUT}s" || {
+      echo "Check logs: pg log"
+      return 1
+    }
 }
 
 cmd_stop() {
   if ! is_running; then
     echo "PostgreSQL is not running"
-    exit 0
+    return 0
   fi
 
-  # Track log position for incremental output
-  local log_size=0
-  if log_exists; then
-    log_size=$(wc -c < "$LOG_FILE")
-  fi
-
-  # Bootout to fully unload (stop won't work with KeepAlive=true)
-  launchctl bootout "gui/$(id -u)/$SERVICE_LABEL" 2>/dev/null || true
-
-  # Poll with countdown and incremental log output
-  local elapsed=0
-  while [ $elapsed -lt $STOP_TIMEOUT ]; do
-    if not_running; then
-      printf "\r\033[K${GREEN}✓ PostgreSQL stopped (${elapsed}s)${NC}\n"
-      exit 0
-    fi
-
-    # Show countdown (in place)
-    local remaining=$((STOP_TIMEOUT - elapsed))
-    printf "\r\033[K⏳ Stopping PostgreSQL... ${remaining}s remaining"
-
-    # Show new log lines
-    if log_exists; then
-      local new_size=$(wc -c < "$LOG_FILE")
-      if [ "$new_size" -gt "$log_size" ]; then
-        printf "\n"
-        tail -c +$((log_size + 1)) "$LOG_FILE"
-        log_size=$new_size
-      fi
-    fi
-
-    sleep 1
-    elapsed=$((elapsed + 1))
-  done
-
-  printf "\r\033[K${RED}✗ PostgreSQL failed to stop within ${STOP_TIMEOUT}s${NC}\n"
-  exit 1
+  stop_service
+  wait_with_logs not_running "$STOP_TIMEOUT" \
+    "Stopping PostgreSQL" \
+    "PostgreSQL stopped" \
+    "PostgreSQL failed to stop within ${STOP_TIMEOUT}s"
 }
 
 cmd_restart() {
-  cmd_stop
+  cmd_stop || return 1
   echo ""
   cmd_start
 }
@@ -167,20 +163,19 @@ cmd_restart() {
 cmd_status() {
   if is_running; then
     echo -e "${GREEN}PostgreSQL is running${NC}"
-    pg_isready -h localhost
-    exit 0
+    pg_isready -h "$DATA_DIR"
   else
     echo -e "${YELLOW}PostgreSQL is not running${NC}"
-    exit 1
+    return 1
   fi
 }
 
 cmd_log() {
-  local db_filter="$1"
+  local db_filter=$1
 
   if ! log_exists; then
     echo "Log file not found: $LOG_FILE" >&2
-    exit 1
+    return 1
   fi
 
   if [ -n "$db_filter" ]; then
