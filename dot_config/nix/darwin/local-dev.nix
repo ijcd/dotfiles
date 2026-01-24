@@ -37,10 +37,10 @@ let
     builtins.map (ip: "/sbin/ifconfig lo0 alias ${ip}") devIPs
   );
 
-  # PF NAT rules - fix hairpin routing for each IP
+  # PF NAT rules - fix hairpin routing for each IP (trailing newline required)
   pfNatRules = builtins.concatStringsSep "\n" (
     builtins.map (ip: "nat on lo0 from ${ip} to ${ip} -> 127.0.0.1") devIPs
-  );
+  ) + "\n";
 
   # Script to configure pf.conf and enable PF (no /nix dependency at runtime)
   pfSetupScript = ''
