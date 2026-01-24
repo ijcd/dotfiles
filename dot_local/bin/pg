@@ -1,0 +1,216 @@
+#!/bin/bash
+# pg - Manage nix-darwin PostgreSQL service
+#
+# Usage: pg <command> [args]
+#
+# Commands:
+#   start      Start PostgreSQL (shows logs until ready)
+#   stop       Stop PostgreSQL (shows logs until stopped)
+#   restart    Restart PostgreSQL
+#   status     Check if PostgreSQL is running
+#   log        Tail the PostgreSQL log
+#   log <db>   Tail log filtered by database name
+#
+# Examples:
+#   pg start
+#   pg log myapp_dev
+
+set -e
+
+# Configuration
+SERVICE_LABEL="org.nixos.postgresql"
+DATA_DIR="$HOME/.local/share/postgres"
+LOG_DIR="$DATA_DIR/logs"
+LOG_FILE="$LOG_DIR/postgresql-$(date +%Y-%m-%d).log"
+START_TIMEOUT=30
+STOP_TIMEOUT=10
+
+# Colors (if terminal supports it)
+if [ -t 1 ]; then
+  GREEN='\033[0;32m'
+  RED='\033[0;31m'
+  YELLOW='\033[0;33m'
+  NC='\033[0m'
+else
+  GREEN='' RED='' YELLOW='' NC=''
+fi
+
+#-----------------------------------------------------------
+# Helpers
+#-----------------------------------------------------------
+
+is_running() {
+  pg_isready -h localhost -q 2>/dev/null
+}
+
+not_running() {
+  ! is_running
+}
+
+log_exists() {
+  [ -f "$LOG_FILE" ]
+}
+
+#-----------------------------------------------------------
+# Commands
+#-----------------------------------------------------------
+
+cmd_start() {
+  if is_running; then
+    echo -e "${YELLOW}PostgreSQL is already running${NC}"
+    exit 0
+  fi
+
+  # Try to start the service
+  if ! launchctl kickstart -k "gui/$(id -u)/$SERVICE_LABEL" 2>/dev/null; then
+    if ! launchctl bootstrap "gui/$(id -u)" "$HOME/Library/LaunchAgents/$SERVICE_LABEL.plist" 2>/dev/null; then
+      echo -e "${RED}Failed to start service. Try: darwin-rebuild switch${NC}"
+      exit 1
+    fi
+  fi
+
+  # Wait for log file (up to 2.5s)
+  local wait_log=0
+  while [ $wait_log -lt 5 ] && ! log_exists; do
+    sleep 0.5
+    wait_log=$((wait_log + 1))
+  done
+
+  # Track log position for incremental output
+  local log_size=0
+  if log_exists; then
+    log_size=$(wc -c < "$LOG_FILE")
+  fi
+
+  # Poll with countdown and incremental log output
+  local elapsed=0
+  while [ $elapsed -lt $START_TIMEOUT ]; do
+    if is_running; then
+      printf "\r\033[K${GREEN}✓ PostgreSQL is ready (${elapsed}s)${NC}\n"
+      exit 0
+    fi
+
+    # Show countdown (in place)
+    local remaining=$((START_TIMEOUT - elapsed))
+    printf "\r\033[K⏳ Starting PostgreSQL... ${remaining}s remaining"
+
+    # Show new log lines
+    if log_exists; then
+      local new_size=$(wc -c < "$LOG_FILE")
+      if [ "$new_size" -gt "$log_size" ]; then
+        printf "\n"
+        tail -c +$((log_size + 1)) "$LOG_FILE"
+        log_size=$new_size
+      fi
+    fi
+
+    sleep 1
+    elapsed=$((elapsed + 1))
+  done
+
+  printf "\r\033[K${RED}✗ PostgreSQL failed to start within ${START_TIMEOUT}s${NC}\n"
+  echo "Check logs: pg log"
+  exit 1
+}
+
+cmd_stop() {
+  if ! is_running; then
+    echo "PostgreSQL is not running"
+    exit 0
+  fi
+
+  # Track log position for incremental output
+  local log_size=0
+  if log_exists; then
+    log_size=$(wc -c < "$LOG_FILE")
+  fi
+
+  # Bootout to fully unload (stop won't work with KeepAlive=true)
+  launchctl bootout "gui/$(id -u)/$SERVICE_LABEL" 2>/dev/null || true
+
+  # Poll with countdown and incremental log output
+  local elapsed=0
+  while [ $elapsed -lt $STOP_TIMEOUT ]; do
+    if not_running; then
+      printf "\r\033[K${GREEN}✓ PostgreSQL stopped (${elapsed}s)${NC}\n"
+      exit 0
+    fi
+
+    # Show countdown (in place)
+    local remaining=$((STOP_TIMEOUT - elapsed))
+    printf "\r\033[K⏳ Stopping PostgreSQL... ${remaining}s remaining"
+
+    # Show new log lines
+    if log_exists; then
+      local new_size=$(wc -c < "$LOG_FILE")
+      if [ "$new_size" -gt "$log_size" ]; then
+        printf "\n"
+        tail -c +$((log_size + 1)) "$LOG_FILE"
+        log_size=$new_size
+      fi
+    fi
+
+    sleep 1
+    elapsed=$((elapsed + 1))
+  done
+
+  printf "\r\033[K${RED}✗ PostgreSQL failed to stop within ${STOP_TIMEOUT}s${NC}\n"
+  exit 1
+}
+
+cmd_restart() {
+  cmd_stop
+  echo ""
+  cmd_start
+}
+
+cmd_status() {
+  if is_running; then
+    echo -e "${GREEN}PostgreSQL is running${NC}"
+    pg_isready -h localhost
+    exit 0
+  else
+    echo -e "${YELLOW}PostgreSQL is not running${NC}"
+    exit 1
+  fi
+}
+
+cmd_log() {
+  local db_filter="$1"
+
+  if ! log_exists; then
+    echo "Log file not found: $LOG_FILE" >&2
+    exit 1
+  fi
+
+  if [ -n "$db_filter" ]; then
+    echo "Tailing log for database: $db_filter (Ctrl+C to stop)"
+    echo ""
+    tail -f "$LOG_FILE" | grep --line-buffered "\[$db_filter\]"
+  else
+    echo "Tailing log (Ctrl+C to stop)"
+    echo ""
+    tail -f "$LOG_FILE"
+  fi
+}
+
+cmd_help() {
+  sed -n '2,/^$/p' "$0" | sed 's/^# \?//'
+}
+
+#-----------------------------------------------------------
+# Main
+#-----------------------------------------------------------
+
+case "${1:-}" in
+  start)   cmd_start ;;
+  stop)    cmd_stop ;;
+  restart) cmd_restart ;;
+  status)  cmd_status ;;
+  log)     cmd_log "$2" ;;
+  help|-h|--help) cmd_help ;;
+  *)
+    echo "Usage: pg {start|stop|restart|status|log [db]|help}" >&2
+    exit 1
+    ;;
+esac

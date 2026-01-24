@@ -2,6 +2,7 @@
 archive/
 ideas/
 legacy/
+plans/
 *.txt
 
 # Home Directories
