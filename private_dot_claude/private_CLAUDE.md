@@ -59,3 +59,16 @@ were added or bugs were fixed.
 - At the end of each plan, give me a list of unresolved questions to answer,
 if any. Make the questions extremely concise. Sacrifice grammar for the sake
 of concision.
+
+## Testing
+
+### Test-First Development
+- Write failing test before implementing
+- Run test to verify it fails for the right reason
+- Implement minimal code to pass
+- Refactor while green
+
+When fixing bugs:
+- Write regression test first (prove bug exists)
+- Then fix (test turns green)
+- Bug can never return undetected
