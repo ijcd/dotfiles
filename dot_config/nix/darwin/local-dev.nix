@@ -6,15 +6,26 @@ let
   # ═══════════════════════════════════════════════════════════════════════════
   devProjects = [
     { domain = "theliberties.test"; ip = "127.0.0.10"; }
-    # { domain = "myapp.test"; ip = "127.0.0.20"; }
+    # { domain = "myapp.test"; ip = "127.0.0.11"; }
   ];
+
+  # ═══════════════════════════════════════════════════════════════════════════
+  # dev_ip pool: Dynamic IP allocation for worktrees/branches
+  # These IPs are managed by the dev_ip tool, announced via mDNS (.local)
+  # Range: 127.0.0.20 - 127.0.0.39 (20 IPs)
+  # ═══════════════════════════════════════════════════════════════════════════
+  devIpPoolStart = 20;
+  devIpPoolEnd = 39;
+  devIpPool = builtins.genList (i: "127.0.0.${toString (i + devIpPoolStart)}")
+              (devIpPoolEnd - devIpPoolStart + 1);
 
   # ═══════════════════════════════════════════════════════════════════════════
   # Derived values (don't edit below unless changing behavior)
   # ═══════════════════════════════════════════════════════════════════════════
 
-  # Extract just the IPs
-  devIPs = builtins.map (p: p.ip) devProjects;
+  # Extract project IPs + pool IPs
+  projectIPs = builtins.map (p: p.ip) devProjects;
+  devIPs = projectIPs ++ devIpPool;
 
   # Build domain->IP mapping for dnsmasq
   devDomains = builtins.listToAttrs (
