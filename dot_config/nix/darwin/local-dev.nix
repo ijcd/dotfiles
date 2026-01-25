@@ -1,23 +1,19 @@
 { ... }:
 let
   # ═══════════════════════════════════════════════════════════════════════════
-  # Dev project loopback configuration
-  # Add new projects here - everything else is derived from this list
+  # Dev IP pool: Dynamic allocation for projects/worktrees/branches
+  # Managed by dev_ip tool, announced via mDNS (.local)
+  # Range: 127.0.0.10 - 127.0.0.99 (90 IPs)
   # ═══════════════════════════════════════════════════════════════════════════
-  devProjects = [
-    { domain = "theliberties.test"; ip = "127.0.0.10"; }
-    # { domain = "myapp.test"; ip = "127.0.0.11"; }
-  ];
-
-  # ═══════════════════════════════════════════════════════════════════════════
-  # dev_ip pool: Dynamic IP allocation for worktrees/branches
-  # These IPs are managed by the dev_ip tool, announced via mDNS (.local)
-  # Range: 127.0.0.20 - 127.0.0.39 (20 IPs)
-  # ═══════════════════════════════════════════════════════════════════════════
-  devIpPoolStart = 20;
-  devIpPoolEnd = 39;
+  devIpPoolStart = 10;
+  devIpPoolEnd = 99;
   devIpPool = builtins.genList (i: "127.0.0.${toString (i + devIpPoolStart)}")
               (devIpPoolEnd - devIpPoolStart + 1);
+
+  # Static domain mappings (optional - for .test domains via dnsmasq)
+  devProjects = [
+    # { domain = "myapp.test"; ip = "127.0.0.10"; }
+  ];
 
   # ═══════════════════════════════════════════════════════════════════════════
   # Derived values (don't edit below unless changing behavior)
@@ -37,10 +33,8 @@ let
     builtins.map (ip: "/sbin/ifconfig lo0 alias ${ip}") devIPs
   );
 
-  # PF NAT rules - fix hairpin routing for each IP (trailing newline required)
-  pfNatRules = builtins.concatStringsSep "\n" (
-    builtins.map (ip: "nat on lo0 from ${ip} to ${ip} -> 127.0.0.1") devIPs
-  ) + "\n";
+  # PF NAT rules - fix hairpin routing for entire 127.0.0.x range
+  pfNatRules = "nat on lo0 from 127.0.0.0/24 to 127.0.0.0/24 -> 127.0.0.1\n";
 
   # Script to configure pf.conf and enable PF (no /nix dependency at runtime)
   pfSetupScript = ''
