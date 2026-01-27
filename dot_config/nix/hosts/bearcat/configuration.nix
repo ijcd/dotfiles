@@ -120,6 +120,7 @@
     "ibazel"           # Bazel file watcher
     "aws-sso-cli"      # AWS SSO helper
     "aws-sso-util"     # AWS SSO utilities
+    "sandvault"        # sandboxed macOS user account for AI agents
   ];
 
   # Install apps from AppStore (https://discourse.nixos.org/t/nix-darwin-homebrew-masapps-is-hanging/60828)
