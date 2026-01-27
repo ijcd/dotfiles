@@ -44,6 +44,8 @@ work
 .claude/*                         # Local AI state
 !.claude/CLAUDE.md                # Track global claude instructions
 !.claude/settings.json            # Track plugin config
+!.claude/.credentials.json        # Track OAuth tokens (encrypted)
+!.claude/statusline.sh            # Track custom statusline
 .claude.json*                     # Local AI state
 .cups                             # Printer state
 .docker                           # Docker credentials/state
