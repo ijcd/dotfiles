@@ -36,6 +36,28 @@ were added or bugs were fixed.
 
 - Your primary method for interacting with GitHub should be the GitHub CLI.
 
+## PR Forks (upstream contributions)
+
+When forking a repo to submit a PR:
+
+1. **Local location**: Clone to `~/work/prs/<repo-name>`
+2. **Branch naming**: Use `ijcd/<description>` prefix (e.g., `ijcd/fix-endpoint-url`)
+3. **Topic tag**: Add `pr-fork` topic for easy discovery
+   ```bash
+   gh repo fork <owner>/<repo> --clone=false
+   gh repo edit ijcd/<repo> --add-topic pr-fork
+   git clone git@github.com:ijcd/<repo> ~/work/prs/<repo>
+   cd ~/work/prs/<repo>
+   git checkout -b ijcd/fix-something
+   ```
+3. **Cleanup**: After PR merged, delete local and archive/delete fork
+   ```bash
+   rm -rf ~/work/prs/<repo>
+   gh repo delete ijcd/<repo> --yes
+   # or archive instead: gh repo archive ijcd/<repo>
+   ```
+4. **Find all PR forks**: `gh repo list ijcd --topic pr-fork`
+
 ## Git
 
 - When creating branches, prefix them with ijcd/ to indicate they come from me.
