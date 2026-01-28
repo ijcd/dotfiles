@@ -14,7 +14,7 @@
     # "macforge"               # plugin-based system UI modification framework
 
     ### DESKTOP ENHANCEMENTS / AUTOMATION
-    "alfred" # powerful launcher & workflow automation (Spotlight replacement)
+    { name = "alfred"; greedy = true; } # powerful launcher & workflow automation (Spotlight replacement)
     "hammerspoon" # Lua-based macOS automation / window management
     "hazel" # automatic file organization rules for folders
     "hiddenbar" # hide/organize menu bar icons
@@ -29,7 +29,7 @@
     # "raycast"                # fast launcher with plugins and automation
 
     ### BROWSERS
-    "firefox" # Mozilla browser, good dev tooling and privacy features
+    { name = "firefox"; greedy = true; } # Mozilla browser, good dev tooling and privacy features
     # "brave-browser"          # privacy-focused Chromium browser with ad/tracker blocking
     # "thebrowsercompany-dia""thebrowsercompany-dia"   # Experimental dev-focused browser from The Browser Company (Arc), a sandbox for new UI/engine ideas
     # "zen"                    # privacy-oriented Firefox fork with opinionated defaults
@@ -40,19 +40,20 @@
 
     ### EDITORS
     "android-studio" # full Android app development IDE
-    "cursor" # AI-augmented code editor (VS Code derivative)
-    "visual-studio-code" # general-purpose code editor / lightweight IDE
-    "zed" # modern multiplayer code editor
+    { name = "cursor"; greedy = true; } # AI-augmented code editor (VS Code derivative)
+    { name = "visual-studio-code"; greedy = true; } # general-purpose code editor / lightweight IDE
+    { name = "zed"; greedy = true; } # modern multiplayer code editor
     # "zed@preview"            # preview/insider build of Zed editor
 
     ### DEV TOOLS
     "charles" # HTTP/S proxy, traffic viewer and debugger
     "claude-code" # Claude-based CLI / code assistant (terminal integration)
     "dash" # offline API/documentation browser
-    "ghostty" # fast GPU-accelerated terminal emulator
-    "kitty" # GPU-accelerated terminal emulator
+    { name = "ghostty"; greedy = true; } # fast GPU-accelerated terminal emulator
+    { name = "kitty"; greedy = true; } # GPU-accelerated terminal emulator
     "livebook" # Elixir Livebook notebooks for data/ML/prototyping
     "ngrok" # secure public tunnels to local dev servers
+    { name = "orbstack"; greedy = true; } # fast Docker & Linux VM runtime
     "pgadmin4" # PostgreSQL admin GUI
     "sourcetree" # GUI Git client
     "virtualbox" # virtualization hypervisor for running VMs
@@ -64,11 +65,11 @@
     "intellij-idea" # JetBrains Java/Kotlin/polyglot IDE
 
     ### MESSAGING & COLLAB
-    "discord" # community chat/voice/video (dev servers, communities)
+    { name = "discord"; greedy = true; } # community chat/voice/video (dev servers, communities)
     "loom" # async screen & camera recording and sharing
-    "slack" # team and work chat with channels
-    "signal" # end-to-end encrypted messaging
-    "whatsapp" # mainstream messaging app (desktop client)
+    { name = "slack"; greedy = true; } # team and work chat with channels
+    { name = "signal"; greedy = true; } # end-to-end encrypted messaging
+    { name = "whatsapp"; greedy = true; } # mainstream messaging app (desktop client)
     "messenger" # Facebook Messenger desktop app
     "keybase" # encrypted chat, file sharing, and crypto identity
 
@@ -76,9 +77,9 @@
     "teamviewer" # remote desktop/support tool
 
     ### PRODUCTIVITY, PKM & ORGANIZATION
-    "1password" # password manager and secure vault
+    { name = "1password"; greedy = true; } # password manager and secure vault
     "anki" # spaced repetition (SRS) flashcard learning
-    "obsidian" # markdown-based personal knowledge management
+    { name = "obsidian"; greedy = true; } # markdown-based personal knowledge management
     "omnifocus" # GTD-style task/project manager
 
     ### MEDIA, CREATIVE & CONTENT
@@ -92,7 +93,7 @@
 
     ### STREAMING
     "plex-media-server" # media server for local movies/TV/music libraries
-    "spotify" # music streaming client
+    { name = "spotify"; greedy = true; } # music streaming client
     "qbittorrent" # BitTorrent client (full-featured, open source)
 
     ### SECURITY / NETWORKING / PRIVACY
