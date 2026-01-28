@@ -14,7 +14,10 @@
     "learning-output-style@claude-plugins-official": true,
     "gopls-lsp@claude-plugins-official": true,
     "slack@claude-plugins-official": true,
-    "rust-analyzer-lsp@claude-plugins-official": true,
-    "oh-my-claudecode@omc": true
+    "rust-analyzer-lsp@claude-plugins-official": true
+  },
+  "statusLine": {
+    "type": "command",
+    "command": "/Users/ijcd/.claude/statusline.sh"
   }
 }
