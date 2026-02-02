@@ -56,6 +56,9 @@ export RSYNC_RSH=ssh
 export EDITOR=vim
 export VISUAL=$EDITOR
 
+# Claude
+export CLAUDE_IMAGE=claude-dev
+
 # Erlang/Elixir - persistent shell history in erl/iex
 export ERL_AFLAGS="-kernel shell_history enabled"
 
