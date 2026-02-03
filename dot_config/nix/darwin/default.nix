@@ -9,6 +9,7 @@
   imports = [
     ./local-dev.nix
     ./homebrew.nix
+    ./nix-store-fallback.nix
     ./postgres.nix
     ./settings.nix
     inputs.home-manager.darwinModules.home-manager
