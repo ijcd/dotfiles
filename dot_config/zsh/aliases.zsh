@@ -116,6 +116,11 @@ alias -g thisbranch:thisbranch='$(git rev-parse --abbrev-ref HEAD)':'$(git rev-p
 # alias jj='fasd_cd -d -i' # cd with interactive selection
 
 ############
+# media (yt script in ~/.local/bin)
+############
+alias ytv='mpv'                                        # video (foreground)
+
+############
 # emacs
 ############
 alias emacs-start='emacs --daemon'

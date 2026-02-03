@@ -88,6 +88,7 @@
       imagemagick        # image manipulation
       ffmpeg             # video/audio processing
       yt-dlp             # youtube downloader
+      mpv                # media player (audio/video)
       sox                # audio processing
       graphviz           # graph visualization
       poppler_utils      # PDF utilities

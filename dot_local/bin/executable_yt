@@ -1,0 +1,149 @@
+#!/bin/bash
+# yt - play youtube/media URLs via mpv in background tmux session
+#
+# Usage:
+#   yt                    Pick from history (fzf)
+#   yt <url>              Play URL (auto-fetches title)
+#   yt -f|--fav [name]    Pick favorite (or play named favorite)
+#   yt -a|--add <n> [url] Add to favorites (url defaults to now playing)
+#   yt -l|--list          List favorites
+#   yt -c|--control       Attach to control (Ctrl-b d to detach)
+#   yt -q|--quit          Stop playback
+#   yt -n|--now           Show what's playing
+#   yt -h|--help          Show this help
+#
+# Controls (when attached): space=pause, q=quit, 9/0=volume, m=mute
+#
+# Data:      $XDG_CONFIG_HOME/yt/ (favorites, history, now)
+
+set -e
+
+SESSION="music"
+CONFIG_DIR="${XDG_CONFIG_HOME:-$HOME/.config}/yt"
+FAVS_FILE="$CONFIG_DIR/favorites"
+HIST_FILE="$CONFIG_DIR/history"
+NOW_FILE="$CONFIG_DIR/now"
+HIST_LIMIT=50
+
+mkdir -p "$CONFIG_DIR"
+touch "$FAVS_FILE" "$HIST_FILE"
+
+usage() {
+  sed -n '2,/^$/s/^# //p' "$0"
+  exit 0
+}
+
+die() { echo "error: $1" >&2; exit 1; }
+
+get_title() {
+  local url="$1"
+  yt-dlp --get-title "$url" 2>/dev/null || echo "$url"
+}
+
+play_url() {
+  local url="$1" title="$2"
+  [ -z "$url" ] && die "no URL provided"
+
+  # Fetch title if not provided
+  [ -z "$title" ] && { echo "fetching title..."; title=$(get_title "$url"); }
+
+  # Add to history (dedup by url, keep recent)
+  grep -v "=$url$" "$HIST_FILE" 2>/dev/null | tail -n $((HIST_LIMIT - 1)) > "$HIST_FILE.tmp" || true
+  echo "$title=$url" >> "$HIST_FILE.tmp"
+  mv "$HIST_FILE.tmp" "$HIST_FILE"
+
+  # Save now playing
+  echo "$title=$url" > "$NOW_FILE"
+
+  # Kill existing and start new
+  tmux kill-session -t "$SESSION" 2>/dev/null || true
+  tmux new -d -s "$SESSION" "mpv --no-video '$url'"
+  echo "playing: $title"
+  tmux attach -t "$SESSION"
+}
+
+pick_and_play() {
+  local file="$1" prompt="$2"
+  [ ! -s "$file" ] && die "no entries yet"
+  local line
+  # Add control option if something is playing
+  local entries
+  entries=$(tac "$file")
+  tmux has-session -t "$SESSION" 2>/dev/null && entries="[control] attach to player"$'\n'"$entries"
+  line=$(echo "$entries" | fzf --prompt="$prompt" --with-nth=1 --delimiter='=') || exit 0
+  # Handle control selection
+  [[ "$line" == "[control]"* ]] && { control; return; }
+  local title="${line%%=*}"
+  local url="${line#*=}"
+  play_url "$url" "$title"
+}
+
+play_named_fav() {
+  local name="$1"
+  local line
+  line=$(grep -i "^$name=" "$FAVS_FILE" || grep -i "$name" "$FAVS_FILE" | head -1) || die "favorite '$name' not found"
+  local title="${line%%=*}"
+  local url="${line#*=}"
+  play_url "$url" "$title"
+}
+
+add_fav() {
+  local name="$1" url="$2"
+  # If no url, use now playing
+  if [ -z "$url" ] && [ -f "$NOW_FILE" ]; then
+    local now
+    now=$(cat "$NOW_FILE")
+    url="${now#*=}"
+    [ -z "$name" ] && name="${now%%=*}"
+  fi
+  [ -z "$name" ] || [ -z "$url" ] && die "usage: yt -a <name> [url]"
+  grep -v "=$url$" "$FAVS_FILE" > "$FAVS_FILE.tmp" 2>/dev/null || true
+  echo "$name=$url" >> "$FAVS_FILE.tmp"
+  sort "$FAVS_FILE.tmp" > "$FAVS_FILE"
+  rm "$FAVS_FILE.tmp"
+  echo "favorited: $name"
+}
+
+list_favs() {
+  [ ! -s "$FAVS_FILE" ] && die "no favorites yet"
+  cat "$FAVS_FILE" | while IFS='=' read -r title url; do
+    echo "$title"
+  done
+}
+
+control() {
+  tmux has-session -t "$SESSION" 2>/dev/null || die "nothing playing"
+  tmux attach -t "$SESSION"
+}
+
+quit() {
+  tmux kill-session -t "$SESSION" 2>/dev/null && echo "stopped" || echo "nothing playing"
+  rm -f "$NOW_FILE"
+}
+
+now_playing() {
+  [ -f "$NOW_FILE" ] || die "nothing playing"
+  local now
+  now=$(cat "$NOW_FILE")
+  echo "${now%%=*}"
+}
+
+# Parse args
+case "${1:-}" in
+  -h|-\?|--help) usage ;;
+  "")           pick_and_play "$HIST_FILE" "history> " ;;
+  -f|--fav)
+    if [ -n "$2" ]; then
+      play_named_fav "$2"
+    else
+      pick_and_play "$FAVS_FILE" "favorite> "
+    fi
+    ;;
+  -a|--add)     add_fav "$2" "$3" ;;
+  -l|--list)    list_favs ;;
+  -c|--control) control ;;
+  -q|--quit)    quit ;;
+  -n|--now)     now_playing ;;
+  -*)           die "unknown option: $1 (try --help)" ;;
+  *)            play_url "$1" ;;
+esac
