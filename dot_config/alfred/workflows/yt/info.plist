@@ -1,0 +1,95 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>bundleid</key>
+	<string>com.ijcd.yt-player</string>
+	<key>name</key>
+	<string>YouTube Player</string>
+	<key>description</key>
+	<string>Play YouTube audio via mpv in background</string>
+	<key>createdby</key>
+	<string>ijcd</string>
+	<key>disabled</key>
+	<false/>
+	<key>connections</key>
+	<dict>
+		<key>keyword-trigger</key>
+		<array>
+			<dict>
+				<key>destinationuid</key>
+				<string>run-script</string>
+				<key>modifiers</key>
+				<integer>0</integer>
+				<key>vitoclose</key>
+				<false/>
+			</dict>
+		</array>
+	</dict>
+	<key>objects</key>
+	<array>
+		<dict>
+			<key>config</key>
+			<dict>
+				<key>argumenttype</key>
+				<integer>1</integer>
+				<key>keyword</key>
+				<string>yt</string>
+				<key>subtext</key>
+				<string>Play YouTube URL or pick from history</string>
+				<key>text</key>
+				<string>YouTube Player</string>
+				<key>withspace</key>
+				<true/>
+			</dict>
+			<key>type</key>
+			<string>alfred.workflow.input.keyword</string>
+			<key>uid</key>
+			<string>keyword-trigger</string>
+			<key>version</key>
+			<integer>1</integer>
+		</dict>
+		<dict>
+			<key>config</key>
+			<dict>
+				<key>concurrently</key>
+				<false/>
+				<key>escaping</key>
+				<integer>102</integer>
+				<key>script</key>
+				<string>export PATH="$HOME/.local/bin:$HOME/.nix-profile/bin:/nix/var/nix/profiles/default/bin:$PATH"
+yt "{query}"</string>
+				<key>scriptargtype</key>
+				<integer>0</integer>
+				<key>type</key>
+				<integer>0</integer>
+			</dict>
+			<key>type</key>
+			<string>alfred.workflow.action.script</string>
+			<key>uid</key>
+			<string>run-script</string>
+			<key>version</key>
+			<integer>2</integer>
+		</dict>
+	</array>
+	<key>uidata</key>
+	<dict>
+		<key>keyword-trigger</key>
+		<dict>
+			<key>xpos</key>
+			<real>100</real>
+			<key>ypos</key>
+			<real>100</real>
+		</dict>
+		<key>run-script</key>
+		<dict>
+			<key>xpos</key>
+			<real>350</real>
+			<key>ypos</key>
+			<real>100</real>
+		</dict>
+	</dict>
+	<key>version</key>
+	<string>1.0</string>
+</dict>
+</plist>
