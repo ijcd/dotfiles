@@ -1,7 +1,7 @@
 { pkgs, lib, ... }:
 
 let
-  version = "1.6.1";
+  version = "1.6.2";
 
   claude-container = pkgs.stdenvNoCC.mkDerivation {
     pname = "claude-container";
@@ -10,7 +10,7 @@ let
       owner = "nezhar";
       repo = "claude-container";
       rev = version;
-      hash = "sha256-vXgxmuJgTYoyEHGYAGdDB18DaqcioxokesRNq7uuBN4=";
+      hash = "sha256-AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=";
     };
     installPhase = ''
       mkdir -p $out/bin
