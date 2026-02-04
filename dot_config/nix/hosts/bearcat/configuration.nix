@@ -47,7 +47,7 @@
 
     ### DEV TOOLS
     "charles" # HTTP/S proxy, traffic viewer and debugger
-    "claude-code" # Claude-based CLI / code assistant (terminal integration)
+    { name = "claude-code"; greedy = true; } # Claude-based CLI / code assistant
     "dash" # offline API/documentation browser
     { name = "ghostty"; greedy = true; } # fast GPU-accelerated terminal emulator
     { name = "kitty"; greedy = true; } # GPU-accelerated terminal emulator

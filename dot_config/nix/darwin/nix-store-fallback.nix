@@ -24,13 +24,19 @@
               sleep 2
           fi
 
-          # Ensure daemon is running (Determinate Systems installer)
+          # Ensure daemon is loaded and running
           if [ -d /nix/store ]; then
+              PLIST="/Library/LaunchDaemons/org.nixos.nix-daemon.plist"
               if ! /bin/launchctl print system/org.nixos.nix-daemon >/dev/null 2>&1; then
-                  echo "$(date): Daemon not running, starting..." >> "$LOG"
+                  echo "$(date): Daemon not loaded, loading plist..." >> "$LOG"
+                  /bin/launchctl load "$PLIST" >> "$LOG" 2>&1
+                  sleep 1
+              fi
+              if ! /bin/launchctl print system/org.nixos.nix-daemon >/dev/null 2>&1; then
+                  echo "$(date): Daemon still not running, kickstarting..." >> "$LOG"
                   /bin/launchctl kickstart -k system/org.nixos.nix-daemon >> "$LOG" 2>&1
               else
-                  echo "$(date): Daemon already running." >> "$LOG"
+                  echo "$(date): Daemon running." >> "$LOG"
               fi
           else
               echo "$(date): /nix still not mounted, cannot start daemon." >> "$LOG"

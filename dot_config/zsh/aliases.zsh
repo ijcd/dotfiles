@@ -65,7 +65,7 @@ alias todos-pick="rg -n '(TODO|FIXME|XXX|HACK)' | \
 ############
 alias cm=chezmoi
 
-alias nixhome-switch='sudo nix run nix-darwin -- switch --flake ~/.config/nix'
+alias nixhome-switch='sudo -H nix run nix-darwin -- switch --flake /Users/$USER/.config/nix'
 alias nixhome-activate='sudo nix run nix-darwin -- activate --flake ~/.config/nix'
 
 alias whatchanged-cm="~/.config/nix/scripts/chezmoi-report.sh";
