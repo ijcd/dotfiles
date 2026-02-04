@@ -37,7 +37,7 @@
         "cachix.cachix.org-1:eWNHQldwUO7G2VkjpnjDbWwy4KQ/HNxht7H4SSoMckM="
       ];
     };
-    enable = false; # using determinate installer
+    enable = false; # nix installed separately, don't let nix-darwin manage it
   };
 
   nixpkgs.config.allowUnfree = true;
