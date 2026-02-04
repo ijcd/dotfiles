@@ -4,8 +4,9 @@
     enable = true;
 
     onActivation = {
-      autoUpdate = false;
-      upgrade = true;
+      autoUpdate = true;             # fetch latest formulae/casks
+      upgrade = true;                # upgrade outdated packages
+      extraFlags = [ "--greedy" ];   # upgrade casks even if version unchanged
       cleanup = "uninstall";         # one of "none", "uninstall", "zap"
     };
 
