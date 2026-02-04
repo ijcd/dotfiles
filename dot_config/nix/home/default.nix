@@ -2,7 +2,6 @@
 {
   imports = [
     ./packages.nix
-    ./claude-container.nix
     ./git.nix
     ./shell.nix
     ./mise.nix
