@@ -10,6 +10,7 @@
     ./local-dev.nix
     ./homebrew.nix
     ./nix-store-fallback.nix
+    ./performance.nix
     ./postgres.nix
     ./settings.nix
     inputs.home-manager.darwinModules.home-manager
