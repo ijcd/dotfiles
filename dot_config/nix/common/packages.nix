@@ -40,6 +40,7 @@
       # ─────────────────────────────────────────────────────────────────────────
       git
       gh                 # GitHub CLI
+      graphite-cli       # stacked PRs
       delta              # better git diffs
       git-filter-repo    # history rewriting
 
