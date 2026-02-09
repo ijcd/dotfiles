@@ -56,7 +56,7 @@
     backupFileExtension = "mine";
     users.${primaryUser} = {
       imports = [
-        ../home
+        ../common
       ];
     };
     extraSpecialArgs = {

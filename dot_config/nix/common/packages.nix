@@ -47,7 +47,7 @@
       # Dev environment
       # ─────────────────────────────────────────────────────────────────────────
       # direnv - managed by programs.direnv in direnv.nix
-      mise               # polyglot version manager (node, rust, python, etc.)
+      # mise - managed by homebrew (nix version broken on x86_64-darwin)
       chezmoi            # dotfile manager
       mkcert             # local HTTPS certs
       watchman           # file watcher
