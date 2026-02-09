@@ -8,6 +8,12 @@
     ./direnv.nix
   ];
 
+  nix.gc = {
+    automatic = true;
+    frequency = "daily";
+    options = "--delete-older-than 7d";
+  };
+
   home = {
     username = primaryUser;
     stateVersion = "25.05";
