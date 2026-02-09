@@ -122,6 +122,7 @@
     "aws-sso-cli"      # AWS SSO helper
     "aws-sso-util"     # AWS SSO utilities
     "sandvault"        # sandboxed macOS user account for AI agents
+    "gastown"          # git status in shell prompt
   ];
 
   # Install apps from AppStore (https://discourse.nixos.org/t/nix-darwin-homebrew-masapps-is-hanging/60828)
