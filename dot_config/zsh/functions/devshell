@@ -1,0 +1,101 @@
+# devshell - Quick nix dev shells from templates
+#
+# Usage:
+#   devshell init <ecosystem>   Scaffold flake.nix + .envrc into cwd
+#   devshell run <ecosystem>    Ephemeral interactive shell
+#   devshell list               Show available ecosystems
+
+function devshell() {
+  local templates_dir="${XDG_CONFIG_HOME:-$HOME/.config}/devshell-templates"
+
+  case "$1" in
+    init)
+      local ecosystem="$2"
+      if [[ -z "$ecosystem" ]]; then
+        echo "Usage: devshell init <ecosystem>" >&2
+        echo "Run 'devshell list' to see available ecosystems" >&2
+        return 1
+      fi
+
+      local template_dir="$templates_dir/$ecosystem"
+      if [[ ! -d "$template_dir" ]]; then
+        echo "Unknown ecosystem: $ecosystem" >&2
+        echo "Run 'devshell list' to see available ecosystems" >&2
+        return 1
+      fi
+
+      if [[ -f flake.nix ]]; then
+        echo "flake.nix already exists in current directory" >&2
+        return 1
+      fi
+
+      cp "$template_dir/flake.nix" ./flake.nix
+      echo "Created flake.nix ($ecosystem)"
+
+      if [[ ! -f .envrc ]]; then
+        cp "$templates_dir/envrc" ./.envrc
+        echo "Created .envrc"
+      else
+        echo ".envrc already exists, skipping"
+      fi
+
+      if (( $+commands[direnv] )); then
+        direnv allow
+        echo "Ran direnv allow"
+      fi
+
+      echo "Done. Run 'nix develop' or cd out and back in for direnv."
+      ;;
+
+    run)
+      local ecosystem="$2"
+      if [[ -z "$ecosystem" ]]; then
+        echo "Usage: devshell run <ecosystem>" >&2
+        echo "Run 'devshell list' to see available ecosystems" >&2
+        return 1
+      fi
+
+      local pkgs
+      case "$ecosystem" in
+        elixir)     pkgs=(elixir erlang hex rebar3) ;;
+        go)         pkgs=(go gopls delve golangci-lint) ;;
+        rust)       pkgs=(rustc cargo rustfmt clippy rust-analyzer) ;;
+        python)     pkgs=(python3 black ruff mypy) ;;
+        ruby)       pkgs=(ruby bundler) ;;
+        typescript) pkgs=(nodejs corepack) ;;
+        zig)        pkgs=(zig zls) ;;
+        java)       pkgs=(jdk maven gradle) ;;
+        *)
+          echo "Unknown ecosystem: $ecosystem" >&2
+          echo "Run 'devshell list' to see available ecosystems" >&2
+          return 1
+          ;;
+      esac
+
+      local nix_args=()
+      for pkg in "${pkgs[@]}"; do
+        nix_args+=("nixpkgs#$pkg")
+      done
+
+      echo "Entering $ecosystem shell (ephemeral)..."
+      nix shell "${nix_args[@]}" -c zsh
+      ;;
+
+    list)
+      echo "Available ecosystems:"
+      for dir in "$templates_dir"/*/; do
+        [[ -d "$dir" ]] && echo "  $(basename "$dir")"
+      done
+      ;;
+
+    *)
+      echo "Usage: devshell <command> [args]" >&2
+      echo "" >&2
+      echo "Commands:" >&2
+      echo "  init <ecosystem>   Scaffold flake.nix + .envrc into cwd" >&2
+      echo "  run <ecosystem>    Ephemeral interactive shell" >&2
+      echo "  list               Show available ecosystems" >&2
+      return 1
+      ;;
+  esac
+}

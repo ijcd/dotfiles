@@ -45,6 +45,7 @@ add-zsh-hook precmd starship_last_command_precmd
 
 # Load the my-help function
 source $ZDOTDIR/functions/my-help
+source $ZDOTDIR/functions/devshell
 
 # Ctrl+/ - Launch my-commands browser
 zle -N _my-commands-widget
