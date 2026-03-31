@@ -51,6 +51,11 @@ function my-help() {
   macos-open-from-clipboard  Open URL from clipboard
   macos-unquarantine   Remove quarantine from app
 
+─── Dev Shells ─────────────────────────────────────────────────────
+  devshell init <eco>  Scaffold flake.nix + .envrc (elixir, go, rust, ...)
+  devshell run <eco>   Ephemeral nix shell
+  devshell list        Show available ecosystems
+
 EOF
 }
 
