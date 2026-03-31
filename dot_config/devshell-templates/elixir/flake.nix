@@ -22,9 +22,6 @@
               postgresql
             ] ++ pkgs.lib.optionals pkgs.stdenv.isLinux [
               inotify-tools
-            ] ++ pkgs.lib.optionals pkgs.stdenv.isDarwin [
-              darwin.apple_sdk.frameworks.CoreServices
-              darwin.apple_sdk.frameworks.CoreFoundation
             ];
 
             shellHook = ''
