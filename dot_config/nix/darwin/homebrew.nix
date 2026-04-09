@@ -4,8 +4,8 @@
     enable = true;
 
     onActivation = {
-      autoUpdate = true;             # fetch latest formulae/casks
-      upgrade = true;                # upgrade outdated packages
+      autoUpdate = false;            # skip `brew update` on rebuild; run manually
+      upgrade = false;               # skip `brew upgrade` on rebuild; run manually
       cleanup = "uninstall";         # one of "none", "uninstall", "zap"
     };
 
@@ -41,7 +41,7 @@
       "aws-sso-util"     # AWS SSO utilities
       "gastown"          # git status in shell prompt
       "mise"             # version manager (nix broken on x86_64-darwin, nixpkgs#427748)
-      "workmux"          # tmux workspace manager (nix flake needs rust 1.88+)
+      "raine/workmux/workmux" # tmux workspace manager (nix flake needs rust 1.88+)
     ];
 
     casks = [
@@ -57,7 +57,7 @@
       "hiddenbar" # hide/organize menu bar icons
       "rectangle" # window snapping/tiling manager
       "xquartz" # X11 server (for legacy Unix GUI apps requiring X11)
-      # "aerospace"              # tiling window manager / Spaces replacement for macOS
+      "aerospace"              # tiling window manager / Spaces replacement for macOS
       # "amitv87-pip"            # always-on-top picture-in-picture video player
       # "betterdisplay"          # advanced display/scaling control, virtual monitors
       # "cleanshot"              # best-in-class screenshot and screen recording tool
