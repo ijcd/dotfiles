@@ -1,4 +1,4 @@
-{ pkgs, ... }:
+{ pkgs, config, lib, ... }:
 {
   programs.emacs = {
     enable = true;
@@ -7,5 +7,11 @@
       vterm
       treesit-grammars.with-all-grammars
     ];
+  };
+
+  # Copy Emacs.app to ~/Applications so macOS Spotlight/Alfred can find it
+  home.file = lib.mkIf pkgs.stdenv.isDarwin {
+    "Applications/Emacs.app".source =
+      "${config.programs.emacs.finalPackage}/Applications/Emacs.app";
   };
 }
