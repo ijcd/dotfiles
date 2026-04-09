@@ -31,6 +31,7 @@ work
 .config/hub                       # GitHub credentials
 .config/iterm2                    # Syncs separately or machine-specific
 .config/nix/result                # Nix build output (symlink)
+.config/emacs                     # Separate git repo (dotemacs)
 .config/zed                       # Zed syncs via account
 
 ##############################################

@@ -41,6 +41,9 @@
   };
 
   nixpkgs.config.allowUnfree = true;
+  nixpkgs.overlays = [
+    inputs.emacs-overlay.overlay
+  ];
 
   # homebrew installation manager
   nix-homebrew = {

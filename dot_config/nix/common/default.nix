@@ -6,6 +6,7 @@
     ./shell.nix
     ./mise.nix
     ./direnv.nix
+    ./emacs.nix
   ];
 
   nix.gc = {
