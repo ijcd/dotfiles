@@ -62,3 +62,13 @@ bindkey "^[?" _my-help-widget  # Alt+? for help (Ctrl+Shift+/ on some terminals)
 # Source keybindings.zsh for ztrace_*, show_keybindings, bindkey_dump
 # Uncomment if you want these available in every shell:
 # source $ZDOTDIR/support/keybindings.zsh
+
+###########################################
+# Directory-based terminal colors
+###########################################
+
+source $ZDOTDIR/functions/dircolor
+
+_dircolor_chpwd() { dircolor apply }
+add-zsh-hook chpwd _dircolor_chpwd
+dircolor apply  # apply on shell start

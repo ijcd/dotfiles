@@ -56,6 +56,13 @@ function my-help() {
   devshell run <eco>   Ephemeral nix shell
   devshell list        Show available ecosystems
 
+─── Terminal Colors ──────────────────────────────────────────────────
+  dircolor             Pick background color for current dir
+  dircolor list        Show palette + current mappings
+  dircolor set NAME    Assign color to $PWD
+  dircolor clear       Remove mapping for $PWD
+  dircolor show        Show current dir's color
+
 EOF
 }
 
