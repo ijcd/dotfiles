@@ -1,15 +1,52 @@
 { primaryUser, ... }:
 {
-  # Spotlight: Disable indexing on data paths we don't need searched
-  # Note: /System, /usr, /nix are read-only or special mounts - can't modify
-  # Alfred needs /Applications and ~ indexed
+  # Spotlight: only index overnight (3:30am–8:00am) to avoid drive thrash.
+  # Activation sets correct state based on current hour; launchd handles transitions.
   system.activationScripts.postActivation.text = ''
-    echo "Configuring Spotlight indexing (data volumes only)..."
-    # These are on the writable data volume
-    /usr/bin/mdutil -i off /Library 2>/dev/null || true
-    /usr/bin/mdutil -i off /private 2>/dev/null || true
-    /usr/bin/mdutil -i off /opt 2>/dev/null || true
+    # Index home-manager apps for Alfred/Spotlight, then set Spotlight state.
+    appDir="/Users/${primaryUser}/Applications/Home Manager Apps"
+    if [ -d "$appDir" ]; then
+      echo "Spotlight: indexing home-manager apps..."
+      /usr/bin/mdutil -a -i on 2>/dev/null || true
+      find "$appDir" -maxdepth 1 -name "*.app" -exec /usr/bin/mdimport {} +
+      sleep 5
+    fi
+
+    hour=$(date +%H)
+    if [ "$hour" -ge 3 ] && [ "$hour" -lt 8 ]; then
+      echo "Spotlight: inside overnight window, leaving indexing on..."
+      /usr/bin/mdutil -a -i on 2>/dev/null || true
+    else
+      echo "Spotlight: outside overnight window, disabling indexing..."
+      /usr/bin/mdutil -a -i off 2>/dev/null || true
+    fi
   '';
+
+  launchd.daemons.spotlight-on = {
+    serviceConfig = {
+      Label = "local.spotlight-on";
+      ProgramArguments = [
+        "/usr/bin/mdutil" "-a" "-i" "on"
+      ];
+      StartCalendarInterval = {
+        Hour = 3;
+        Minute = 30;
+      };
+    };
+  };
+
+  launchd.daemons.spotlight-off = {
+    serviceConfig = {
+      Label = "local.spotlight-off";
+      ProgramArguments = [
+        "/usr/bin/mdutil" "-a" "-i" "off"
+      ];
+      StartCalendarInterval = {
+        Hour = 8;
+        Minute = 0;
+      };
+    };
+  };
 
   # Disable Siri learning daemon (duetexpertd)
   # Powers: suggested apps, Siri suggestions, app predictions

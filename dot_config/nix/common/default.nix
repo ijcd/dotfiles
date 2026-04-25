@@ -1,4 +1,4 @@
-{ primaryUser, ... }:
+{ primaryUser, lib, config, pkgs, ... }:
 {
   imports = [
     ./packages.nix
@@ -11,9 +11,14 @@
 
   nix.gc = {
     automatic = true;
-    frequency = "daily";
+    dates = "daily";
     options = "--delete-older-than 7d";
   };
+
+  # Copy .app bundles to ~/Applications so Spotlight/Alfred can find them.
+  # Default is linkApps (symlinks) for stateVersion < 25.11; override to copyApps.
+  targets.darwin.copyApps.enable = true;
+  targets.darwin.linkApps.enable = false;
 
   home = {
     username = primaryUser;
