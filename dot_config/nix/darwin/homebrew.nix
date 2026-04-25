@@ -9,7 +9,7 @@
       cleanup = "uninstall";         # one of "none", "uninstall", "zap"
     };
 
-    caskArgs.no_quarantine = true;
+    # caskArgs.no_quarantine removed in newer Homebrew
     global.brewfile = true;
 
     # homebrew is best for GUI apps
@@ -97,6 +97,7 @@
       "wireshark-app" # network protocol analyzer / packet sniffer
 
       ### SDKs
+      "basictex" # minimal TeX distribution (subset of MacTeX)
       "flutter" # Flutter SDK / tooling via cask
       "oracle-jdk" # Oracle Java Development Kit distribution
       "intellij-idea" # JetBrains Java/Kotlin/polyglot IDE
