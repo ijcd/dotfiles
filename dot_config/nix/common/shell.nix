@@ -1,10 +1,10 @@
-_: {
+{ config, ... }: {
   # Zsh dotfiles managed by chezmoi (ZDOTDIR=~/.config/zsh)
   # HM generates its zshrc to a separate location, which we source for integrations
   # ~/.zshenv is a symlink managed by chezmoi, so HM doesn't touch it
   programs.zsh = {
     enable = true;
-    dotDir = ".local/share/hm-zsh";
+    dotDir = "${config.home.homeDirectory}/.local/share/hm-zsh";
     enableCompletion = false;  # Zim handles completion
   };
 
