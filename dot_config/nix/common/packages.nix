@@ -35,7 +35,6 @@
       # ─────────────────────────────────────────────────────────────────────────
       git
       gh                 # GitHub CLI
-      graphite-cli       # stacked PRs
       delta              # better git diffs
       git-filter-repo    # history rewriting
 
@@ -46,7 +45,7 @@
       # mise - managed by homebrew (nix version broken on x86_64-darwin)
       chezmoi            # dotfile manager
       mkcert             # local HTTPS certs
-      watchman           # file watcher
+      # watchman - file watcher (folly broken on x86_64-darwin, nixpkgs .align 64 asm error)
 
       # ─────────────────────────────────────────────────────────────────────────
       # Cloud & infrastructure
@@ -54,7 +53,7 @@
       awscli2            # AWS CLI v2
       aws-vault          # AWS credential management
       doctl              # DigitalOcean CLI
-      flyctl             # Fly.io CLI
+      # flyctl - installed via curl (https://fly.io/install.sh), self-updates; nix lags behind
       kubectl            # Kubernetes CLI
       ansible            # Automation/orchestration
 
@@ -92,14 +91,14 @@
       mpv                # media player (audio/video)
       sox                # audio processing
       graphviz           # graph visualization
-      poppler_utils      # PDF utilities
+      poppler-utils      # PDF utilities
 
       # ─────────────────────────────────────────────────────────────────────────
       # Nix tooling
       # ─────────────────────────────────────────────────────────────────────────
       devenv             # reproducible dev environments
       nil                # Nix LSP
-      nixfmt-rfc-style   # Nix formatter
+      nixfmt             # Nix formatter
       nvd                # Nix version diff (compare system generations)
 
       # ─────────────────────────────────────────────────────────────────────────

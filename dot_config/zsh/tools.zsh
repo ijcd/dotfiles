@@ -106,4 +106,10 @@ if [[ -d ~/.cargo/bin ]]; then
   path+=(~/.cargo/bin)
 fi
 
+# fly.io - Fly CLI (flyctl)
+# Installed via: curl -L https://fly.io/install.sh | sh
+if [[ -d ~/.fly/bin ]]; then
+  path+=(~/.fly/bin)
+fi
+
 debug_file_end
