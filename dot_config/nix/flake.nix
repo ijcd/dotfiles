@@ -19,6 +19,7 @@
     # declarative homebrew management
     # TODO: pin homebrew taps (https://blog.dbalan.in/blog/2024/03/25/boostrap-a-macos-machine-with-nix/index.html?utm_source=chatgpt.com)
     nix-homebrew.url = "github:zhaofengli/nix-homebrew";
+
   };
 
   outputs =
