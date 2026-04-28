@@ -1,0 +1,72 @@
+#!/bin/bash
+# spotlight - control Spotlight indexing
+#
+# Usage:
+#   spotlight start          Enable indexing
+#   spotlight stop           Disable indexing
+#   spotlight mute [hours]   Disable for N hours (default: 2), then re-enable
+#   spotlight status         Show current indexing state
+
+set -e
+
+MUTE_PID_FILE="${TMPDIR:-/tmp}/spotlight-mute.pid"
+
+cmd_start() {
+  # Cancel any pending mute timer
+  cancel_mute_timer
+  sudo mdutil -a -i on
+  echo "Spotlight indexing enabled."
+}
+
+cmd_stop() {
+  cancel_mute_timer
+  sudo mdutil -a -i off
+  echo "Spotlight indexing disabled."
+}
+
+cmd_mute() {
+  local hours="${1:-2}"
+  local seconds=$((hours * 3600))
+
+  cancel_mute_timer
+  sudo mdutil -a -i off
+
+  # Background re-enable after duration
+  (
+    sleep "$seconds"
+    sudo mdutil -a -i on 2>/dev/null
+    rm -f "$MUTE_PID_FILE"
+  ) &
+  echo "$!" > "$MUTE_PID_FILE"
+  disown
+
+  echo "Spotlight muted for ${hours}h. Will re-enable automatically."
+}
+
+cmd_status() {
+  mdutil -a -s 2>&1 | grep -E "^/|Indexing"
+  if [ -f "$MUTE_PID_FILE" ] && kill -0 "$(cat "$MUTE_PID_FILE")" 2>/dev/null; then
+    echo ""
+    echo "Mute timer active (pid $(cat "$MUTE_PID_FILE"))"
+  fi
+}
+
+cancel_mute_timer() {
+  if [ -f "$MUTE_PID_FILE" ]; then
+    local pid
+    pid=$(cat "$MUTE_PID_FILE")
+    kill "$pid" 2>/dev/null || true
+    rm -f "$MUTE_PID_FILE"
+  fi
+}
+
+case "${1:-}" in
+  start)  cmd_start ;;
+  stop)   cmd_stop ;;
+  mute)   cmd_mute "$2" ;;
+  status) cmd_status ;;
+  *)
+    echo "Usage: spotlight {start|stop|mute [hours]|status}" >&2
+    exit 1
+    ;;
+esac

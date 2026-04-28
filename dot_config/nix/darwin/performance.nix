@@ -1,48 +1,33 @@
 { primaryUser, ... }:
 {
-  # Spotlight: only index overnight (3:30am–8:00am) to avoid drive thrash.
-  # Activation sets correct state based on current hour; launchd handles transitions.
+  # Spotlight: keep indexing enabled so Alfred can discover all apps.
+  # Exclude noisy paths to reduce drive thrash.
   system.activationScripts.postActivation.text = ''
-    # Index home-manager apps for Alfred/Spotlight, then set Spotlight state.
+    echo "Spotlight: enabling indexing..."
+    /usr/bin/mdutil -a -i on 2>/dev/null || true
+
+    # Exclude paths we don't need searched
+    /usr/bin/mdutil -i off /Library 2>/dev/null || true
+    /usr/bin/mdutil -i off /private 2>/dev/null || true
+    /usr/bin/mdutil -i off /opt 2>/dev/null || true
+
+    # Ensure home-manager apps are indexed for Alfred
     appDir="/Users/${primaryUser}/Applications/Home Manager Apps"
     if [ -d "$appDir" ]; then
-      echo "Spotlight: indexing home-manager apps..."
-      /usr/bin/mdutil -a -i on 2>/dev/null || true
+      echo "Spotlight: importing home-manager apps..."
       find "$appDir" -maxdepth 1 -name "*.app" -exec /usr/bin/mdimport {} +
-      sleep 5
-    fi
-
-    hour=$(date +%H)
-    if [ "$hour" -ge 3 ] && [ "$hour" -lt 8 ]; then
-      echo "Spotlight: inside overnight window, leaving indexing on..."
-      /usr/bin/mdutil -a -i on 2>/dev/null || true
-    else
-      echo "Spotlight: outside overnight window, disabling indexing..."
-      /usr/bin/mdutil -a -i off 2>/dev/null || true
     fi
   '';
 
-  launchd.daemons.spotlight-on = {
+  # Re-enable Spotlight every morning in case it was stopped/muted and forgotten.
+  launchd.daemons.spotlight-morning = {
     serviceConfig = {
-      Label = "local.spotlight-on";
+      Label = "local.spotlight-morning";
       ProgramArguments = [
         "/usr/bin/mdutil" "-a" "-i" "on"
       ];
       StartCalendarInterval = {
-        Hour = 3;
-        Minute = 30;
-      };
-    };
-  };
-
-  launchd.daemons.spotlight-off = {
-    serviceConfig = {
-      Label = "local.spotlight-off";
-      ProgramArguments = [
-        "/usr/bin/mdutil" "-a" "-i" "off"
-      ];
-      StartCalendarInterval = {
-        Hour = 8;
+        Hour = 7;
         Minute = 0;
       };
     };
