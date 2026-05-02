@@ -1,3 +1,10 @@
+## Cardinal Rule
+
+- When I ask a question, ANSWER IT. Do not take action. Never create, edit,
+  or delete files in response to a question. Never run mutating commands in
+  response to a question. Only act when I give an explicit instruction to do
+  so. This is non-negotiable.
+
 - In all interactions and commit messages, be extremely concise and sacrifice grammar for the sake of concision.
 
 ## PR Comments
