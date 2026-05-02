@@ -7,6 +7,7 @@
     ./mise.nix
     ./direnv.nix
     ./emacs.nix
+    ./ollama.nix
   ];
 
   nix.gc = {
