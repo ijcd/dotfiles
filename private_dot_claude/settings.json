@@ -1,4 +1,8 @@
 {
+  "statusLine": {
+    "type": "command",
+    "command": "/Users/ijcd/.claude/statusline.sh"
+  },
   "enabledPlugins": {
     "sentry@claude-plugins-official": true,
     "superpowers@claude-plugins-official": true,
@@ -16,8 +20,27 @@
     "slack@claude-plugins-official": true,
     "rust-analyzer-lsp@claude-plugins-official": true
   },
-  "statusLine": {
-    "type": "command",
-    "command": "/Users/ijcd/.claude/statusline.sh"
+  "skipDangerousModePermissionPrompt": true,
+  "hooks": {
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "/Users/ijcd/.claude/hooks/claude-stop.sh"
+          }
+        ]
+      }
+    ],
+    "UserPromptSubmit": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "/Users/ijcd/.claude/hooks/claude-start.sh"
+          }
+        ]
+      }
+    ]
   }
 }

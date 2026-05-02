@@ -48,6 +48,8 @@ work
 !.claude/.credentials.json        # Track OAuth tokens (encrypted)
 !.claude/statusline.sh            # Track custom statusline
 !.claude/skills                   # Track custom skills
+!.claude/hooks                    # Track custom hooks
+!.claude/hooks/**                 # Track files inside hooks
 .claude.json*                     # Local AI state
 .cups                             # Printer state
 .docker                           # Docker credentials/state
