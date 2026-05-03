@@ -29,6 +29,7 @@ let
 
     # App data (caches/databases)
     "${homeDir}/.local/share"
+    "${homeDir}/.ollama"   # local LLM model blobs (multi-GB, opaque binaries)
 
     # Dev projects (blog and resume kept indexed)
     "${homeDir}/work"
