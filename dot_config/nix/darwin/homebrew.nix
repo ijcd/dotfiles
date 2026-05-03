@@ -39,7 +39,6 @@
       "ibazel"           # Bazel file watcher
       "aws-sso-cli"      # AWS SSO helper
       "aws-sso-util"     # AWS SSO utilities
-      "gastown"          # git status in shell prompt
       "mise"             # version manager (nix broken on x86_64-darwin, nixpkgs#427748)
       "raine/workmux/workmux" # tmux workspace manager (nix flake needs rust 1.88+)
     ];
