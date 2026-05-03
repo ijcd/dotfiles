@@ -21,8 +21,23 @@
     "rust-analyzer-lsp@claude-plugins-official": true
   },
   "skipDangerousModePermissionPrompt": true,
+  "sandbox": {
+    "filesystem": {
+      "allowRead": ["/private/tmp/claude-501/"]
+    }
+  },
   "hooks": {
     "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "/Users/ijcd/.claude/hooks/claude-stop.sh"
+          }
+        ]
+      }
+    ],
+    "Notification": [
       {
         "hooks": [
           {
