@@ -1,0 +1,17 @@
+# runclaude - Run claude in current tab with cc:<name> tab title.
+#
+# Usage:
+#   runclaude            # name = basename of cwd
+#   runclaude <name>     # explicit name
+#
+# Tab title set sticky (kitty heavy override) when running inside kitty;
+# silently skipped otherwise. Claude starts with --dangerously-skip-permissions
+# (full yolo, no permission prompts) and --continue (auto-resumes if cwd has
+# a session, else fresh). No /sandbox — v2.1's sandbox is too aggressive,
+# adds friction without meaningful safety on top of skip-permissions.
+
+function runclaude() {
+  local name="${1:-${PWD:t}}"
+  [[ -n "$KITTY_LISTEN_ON" ]] && kitten @ set-tab-title "cc:${name}"
+  claude --dangerously-skip-permissions --continue
+}
