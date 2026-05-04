@@ -72,7 +72,6 @@
 
       ### CLOUD STORAGE & BACKUP
       "backblaze" # continuous, offsite cloud backup
-      "google-drive" # Google Drive desktop sync client
 
       ### EDITORS
       "android-studio" # full Android app development IDE
