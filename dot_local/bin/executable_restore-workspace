@@ -1,0 +1,39 @@
+#!/bin/bash
+# restore-workspace - launch kitty instances from saved sessions.
+#
+# Default: $HOME/.local/share/workspace/latest (most recent save).
+# Override: pass a snapshot dir as $1 (e.g. ~/.local/share/workspace/snapshot-...).
+#
+# For each *.kitty-session file in the snapshot dir, launches a new kitty OS
+# window (one per saved instance) restoring its tabs, cwds, and foreground
+# commands. cc:<name> tabs that were running claude will resume their session
+# because --use-foreground-process captured the full cmdline (including
+# --continue) at save time.
+
+set -euo pipefail
+
+SNAP_DIR="${1:-$HOME/.local/share/workspace/latest}"
+if [[ ! -d "$SNAP_DIR" ]]; then
+  echo "restore-workspace: no snapshot at $SNAP_DIR" >&2
+  exit 1
+fi
+
+KITTY_BIN="/Applications/kitty.app/Contents/MacOS/kitty"
+[[ -x "$KITTY_BIN" ]] || { echo "restore-workspace: kitty.app not found" >&2; exit 1; }
+
+shopt -s nullglob
+sessions=( "$SNAP_DIR"/*.kitty-session )
+if [[ ${#sessions[@]} -eq 0 ]]; then
+  echo "restore-workspace: no .kitty-session files in $SNAP_DIR" >&2
+  exit 1
+fi
+
+count=0
+for session in "${sessions[@]}"; do
+  # Each session = one kitty OS-window-instance. Launch detached.
+  "$KITTY_BIN" --single-instance=no --session="$session" &
+  count=$((count + 1))
+  sleep 0.3   # small stagger to avoid socket-name collisions
+done
+
+echo "restore-workspace: launched $count kitty instance(s) from $SNAP_DIR"

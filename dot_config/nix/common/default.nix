@@ -7,6 +7,7 @@
     ./mise.nix
     ./direnv.nix
     ./emacs.nix
+    ./workspace.nix
   ];
 
   nix.gc = {

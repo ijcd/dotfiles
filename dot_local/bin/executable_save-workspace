@@ -1,0 +1,110 @@
+#!/bin/bash
+# save-workspace - snapshot all running kitty instances to session files.
+#
+# Iterates kitty remote-control sockets at /tmp/kitty-*. For each instance,
+# enumerates its OS windows from `kitten @ ls`, then writes ONE session file
+# per OS window to ~/.local/share/workspace/snapshot-<ts>/<pid>-os<id>.kitty-session.
+#
+# Per-OS-window granularity matters because kitty's native save_as_session
+# collapses all OS windows of an instance into a single session, which would
+# restore as one OS window instead of N. Building from `ls` JSON preserves
+# the OS window count.
+#
+# Captures: tab titles, cwds, foreground process cmdlines (claude --continue
+# args included verbatim, so claude tabs resume their session on restore).
+# Splits/panes within tabs are NOT captured (the JSON dump doesn't easily
+# expose layout state); each tab restores as a single pane.
+#
+# Restore with: restore-workspace [snapshot-dir]
+
+set -euo pipefail
+
+SNAP_ROOT="$HOME/.local/share/workspace"
+TS=$(date +%Y%m%d-%H%M%S)
+SNAP_DIR="$SNAP_ROOT/snapshot-$TS"
+mkdir -p "$SNAP_DIR"
+
+shopt -s nullglob
+sockets=( /tmp/kitty-* )
+if [[ ${#sockets[@]} -eq 0 ]]; then
+  echo "save-workspace: no kitty instances with remote control found" >&2
+  exit 1
+fi
+
+count=0
+for sock in "${sockets[@]}"; do
+  [[ -S "$sock" ]] || continue
+  pid="${sock##*-}"
+
+  state=$(kitten @ --to="unix:$sock" ls 2>/dev/null) || continue
+  [[ -z "$state" || "$state" == "[]" ]] && continue
+
+  # For each OS window in this instance, write a session file.
+  # Python parses JSON (passed via env to avoid stdin/heredoc conflict).
+  STATE="$state" SNAP_DIR="$SNAP_DIR" PID="$pid" /usr/bin/python3 - <<'PYEOF'
+import json, os, shlex
+snap_dir = os.environ["SNAP_DIR"]
+pid = os.environ["PID"]
+data = json.loads(os.environ["STATE"])
+
+for os_win in data:
+    os_id = os_win.get("id")
+    tabs = os_win.get("tabs", [])
+    if not tabs:
+        continue
+
+    out_path = os.path.join(snap_dir, f"{pid}-os{os_id}.kitty-session")
+    lines = []
+    for tab in tabs:
+        title = tab.get("title", "") or ""
+        # Strip our status indicators so they don't accumulate on restore
+        for prefix in ("⏳ ", "… "):
+            if title.startswith(prefix):
+                title = title[len(prefix):]
+
+        windows = tab.get("windows", [])
+        if not windows:
+            continue
+        # Take the first window's cwd as the tab's cwd
+        first_win = windows[0]
+        cwd = first_win.get("cwd") or first_win.get("env", {}).get("PWD") or os.path.expanduser("~")
+
+        lines.append(f"new_tab {title}".rstrip())
+        lines.append(f"cd {cwd}")
+
+        # Emit one launch per window (pane). For now, just first window
+        # since splits aren't fully captured.
+        fg = first_win.get("foreground_processes", [])
+        if fg and fg[0].get("cmdline"):
+            cmdline = fg[0]["cmdline"]
+            # Skip plain shells — let kitty start its default shell
+            if cmdline and os.path.basename(cmdline[0]) not in ("zsh", "bash", "fish", "sh", "-zsh", "-bash"):
+                quoted = " ".join(shlex.quote(arg) for arg in cmdline)
+                lines.append(f"launch {quoted}")
+            else:
+                lines.append("launch")
+        else:
+            lines.append("launch")
+        lines.append("")  # blank between tabs
+
+    with open(out_path, "w") as f:
+        f.write("\n".join(lines).rstrip() + "\n")
+    print(out_path)
+PYEOF
+  count=$((count + $(ls "$SNAP_DIR"/${pid}-os*.kitty-session 2>/dev/null | wc -l | tr -d ' ')))
+done
+
+if [[ $count -eq 0 ]]; then
+  echo "save-workspace: no OS windows captured; removing empty snapshot" >&2
+  rmdir "$SNAP_DIR" 2>/dev/null || true
+  exit 1
+fi
+
+# Update latest symlink atomically
+ln -sfn "snapshot-$TS" "$SNAP_ROOT/latest"
+
+# Prune snapshots older than 7 days
+find "$SNAP_ROOT" -maxdepth 1 -type d -name 'snapshot-*' -mtime +7 \
+  -exec rm -rf {} + 2>/dev/null || true
+
+echo "save-workspace: saved $count OS window(s) to $SNAP_DIR"
