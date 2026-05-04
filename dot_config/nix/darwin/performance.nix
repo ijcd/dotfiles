@@ -30,6 +30,8 @@ let
     # App data (caches/databases)
     "${homeDir}/.local/share"
     "${homeDir}/.ollama"   # local LLM model blobs (multi-GB, opaque binaries)
+    "${homeDir}/Library/Mobile Documents"   # iCloud Drive containers — indexing forces materialization, kills CPU
+    "${homeDir}/Library/CloudStorage"       # third-party cloud providers (Dropbox, OneDrive, Box) — same materialize-on-index pattern
 
     # Dev projects (blog and resume kept indexed)
     "${homeDir}/work"
