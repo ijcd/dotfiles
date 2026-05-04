@@ -19,6 +19,11 @@
 
 set -euo pipefail
 
+# Absolute path — when invoked from launchd, $PATH is minimal and 'kitten'
+# isn't found unless we resolve it here.
+KITTEN="/Applications/kitty.app/Contents/MacOS/kitten"
+[[ -x "$KITTEN" ]] || { echo "save-workspace: $KITTEN not found" >&2; exit 1; }
+
 SNAP_ROOT="$HOME/.local/share/workspace"
 TS=$(date +%Y%m%d-%H%M%S)
 SNAP_DIR="$SNAP_ROOT/snapshot-$TS"
@@ -36,7 +41,7 @@ for sock in "${sockets[@]}"; do
   [[ -S "$sock" ]] || continue
   pid="${sock##*-}"
 
-  state=$(kitten @ --to="unix:$sock" ls 2>/dev/null) || continue
+  state=$("$KITTEN" @ --to="unix:$sock" ls 2>/dev/null) || continue
   [[ -z "$state" || "$state" == "[]" ]] && continue
 
   # For each OS window in this instance, write a session file.
