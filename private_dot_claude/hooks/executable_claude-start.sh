@@ -1,5 +1,6 @@
 #!/bin/bash
-# Claude UserPromptSubmit hook: strip ⏳ prefix added by claude-stop.sh.
+# Claude UserPromptSubmit hook: claude is now working, set the working indicator (…).
+# Strips any prior indicator (⏳ or …) before prepending …, so the prefix never doubles.
 
 [ -n "$KITTY_LISTEN_ON" ] && [ -n "$KITTY_WINDOW_ID" ] || exit 0
 
@@ -18,6 +19,12 @@ except Exception:
     pass
 ')
 
-case "$cur" in
-    "⏳ "*) kitty @ set-tab-title --match "window_id:$KITTY_WINDOW_ID" "${cur#⏳ }" 2>/dev/null ;;
-esac
+# strip any leading status prefix
+base="$cur"
+base="${base#⏳ }"
+base="${base#… }"
+
+# already showing working indicator? skip
+[[ "… $base" == "$cur" ]] && exit 0
+
+kitty @ set-tab-title --match "window_id:$KITTY_WINDOW_ID" "… $base" 2>/dev/null
