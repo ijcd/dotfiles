@@ -1,0 +1,11 @@
+# ~/.authinfo - managed by chezmoi. Secrets fetched from macOS Keychain.
+# Add a new entry: store secret in Keychain, then add a line below.
+#   security add-generic-password -s authinfo-<name> -a $USER -w 'SECRET' -T /usr/bin/security -U
+{{- $groq := output "sh" "-c" "/usr/bin/security find-generic-password -s authinfo-groq -w 2>/dev/null || true" | trim }}
+{{ if $groq -}}
+machine api.groq.com login apikey password {{ $groq }}
+{{- else -}}
+# Groq API key not in Keychain (service: authinfo-groq). Set up with:
+#   security add-generic-password -s authinfo-groq -a $USER -w 'gsk_YOUR_KEY' -T /usr/bin/security -U
+#   chezmoi apply
+{{- end }}
