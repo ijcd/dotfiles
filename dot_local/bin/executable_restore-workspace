@@ -31,7 +31,9 @@ fi
 count=0
 for session in "${sessions[@]}"; do
   # Each session = one kitty OS-window-instance. Launch detached.
-  "$KITTY_BIN" --single-instance=no --session="$session" &
+  # --single-instance keeps everything under ONE kitty.app process (one Dock
+  # icon, multiple OS windows). --single-instance=no would spawn N processes.
+  "$KITTY_BIN" --single-instance --session="$session" &
   count=$((count + 1))
   sleep 0.3   # small stagger to avoid socket-name collisions
 done
