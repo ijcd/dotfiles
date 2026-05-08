@@ -12,6 +12,20 @@
 - Always use subagents when the task fits one. Never ask "subagent or
   inline?" — pick a subagent and go. Inline only when no subagent fits.
 
+- Don't halt for two-way-door decisions. Small choices with low blast
+  radius (UX details, naming, ordering, defaults, confirm/no-confirm,
+  copy strings): decide, present as "here's what we did, easy to
+  change", continue. Idle time on small questions is the cost.
+
+- Either/or execution = parallel subagents, always. If the decision is
+  genuinely "approach A vs approach B" and both produce real work,
+  dispatch BOTH as parallel subagents and let me pick from the
+  outputs. Don't ask which one; run both.
+
+- Reserve real questions for one-way doors: irreversible actions
+  (deploy, force-push, schema migrations, deleting branches), or
+  decisions whose blast radius can't be quickly undone.
+
 ## Visual Companion
 
 - In brainstorming, default-on. Never ask for consent — start the server and
@@ -131,9 +145,11 @@ When fixing bugs:
     - Use Markdown tables as the default for multi-dimensional data to allow for rapid ocular comparison.
     - When offering alternatives or iterations, present them as "small multiples" (side-by-side or compact lists) rather than long, linear sequences.
 
-- **Integrated Evidence & Sparklines:**
+- **Integrated Evidence (Sparklines & Deltas):**
     - Integrate words, numbers, and data points into a single narrative flow.
-    - Use inline metrics or "sparkline-style" text (e.g., [72% → 85%]) to show trends immediately next to the relevant context.
+    - Sparklines show *trajectories* — Unicode blocks for series (e.g., `latency ▁▂▄▇▅▃▁ stable`).
+    - Deltas show *endpoint pairs* — e.g., `[72% → 85%]`, `[2.3s → 0.8s]`.
+    - Both inline in running prose, never as separate diagrams.
 
 - **Establish Narrative Integrity:**
     - Document all sources. Use precise citations for file paths, line numbers, or external documentation.
@@ -142,5 +158,45 @@ When fixing bugs:
 - **Direct Interaction:**
     - Structure responses so the user's eye can move freely across the information.
     - Prioritize the "Grand View"—provide the full context upfront before diving into the details.
+
+- **Answer First ("Above All Else, Show the Data"):**
+    - Lead with the answer. Context, caveats, and alternatives follow.
+    - Never bury the conclusion under reasoning narration or process commentary.
+    - The first sentence should be the take-away — if removed, the rest should still be useful detail, not orphaned setup.
+
+- **"Compared To What?":**
+    - Recommendations name the alternative rejected and the criterion. "X over Y because Z" is the minimum form.
+    - Single-option proposals are suspect — comparison is the heart of analytical reasoning (Tufte: *"At the heart of quantitative reasoning is a single question: Compared to what?"*).
+    - When only one option exists, say so explicitly rather than presenting it as if it were chosen.
+
+- **Mechanism Over Description:**
+    - Explain *why* and *how*, not just *what* changed.
+    - "Fixed bug" is incomplete; "fixed: mutex released before condvar signal, allowing wakeup loss" is the form.
+    - Tufte (*Beautiful Evidence*): show "causality, mechanism, explanation, systematic structure."
+
+- **Layer Foreground vs. Background:**
+    - Primary answer in body prose; caveats, sources, and edge cases visually demoted (parentheticals, trailing notes, footnote-style asides).
+    - Don't render every claim at the same weight — flatness is a failure of editing.
+
+- **Prose Over Bullets When Reasoning:**
+    - Bullets only for genuinely parallel, unordered items (file paths, options, ingredients).
+    - If items relate causally, sequentially, or contrastively, write sentences. A bulleted explanation is usually a fragmented one.
+    - Code explanations follow the literate-programming model: paragraphs explain, code blocks demonstrate, integrated. Avoid bullet-list-then-code-fence as the default shape.
+    - Tufte (*Cognitive Style of PowerPoint*): "bullet outlines dilute thought."
+
+- **Content Drives Format:**
+    - Format scales with content depth. One-sentence answer = one sentence. No headers, no tables, no scaffolding it doesn't earn.
+    - Don't promote thin content with elaborate structure. Tufte: *"making them dance in color won't make them relevant."*
+    - The inverse also holds: when content is rich, don't compress it into a one-liner that hides the substance.
+
+- **Emphasis Has Diminishing Returns (1+1=3 Effect):**
+    - Multiple emphases in close range cancel each other.
+    - At most one bold per paragraph. Don't backtick non-code. Don't stack bold+italic+code on the same token.
+    - Every emphasized token reduces the emphasis of the others.
+
+- **Name, Don't Refer:**
+    - "The former / the latter / the above / this approach" force the reader to re-lookup.
+    - Repeat the name. Cost is one word; benefit is no eye-travel.
+    - Equivalent of Tufte's direct labeling: "Words belong with, on, and within the graphic itself."
 
 @RTK.md
