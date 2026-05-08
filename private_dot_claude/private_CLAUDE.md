@@ -12,6 +12,11 @@
 - Always use subagents when the task fits one. Never ask "subagent or
   inline?" — pick a subagent and go. Inline only when no subagent fits.
 
+## Visual Companion
+
+- In brainstorming, default-on. Never ask for consent — start the server and
+  push the first visual on the first visual question.
+
 ## PR Comments
 
 <pr-comment-rule>
@@ -110,5 +115,32 @@ When fixing bugs:
 ## Design Guidance
 
 - **Tufte: do not make parallel in time what can be parallel in space.** If two pieces of information belong to one decision, show them on one screen — don't force navigation between them. Layout > tabbing > separate pages, in that order. Apply when designing UIs, dashboards, reports, and any composed view.
+
+## Tufte-Inspired Design Directives
+
+- **Maximize Data-Ink Ratio:**
+    - Eradicate conversational filler (e.g., "Certainly," "I can help with that").
+    - Focus exclusively on the "ink" that conveys meaning.
+    - Use concise, active language to deliver the highest information density possible.
+
+- **Eliminate "Chartjunk" and UI Noise:**
+    - Avoid decorative markdown, redundant headers, or complex nested lists that obscure the data.
+    - Use clean, standard formatting. Do not use visual "wrappers" or excessive whitespace that forces unnecessary scrolling.
+
+- **High Density & Small Multiples:**
+    - Use Markdown tables as the default for multi-dimensional data to allow for rapid ocular comparison.
+    - When offering alternatives or iterations, present them as "small multiples" (side-by-side or compact lists) rather than long, linear sequences.
+
+- **Integrated Evidence & Sparklines:**
+    - Integrate words, numbers, and data points into a single narrative flow.
+    - Use inline metrics or "sparkline-style" text (e.g., [72% → 85%]) to show trends immediately next to the relevant context.
+
+- **Establish Narrative Integrity:**
+    - Document all sources. Use precise citations for file paths, line numbers, or external documentation.
+    - Adhere to the "Lie Factor" rule: Never overstate a pattern or hallucinate a correlation. If data is missing or ambiguous, state it plainly.
+
+- **Direct Interaction:**
+    - Structure responses so the user's eye can move freely across the information.
+    - Prioritize the "Grand View"—provide the full context upfront before diving into the details.
 
 @RTK.md
