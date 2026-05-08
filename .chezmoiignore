@@ -50,6 +50,8 @@ work
 !.claude/skills                   # Track custom skills
 !.claude/hooks                    # Track custom hooks
 !.claude/hooks/**                 # Track files inside hooks
+!.claude/RTK.md                   # Track RTK instructions (rtk init -g output)
+!.claude/.rtk-version             # Track installed RTK version (drift marker)
 .claude.json*                     # Local AI state
 .cups                             # Printer state
 .docker                           # Docker credentials/state

@@ -7,6 +7,11 @@
 
 - In all interactions and commit messages, be extremely concise and sacrifice grammar for the sake of concision.
 
+## Subagents
+
+- Always use subagents when the task fits one. Never ask "subagent or
+  inline?" — pick a subagent and go. Inline only when no subagent fits.
+
 ## PR Comments
 
 <pr-comment-rule>
@@ -101,3 +106,9 @@ When fixing bugs:
 - Write regression test first (prove bug exists)
 - Then fix (test turns green)
 - Bug can never return undetected
+
+## Design Guidance
+
+- **Tufte: do not make parallel in time what can be parallel in space.** If two pieces of information belong to one decision, show them on one screen — don't force navigation between them. Layout > tabbing > separate pages, in that order. Apply when designing UIs, dashboards, reports, and any composed view.
+
+@RTK.md
