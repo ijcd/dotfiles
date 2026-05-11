@@ -22,9 +22,48 @@
   dispatch BOTH as parallel subagents and let me pick from the
   outputs. Don't ask which one; run both.
 
+- Independent work = parallel subagents in ONE message. Anytime
+  multiple subagent tasks have no dependency between them, dispatch
+  them as concurrent Agent calls in a single message. If you write
+  "in parallel", the next message must contain N Agent calls.
+  Verify the count before sending. Sequential dispatch of
+  independent work wastes wall time and creates phantom in-flight
+  status. Skip what you can — when in doubt, parallelize.
+
 - Reserve real questions for one-way doors: irreversible actions
   (deploy, force-push, schema migrations, deleting branches), or
   decisions whose blast radius can't be quickly undone.
+
+## Architecture: Functional Core, Imperative Shell
+
+- Pure logic (cascade resolution, normalization, formatting, business
+  rules) lives in domain modules / resource helpers. No IO, no side
+  effects, fully testable in isolation. This is the functional core.
+
+- Side effects (DB writes, scrape calls, message sends, file writes)
+  live in event handlers, workers, controllers, mix tasks. Thin layer:
+  compose pure functions, don't reimplement them. This is the
+  imperative shell.
+
+- Data invariants belong at the resource/model level (Ash validations,
+  identities, calculations, change modules). Don't duplicate them in
+  LiveView event handlers or controllers — invariants you write in the
+  shell only fire on one access path; invariants on the resource fire
+  on every path (admin tools, API, seeds, future features).
+
+- View formatting lives in components and helpers. When a shared
+  component calls a helper, parameterize EVERY field/context that
+  helper depends on. Hardcoding a field name in a helper called from
+  a multi-instance component is a hidden bug class — the component
+  is field-agnostic in body but field-specific in internals.
+
+- Prefer flat case statements over nested if/else/with for branching
+  logic. Tagged tuples (e.g. `{:override, value}`, `{:online, value}`)
+  let case-on-shape replace conditional cascades.
+
+- Normalize to a canonical form before comparing values across layers
+  or sources. "Are these equal?" is a question whose answer differs by
+  representation; "Are their canonical forms equal?" doesn't.
 
 ## Visual Companion
 
@@ -198,5 +237,14 @@ When fixing bugs:
     - "The former / the latter / the above / this approach" force the reader to re-lookup.
     - Repeat the name. Cost is one word; benefit is no eye-travel.
     - Equivalent of Tufte's direct labeling: "Words belong with, on, and within the graphic itself."
+
+## Principia
+
+Reference knowledge at `~/work/principia/` (private repo at github.com/ijcd/principia).
+
+If not cloned locally: `gh repo clone ijcd/principia ~/work/principia`
+For updates: `cd ~/work/principia && git pull`
+
+Read `~/work/principia/AGENTS.md` for navigation; the repo is self-describing.
 
 @RTK.md
