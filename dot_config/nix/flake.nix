@@ -18,7 +18,10 @@
 
     # declarative homebrew management
     # TODO: pin homebrew taps (https://blog.dbalan.in/blog/2024/03/25/boostrap-a-macos-machine-with-nix/index.html?utm_source=chatgpt.com)
+    # NOTE 2026-05-09: brew-src override to upstream master; remove once
+    # zhaofengli/nix-homebrew #136 (5.1.10 bump) merges. Tracks #138 fix.
     nix-homebrew.url = "github:zhaofengli/nix-homebrew";
+    nix-homebrew.inputs.brew-src.url = "github:Homebrew/brew/master";
 
   };
 
