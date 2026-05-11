@@ -1,0 +1,37 @@
+#!/usr/bin/env bash
+# nixhome-update: grouped update of nix flake inputs and brew packages.
+# Doesn't auto-rebuild — review the lock diff, then run `nixhome-rebuild`.
+#
+# Usage: nixhome-update [all|nix|brew]
+set -euo pipefail
+
+WHAT="${1:-all}"
+
+case "$WHAT" in
+    all|nix|brew) ;;
+    -h|--help)
+        echo "usage: nixhome-update [all|nix|brew]"
+        exit 0
+        ;;
+    *)
+        echo "unknown scope: $WHAT (try: all, nix, brew)"
+        exit 1
+        ;;
+esac
+
+if [[ "$WHAT" == "all" || "$WHAT" == "nix" ]]; then
+    echo "── nix flake update ──"
+    ( cd ~/.config/nix && nix flake update )
+fi
+
+if [[ "$WHAT" == "all" || "$WHAT" == "brew" ]]; then
+    echo "── brew update ──"
+    brew update
+    echo "── brew upgrade ──"
+    brew upgrade
+    echo "── brew cleanup ──"
+    brew cleanup
+fi
+
+echo
+echo "Done. Run \`nixhome-rebuild\` to apply."

@@ -1,0 +1,164 @@
+#!/usr/bin/env bash
+# nixhome-rebuild: full chezmoi → darwin-rebuild → re-capture-lock workflow.
+# Companion to bare `nixhome-switch` alias. Solves the flake.lock drift loop
+# by re-adding the lock to chezmoi source after nix has had its turn at it.
+# Ends with a freshness summary as a passive nudge to run `nixhome-update`.
+set -uo pipefail
+
+# ─── Config ───
+CHEZMOI_REPO="$HOME/.local/share/chezmoi"
+LOCK_DEST="$HOME/.config/nix/flake.lock"
+HOST="bearcat"
+BREW_CACHE="$HOME/Library/Caches/Homebrew/api/cask.jws.json"
+SELF="$HOME/.local/bin/nixhome-rebuild"
+
+# ─── Helpers ───
+hr()  { printf '\n── %s ──\n' "$1"; }
+die() { echo "$@" >&2; exit 1; }
+
+# Hash a file (empty stdout if file missing). Absolute path on shasum — Perl-backed,
+# always present on macOS, no PATH-shadow surprises.
+sha() { [ -f "$1" ] && /usr/bin/shasum "$1" 2>/dev/null | cut -d' ' -f1; }
+
+# File mtime in epoch seconds (empty stdout on failure). Absolute path on stat —
+# Home Manager's GNU coreutils shadows /usr/bin/stat in PATH and `stat -f` means
+# different things in BSD vs GNU; absolute path dodges both.
+mtime() { /usr/bin/stat -f %m "$1" 2>/dev/null; }
+
+# Humanize seconds → "5m" / "3h" / "12d".
+hum_age() {
+    local s=$1
+    if   [ "$s" -lt 3600  ]; then echo "$((s/60))m"
+    elif [ "$s" -lt 86400 ]; then echo "$((s/3600))h"
+    else                          echo "$((s/86400))d"
+    fi
+}
+
+# Interactive y/N prompt with default-N. Exits 0 on no.
+confirm_or_exit() {
+    printf '\n%s' "$1"
+    read -r reply < /dev/tty
+    case "${reply:-}" in
+        [yY]*) ;;
+        *) echo "Aborted. Nothing changed."; exit 0 ;;
+    esac
+}
+
+# ─── Phase 1 (re-execed once): diff + confirm + apply, then selectively
+# re-exec if apply replaced this script. Without re-exec, a fix to nixhome-rebuild
+# only takes effect on the NEXT run — apply has already deployed the new version,
+# but the currently-running bash instance is still executing the old script's bytes.
+# We set NIXHOME_REBUILD_REEXECED so the re-execed instance skips Phase 1.
+if [ "${NIXHOME_REBUILD_REEXECED:-}" != "1" ]; then
+    hr "chezmoi diff (before apply)"
+    DIFF_OUT=$(chezmoi --color=on diff 2>&1 || true)
+    if [ -n "$DIFF_OUT" ]; then
+        echo "$DIFF_OUT"
+        if [ "${1:-}" != "-y" ] && [ "${NIXHOME_REBUILD_YES:-0}" != "1" ]; then
+            confirm_or_exit "Proceed with apply + rebuild? [y/N] "
+        fi
+    else
+        echo "  (nothing pending in source — destination already matches)"
+    fi
+
+    hr "chezmoi apply"
+    hash_before=$(sha "$SELF")
+    chezmoi apply --verbose || die "apply failed; halting"
+    hash_after=$(sha "$SELF")
+
+    if [ -n "$hash_before" ] && [ "$hash_before" != "$hash_after" ] && [ -x "$SELF" ]; then
+        echo "  (nixhome-rebuild was updated — re-execing into the new version)"
+        export NIXHOME_REBUILD_REEXECED=1
+        exec "$SELF" "$@"
+    fi
+fi
+
+hr "darwin-rebuild switch"
+sudo -H nix run nix-darwin -- switch --flake "$HOME/.config/nix#$HOST" \
+    || die "darwin-rebuild failed; lock NOT re-imported"
+
+# Hash source lock before/after re-add so we can detect "did THIS RUN mutate
+# the source?" — distinct from "source is uncommitted vs HEAD." The banner
+# fires only on actual mutation. Persistent uncommitted state surfaces as a
+# quieter one-line note.
+SOURCE_LOCK="$CHEZMOI_REPO/dot_config/nix/flake.lock"
+lock_before=$(sha "$SOURCE_LOCK")
+
+hr "re-importing flake.lock into chezmoi"
+chezmoi re-add "$LOCK_DEST"
+
+lock_after=$(sha "$SOURCE_LOCK")
+
+hr "chezmoi diff (after rebuild + re-add — should be silent)"
+chezmoi diff
+
+if [ "$lock_before" != "$lock_after" ]; then
+    hr "lock changes captured in source repo (this run mutated bytes)"
+    cat <<EOF
+
+══════════════════════════════════════════════════════════════════════════
+  ⚠  nixhome-rebuild MUTATED THE FLAKE LOCK IN CHEZMOI SOURCE  ⚠
+══════════════════════════════════════════════════════════════════════════
+
+  The re-add step pulled a NEW post-rebuild flake.lock into source. Either
+  commit it to pin the new lock, or leave it — the override in flake.nix
+  will re-resolve to current master on the next rebuild regardless.
+
+══════════════════════════════════════════════════════════════════════════
+
+EOF
+    git -C "$CHEZMOI_REPO" --no-pager diff --color=always -- dot_config/nix/flake.lock 2>/dev/null || true
+fi
+
+# General source-tree status — surfaces ANY uncommitted change (lock, scripts,
+# config edits, etc.) with copy-pasteable commit commands. Runs every rebuild
+# so the prompt to commit is always present when there's something pending.
+hr "chezmoi source git status"
+UNCOMMITTED=$(git -C "$CHEZMOI_REPO" status --short 2>/dev/null)
+if [ -z "$UNCOMMITTED" ]; then
+    echo "  (clean — no uncommitted changes in source)"
+else
+    git -C "$CHEZMOI_REPO" -c color.status=always status --short 2>/dev/null
+    cat <<EOF
+
+  Commit options (subshell-wrapped — your cwd stays put):
+      (cd $CHEZMOI_REPO && git diff)                                       # see all unstaged changes
+      (cd $CHEZMOI_REPO && git add -p && git commit)                       # stage & commit selectively
+      (cd $CHEZMOI_REPO && git add -A && git commit -m "MESSAGE")          # commit everything
+
+EOF
+fi
+
+# ─── Freshness summary ───
+hr "freshness"
+now=$(date +%s)
+
+# Per-input ages from the just-captured flake.lock.
+jq -r '.nodes | to_entries[] | select(.value.locked.lastModified) |
+       "\(.key)\t\(.value.locked.lastModified)\t\(.value.original.ref // "—")"' "$LOCK_DEST" |
+while IFS=$'\t' read -r name lock_mtime ref; do
+    printf '  %-15s %5s behind  (ref: %s)\n' "$name" "$(hum_age $((now - lock_mtime)))" "$ref"
+done
+
+# Brew side: API cache mtime is the proxy for "last brew update".
+if [ ! -f "$BREW_CACHE" ]; then
+    printf '  %-15s never updated (no cache file)\n' "brew"
+else
+    bmtime=$(mtime "$BREW_CACHE")
+    if [ -z "$bmtime" ]; then
+        printf '  %-15s (could not stat cache file)\n' "brew"
+    else
+        bdays=$(( (now - bmtime) / 86400 ))
+        fcount=$(brew outdated --quiet       2>/dev/null | wc -l | tr -d ' ')
+        ccount=$(brew outdated --cask --quiet 2>/dev/null | wc -l | tr -d ' ')
+        printf '  %-15s %5s since `brew update`  (%s formulae, %s casks outdated*)\n' \
+            "brew" "$(hum_age $((now - bmtime)))" "$fcount" "$ccount"
+        echo "  *count is from cached API data ${bdays}d old — actual upstream count may be higher;"
+        echo "   exact figure requires \`brew update\` first to refresh the cache."
+    fi
+fi
+
+echo
+echo "  Run \`nixhome-update\` to bump nix inputs + brew."
+
+hr "done"

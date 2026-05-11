@@ -1,0 +1,62 @@
+#!/usr/bin/env bash
+# kitty-palette-demo: paint the tabs in the current kitty OS window with the
+# statusline.sh tab-color palette, side-by-side, for visual comparison.
+#
+# Usage:
+#   kitty-palette-demo          # apply demo palette cyclically across all tabs
+#   kitty-palette-demo --reset  # restore default colors (titles unchanged)
+#
+# Constraints:
+#   Uses only set-tab-title / set-tab-color / ls — fits your existing
+#   remote_control_password allowlist. Cannot create new tabs (launch isn't
+#   allowed); open them manually with Cmd+N + Cmd+T first.
+set -uo pipefail
+
+[ -n "${KITTY_LISTEN_ON:-}" ] && [ -n "${KITTY_WINDOW_ID:-}" ] \
+    || { echo "Not running in kitty (KITTY_LISTEN_ON/KITTY_WINDOW_ID unset)"; exit 1; }
+
+# All tab IDs in the OS window that contains this terminal.
+mapfile -t tab_ids < <(
+    kitty @ ls 2>/dev/null | jq -r --argjson w "$KITTY_WINDOW_ID" \
+        '.[] | select(.tabs[].windows[].id == $w) | .tabs[].id'
+)
+[ ${#tab_ids[@]} -eq 0 ] && { echo "No tabs found in current OS window"; exit 1; }
+
+if [ "${1:-}" = "--reset" ]; then
+    for tid in "${tab_ids[@]}"; do
+        kitty @ set-tab-color --match "id:$tid" \
+            active_bg=none inactive_bg=none active_fg=none inactive_fg=none 2>/dev/null
+    done
+    echo "Reset colors on ${#tab_ids[@]} tab(s). Titles unchanged (close tabs to clear)."
+    exit 0
+fi
+
+# Palette to demonstrate — pipe-separated: title|active_bg|inactive_bg|active_fg|inactive_fg
+# Saturated bg in the state's hue + ball-colored fg. Bg carries identifiable
+# state color; fg matches the ball emoji. Active/inactive drop in both
+# bg-brightness and fg-brightness within the hue.
+# Top two entries bind to states in statusline.sh; green is a candidate (unbound).
+declare -a palette=(
+    "🟡 busy (working)|#5e4818|#3e3008|#ffffff|#cc9030"
+    "🔴 idle (waiting)|#5e2424|#3e1818|#ffffff|#cc4040"
+    "🟢 candidate (unbound)|#224e30|#122e1c|#ffffff|#40a050"
+    "(unset / default)|none|none|none|none"
+)
+
+echo "Applying palette to ${#tab_ids[@]} tab(s):"
+for i in "${!tab_ids[@]}"; do
+    entry=${palette[$((i % ${#palette[@]}))]}
+    IFS='|' read -r title abg ibg afg ifg <<< "$entry"
+    tid=${tab_ids[$i]}
+    echo "  tab id $tid → $title"
+    kitty @ set-tab-title --match "id:$tid" "$title" 2>/dev/null
+    kitty @ set-tab-color --match "id:$tid" \
+        active_bg="$abg" inactive_bg="$ibg" \
+        active_fg="$afg" inactive_fg="$ifg" 2>/dev/null
+done
+
+cat <<EOF
+
+Done. Click between tabs to see active vs inactive bg/fg shifts.
+Reset: kitty-palette-demo --reset
+EOF
