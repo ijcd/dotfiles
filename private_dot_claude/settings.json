@@ -27,6 +27,16 @@
     }
   },
   "hooks": {
+    "SessionStart": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "/Users/ijcd/.claude/hooks/claude-stop.sh"
+          }
+        ]
+      }
+    ],
     "PreToolUse": [
       {
         "matcher": "Bash",
@@ -54,16 +64,6 @@
           {
             "type": "command",
             "command": "/Users/ijcd/.claude/hooks/claude-stop.sh"
-          }
-        ]
-      }
-    ],
-    "UserPromptSubmit": [
-      {
-        "hooks": [
-          {
-            "type": "command",
-            "command": "/Users/ijcd/.claude/hooks/claude-start.sh"
           }
         ]
       }
