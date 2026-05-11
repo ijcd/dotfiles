@@ -126,6 +126,30 @@ alias ytv='mpv'                                        # video (foreground)
 alias emacs-start='emacs --daemon'
 alias emacs-stop='emacsclient -e "(kill-emacs)"'
 
+# Open file(s) in running Emacs (current frame, return to shell immediately).
+# - No args: bring Emacs to foreground.
+# - With args: open files, print resolved paths as clickable links (OSC 8).
+# Alternative location: ~/.config/zsh/functions/e (autoloaded). Currently inline.
+e() {
+  if [[ $# -eq 0 ]]; then
+    open -a Emacs 2>/dev/null \
+      || emacsclient -n -e '(x-focus-frame nil)' >/dev/null
+    return
+  fi
+  emacsclient -n "$@" || return
+  emacsclient -n -e '(x-focus-frame nil)' >/dev/null 2>&1
+  local n=$#
+  printf 'opened %d file%s in Emacs:\n' $n $([[ $n -eq 1 ]] && echo '' || echo 's')
+  for f in "$@"; do
+    local abs
+    abs="$(realpath "$f" 2>/dev/null || echo "$f")"
+    printf '  \033]8;;file://%s\033\\%s\033]8;;\033\\\n' "$abs" "$abs"
+  done
+}
+
+# Terminal frame variant — blocks until C-x # (good for git commits, ssh)
+alias et='emacsclient -t'
+
 ###############################
 # Debian
 ###############################
