@@ -1,0 +1,38 @@
+#!/usr/bin/env bash
+# runclaude — launch Claude in cwd, set kitty tab title to cc:<name>.
+#
+# Auto-detects whether a previous session exists in this directory; uses
+# --continue only when there's something to continue, fresh start otherwise.
+# That way `claude --continue` never errors out on "no session to continue."
+#
+# Usage:
+#   runclaude            # name = basename of cwd
+#   runclaude <name>     # explicit tab name
+#
+# A script rather than a shell function so session managers (sesh, etc.)
+# that enumerate executables on PATH can find it.
+
+set -uo pipefail
+
+name="${1:-$(basename "$PWD")}"
+
+# Kitty tab title — silent on non-kitty terminals.
+if [ -n "${KITTY_LISTEN_ON:-}" ]; then
+    kitty @ set-tab-title "cc:${name}" 2>/dev/null || true
+fi
+
+# Claude Code's session storage: ~/.claude/projects/<encoded-cwd>/*.jsonl
+# where encoded-cwd is $PWD with '/' and '.' replaced by '-'.
+# e.g. /Users/foo/.bar/baz → -Users-foo--bar-baz
+encoded="$(echo "$PWD" | sed 's|[/.]|-|g')"
+project_dir="$HOME/.claude/projects/$encoded"
+
+# Decide --continue vs fresh based on whether any session jsonl exists.
+shopt -s nullglob
+sessions=("$project_dir"/*.jsonl)
+
+if [ "${#sessions[@]}" -gt 0 ]; then
+    exec claude --dangerously-skip-permissions --continue
+else
+    exec claude --dangerously-skip-permissions
+fi

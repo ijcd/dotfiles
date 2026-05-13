@@ -46,7 +46,8 @@ add-zsh-hook precmd starship_last_command_precmd
 # Load the my-help function
 source $ZDOTDIR/functions/my-help
 source $ZDOTDIR/functions/devshell
-source $ZDOTDIR/functions/runclaude
+# runclaude is now a binary at ~/.local/bin/runclaude (so sesh/PATH-scanning
+# session managers can see it). The old function lived at functions/runclaude.
 
 # Ctrl+/ - Launch my-commands browser
 zle -N _my-commands-widget
