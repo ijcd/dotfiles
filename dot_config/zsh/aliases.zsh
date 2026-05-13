@@ -150,6 +150,21 @@ e() {
 # Terminal frame variant — blocks until C-x # (good for git commits, ssh)
 alias et='emacsclient -t'
 
+# teecap — show output AND copy to macOS clipboard. Strips ANSI escape codes
+# from the clipboard copy; terminal still sees colors.
+# Usage:
+#   teecap -- eask compile             # -- delimiter (optional, for clarity)
+#   teecap eask compile                # command directly
+#   { c1 && c2 ; } 2>&1 | teecap       # piped form (for compound pipelines)
+teecap() {
+  [[ "$1" == "--" ]] && shift
+  if (( $# > 0 )); then
+    "$@" 2>&1 | tee /dev/tty | sed -E 's/\x1b\[[0-9;]*[a-zA-Z]//g' | pbcopy
+  else
+    tee /dev/tty | sed -E 's/\x1b\[[0-9;]*[a-zA-Z]//g' | pbcopy
+  fi
+}
+
 ###############################
 # Debian
 ###############################
