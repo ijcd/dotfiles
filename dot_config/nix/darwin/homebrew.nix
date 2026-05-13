@@ -42,6 +42,7 @@
       "mise"             # version manager (nix broken on x86_64-darwin, nixpkgs#427748)
       "raine/workmux/workmux" # tmux workspace manager (nix flake needs rust 1.88+)
       "rtk"              # LLM token compressor — proxies Claude Code Bash output (rtk-ai/rtk; not in nixpkgs)
+      "eask-cli"         # Emacs Lisp project build tool (emacs-eask.github.io; binary is `eask`)
     ];
 
     casks = [
