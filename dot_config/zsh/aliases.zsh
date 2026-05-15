@@ -152,17 +152,36 @@ alias et='emacsclient -t'
 
 # teecap — show output AND copy to macOS clipboard. Strips ANSI escape codes
 # from the clipboard copy; terminal still sees colors.
+#
+# Implementation: command's stdout → temp file (not pipe) → tail -f streams
+# to terminal. This avoids the classic "VM-children hold the pipe open after
+# the parent exits" deadlock (mix/iex/beam, npm, gradle, etc.). The piped
+# form is still pipe-based and inherits that limitation if your source
+# command has stragglers.
+#
 # Usage:
-#   teecap -- eask compile             # -- delimiter (optional, for clarity)
+#   teecap -- mix test.all             # -- delimiter (optional, for clarity)
 #   teecap eask compile                # command directly
 #   { c1 && c2 ; } 2>&1 | teecap       # piped form (for compound pipelines)
 teecap() {
   [[ "$1" == "--" ]] && shift
+  local tmpfile rc=0
+  tmpfile=$(mktemp -t teecap.XXXXXX) || return 1
   if (( $# > 0 )); then
-    "$@" 2>&1 | tee /dev/tty | sed -E 's/\x1b\[[0-9;]*[a-zA-Z]//g' | pbcopy
+    "$@" >"$tmpfile" 2>&1 &
+    local cmdpid=$!
+    tail -f "$tmpfile" >/dev/tty 2>/dev/null &
+    local tailpid=$!
+    wait $cmdpid; rc=$?
+    sleep 0.1                        # drain remaining tail output
+    kill $tailpid 2>/dev/null
+    wait $tailpid 2>/dev/null
   else
-    tee /dev/tty | sed -E 's/\x1b\[[0-9;]*[a-zA-Z]//g' | pbcopy
+    tee /dev/tty > "$tmpfile"
   fi
+  sed -E 's/\x1b\[[0-9;]*[a-zA-Z]//g' < "$tmpfile" | pbcopy
+  rm -f "$tmpfile"
+  return $rc
 }
 
 ###############################
