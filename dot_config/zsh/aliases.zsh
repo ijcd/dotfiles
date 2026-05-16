@@ -165,22 +165,30 @@ alias et='emacsclient -t'
 #   { c1 && c2 ; } 2>&1 | teecap       # piped form (for compound pipelines)
 teecap() {
   [[ "$1" == "--" ]] && shift
+  # Local zsh options: silence job-control noise + force-allow clobber
+  # of the mktemp-created file via `>|`.
+  setopt local_options no_notify no_monitor 2>/dev/null
   local tmpfile rc=0
   tmpfile=$(mktemp -t teecap.XXXXXX) || return 1
+  # Trap clean up on any exit path (Ctrl+C, return, error).
+  trap "rm -f '$tmpfile'" EXIT INT TERM HUP
   if (( $# > 0 )); then
-    "$@" >"$tmpfile" 2>&1 &
-    local cmdpid=$!
-    tail -f "$tmpfile" >/dev/tty 2>/dev/null &
-    local tailpid=$!
+    "$@" >| "$tmpfile" 2>&1 &
+    local cmdpid=$! tailpid
+    # -n +1 forces tail to start at byte 0 (default is EOF), avoiding the
+    # race where cmd writes before tail attaches.
+    tail -f -n +1 "$tmpfile" >/dev/tty 2>/dev/null &
+    tailpid=$!
     wait $cmdpid; rc=$?
     sleep 0.1                        # drain remaining tail output
     kill $tailpid 2>/dev/null
     wait $tailpid 2>/dev/null
   else
-    tee /dev/tty > "$tmpfile"
+    tee /dev/tty >| "$tmpfile"
   fi
   sed -E 's/\x1b\[[0-9;]*[a-zA-Z]//g' < "$tmpfile" | pbcopy
   rm -f "$tmpfile"
+  trap - EXIT INT TERM HUP
   return $rc
 }
 
