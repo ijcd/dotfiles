@@ -176,8 +176,9 @@ teecap() {
     "$@" >| "$tmpfile" 2>&1 &
     local cmdpid=$! tailpid
     # -n +1 forces tail to start at byte 0 (default is EOF), avoiding the
-    # race where cmd writes before tail attaches.
-    tail -f -n +1 "$tmpfile" >/dev/tty 2>/dev/null &
+    # race where cmd writes before tail attaches. Compound { } wraps the redirect
+    # so bash's redirect-setup error (no controlling tty) is also caught.
+    { tail -f -n +1 "$tmpfile" >/dev/tty; } 2>/dev/null &
     tailpid=$!
     wait $cmdpid; rc=$?
     sleep 0.1                        # drain remaining tail output
