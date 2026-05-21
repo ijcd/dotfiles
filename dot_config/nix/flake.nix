@@ -23,6 +23,13 @@
     nix-homebrew.url = "github:zhaofengli/nix-homebrew";
     nix-homebrew.inputs.brew-src.url = "github:Homebrew/brew/master";
 
+    # Pin bash to 5.2 to avoid bash 5.3 heredoc deadlock on macOS:
+    # 5.3 switched to pipe-based heredocs; macOS pipes block at ~512 B with no
+    # reader, so `cat > file <<EOF` with bodies > 512 B hangs (e.g. nix-direnv's
+    # _nix_direnv_preflight). This input is parent of nixpkgs a69b606940 (bash
+    # 5.2.p37 -> 5.3p0, 2025-07-05). Remove once upstream bash fixes the bug.
+    nixpkgs-bash52.url = "github:nixos/nixpkgs/27347f2adbdfb32a46a7851519a8606dba91bc7c";
+
   };
 
   outputs =

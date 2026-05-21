@@ -113,6 +113,22 @@
         "type": "github"
       }
     },
+    "nixpkgs-bash52": {
+      "locked": {
+        "lastModified": 1752436649,
+        "narHash": "sha256-ckqX5I3VWyMuOC1f+aZEugqkT6vpmemwuAa70/wQznI=",
+        "owner": "nixos",
+        "repo": "nixpkgs",
+        "rev": "27347f2adbdfb32a46a7851519a8606dba91bc7c",
+        "type": "github"
+      },
+      "original": {
+        "owner": "nixos",
+        "repo": "nixpkgs",
+        "rev": "27347f2adbdfb32a46a7851519a8606dba91bc7c",
+        "type": "github"
+      }
+    },
     "nixpkgs-stable": {
       "locked": {
         "lastModified": 1776434932,
@@ -135,7 +151,8 @@
         "emacs-overlay": "emacs-overlay",
         "home-manager": "home-manager",
         "nix-homebrew": "nix-homebrew",
-        "nixpkgs": "nixpkgs"
+        "nixpkgs": "nixpkgs",
+        "nixpkgs-bash52": "nixpkgs-bash52"
       }
     }
   },

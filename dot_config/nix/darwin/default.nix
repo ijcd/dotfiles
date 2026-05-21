@@ -43,6 +43,31 @@
   nixpkgs.config.allowUnfree = true;
   nixpkgs.overlays = [
     inputs.emacs-overlay.overlay
+    # See nixpkgs-bash52 input comment in flake.nix.
+    (final: prev:
+      let
+        # Fresh minimal config: prev.config carries replaceStdenv=null from
+        # current unstable nixpkgs, which the pinned (Jul-2025) nixpkgs calls
+        # as a function without an isFunction guard -> eval error.
+        pkgs-bash52 = import inputs.nixpkgs-bash52 {
+          inherit (prev.stdenv.hostPlatform) system;
+          config = { allowUnfree = true; };
+        };
+      in
+      {
+        # Only override the interactive bash. bashNonInteractive feeds the
+        # darwin stdenv bootstrap (allDeps isBuiltByBootstrapFilesCompiler
+        # assertion); overriding it with a foreign-built bash breaks the
+        # bootstrap chain.
+        #
+        # Build bash 5.2 source using CURRENT nixpkgs's bashInteractive
+        # derivation (stdenv, readline, ncurses, etc.) — pulls just the
+        # src/version/patches from old nixpkgs's bashInteractive. Only
+        # bash itself needs to compile; everything else uses cached deps.
+        bashInteractive = prev.bashInteractive.overrideAttrs (_: {
+          inherit (pkgs-bash52.bashInteractive) src version patches;
+        });
+      })
   ];
 
   # homebrew installation manager
