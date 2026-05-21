@@ -60,13 +60,11 @@
         # assertion); overriding it with a foreign-built bash breaks the
         # bootstrap chain.
         #
-        # Build bash 5.2 source using CURRENT nixpkgs's bashInteractive
-        # derivation (stdenv, readline, ncurses, etc.) — pulls just the
-        # src/version/patches from old nixpkgs's bashInteractive. Only
-        # bash itself needs to compile; everything else uses cached deps.
-        bashInteractive = prev.bashInteractive.overrideAttrs (_: {
-          inherit (pkgs-bash52.bashInteractive) src version patches;
-        });
+        # nixos-25.05 channel has bash 5.2 fully cached on cache.nixos.org —
+        # wholesale import is fast (fetches binary, ~2.5 MiB) and doesn't
+        # rely on the build env's bash working (which it doesn't, since
+        # that's the bug we're working around in the first place).
+        bashInteractive = pkgs-bash52.bashInteractive;
       })
   ];
 
