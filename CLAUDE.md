@@ -36,7 +36,9 @@ chezmoi cd                # cd to source dir (this repo)
 # nix-darwin / Home Manager (host name = bearcat)
 darwin-rebuild switch --flake ~/.config/nix#bearcat
 nixhome-switch            # alias for the above (sudo wrapper)
+nixhome-rebuild           # full workflow: diff → apply → switch → re-add lock
 nix flake update          # update inputs in flake.lock
+~/.config/nix/scripts/nix-eval-check.sh [host]     # ad-hoc eval check against deployed config (no sudo, no build)
 ~/.config/nix/scripts/darwin-report.sh             # darwin state report
 
 # zsh framework
@@ -90,9 +92,19 @@ Namespaced by prefix: `git-*` (callable as `git foo` git extensions), `docker-*`
 
 ## Working in this repo
 
+### One-time setup per clone
+
+```sh
+lefthook install                         # activate precommit gates (nix eval + dry-build)
+```
+
+`lefthook` is installed via `homebrew.nix` brews. The `lefthook install` writes a `.git/hooks/pre-commit` shim that delegates to `lefthook.yml` in the repo root. Without this step, the precommit gates don't fire and an LLM (or human) can commit broken nix that only surfaces at `nixhome-rebuild` time. With it, any commit touching `dot_config/nix/**` runs `nix eval` + `nix build --dry-run` against the source flake in parallel (~15–25s); commit aborts on failure.
+
+### Notes
+
 - For a question like "how is X configured?" — read source in this repo; **don't** read the destination under `~`. The destination is generated.
 - After editing a managed file, run `chezmoi diff` to confirm the change before `chezmoi apply`.
 - Adding a new file under an already-managed directory: name it with chezmoi prefixes for the perms/transforms you want, then `chezmoi apply`. No registration step.
 - Removing a managed file: delete from source AND run `chezmoi apply` (which will offer to remove the destination), or add it to `.chezmoiignore`.
-- Changes to `dot_config/nix/**` require `darwin-rebuild switch --flake ~/.config/nix#bearcat` to take effect, not `chezmoi apply`. (chezmoi materializes the flake source; nix-darwin acts on it.)
+- Changes to `dot_config/nix/**` require `darwin-rebuild switch --flake ~/.config/nix#bearcat` to take effect, not `chezmoi apply`. (chezmoi materializes the flake source; nix-darwin acts on it.) Precommit (via `lefthook`) gates commits with `nix eval` + `nix build --dry-run` against the source flake — see "One-time setup per clone" above. `~/.config/nix/scripts/nix-eval-check.sh` is for ad-hoc checks against the *deployed* config (after apply), separate from the source-side precommit gates.
 - The user's global `~/.claude/CLAUDE.md` lives at `private_dot_claude/private_CLAUDE.md` in this repo. Edit there, then `chezmoi apply`.

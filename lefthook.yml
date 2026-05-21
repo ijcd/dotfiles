@@ -1,0 +1,19 @@
+# Precommit gates for the dotfiles repo.
+#
+# Activated per-clone with:  lefthook install
+# Bypassed (only if intentional):  git commit --no-verify
+#
+# Both nix checks run in parallel against the chezmoi SOURCE flake (not the
+# destination at ~/.config/nix), since the source is what's being committed.
+# They only fire when staged files match the glob, so non-nix commits are
+# instant.
+
+pre-commit:
+  parallel: true
+  commands:
+    nix-eval:
+      glob: "dot_config/nix/**"
+      run: hooks/nix-eval.sh
+    nix-dry-build:
+      glob: "dot_config/nix/**"
+      run: hooks/nix-dry-build.sh
