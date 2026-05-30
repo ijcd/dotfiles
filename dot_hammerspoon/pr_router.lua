@@ -1,3 +1,9 @@
+-- Eager-load deps so the first `hs -c` call doesn't time out on lazy load.
+require("hs.window")
+require("hs.screen")
+require("hs.mouse")
+require("hs.timer")
+
 -- pr_router.lua — route a PR URL to open on the operator's current screen.
 --
 -- Usage from hs CLI (requires "Install Command Line Tool" in Hammerspoon menu):
