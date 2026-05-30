@@ -1,3 +1,6 @@
+-- Load modules
+require("pr_router")
+
 -- Function to toggle "always on top" for the currently focused window
 hs.hotkey.bind({"cmd", "alt", "ctrl"}, "T", function()
   -- Helper function for showing errors

@@ -1,0 +1,40 @@
+#!/bin/sh
+# pr-open [<pr-number> | <url>]
+#   no args  -> opens the current branch's PR
+#   number   -> opens that PR by number in the current repo
+#   URL      -> opens that URL directly
+#
+# Routes through Hammerspoon so the window lands on the screen you're working on.
+# Requires: gh (GitHub CLI), hs (Hammerspoon CLI — enable via Hammerspoon menu:
+#           Hammerspoon > Install Command Line Tool, or run hs.ipc.cliInstall()
+#           in the Hammerspoon console).
+
+set -e
+
+arg="${1:-}"
+
+case "$arg" in
+  "")
+    url=$(gh pr view --json url -q .url)
+    ;;
+  http://* | https://*)
+    url="$arg"
+    ;;
+  [0-9]*)
+    url=$(gh pr view "$arg" --json url -q .url)
+    ;;
+  *)
+    echo "pr-open: unrecognized argument: $arg" >&2
+    echo "usage: pr-open [<pr-number> | <url>]" >&2
+    exit 1
+    ;;
+esac
+
+if [ -z "$url" ]; then
+  echo "pr-open: could not resolve PR URL" >&2
+  exit 1
+fi
+
+# Escape single quotes for the Lua string literal passed to hs -c.
+esc_url=$(printf '%s' "$url" | sed "s/'/'\\\\''/g")
+hs -c "openPR('$esc_url')"
