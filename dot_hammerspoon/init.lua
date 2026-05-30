@@ -1,4 +1,5 @@
 -- Load modules
+require("hs.ipc") -- enables the `hs` CLI to talk to Hammerspoon
 require("pr_router")
 
 -- Function to toggle "always on top" for the currently focused window
