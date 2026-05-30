@@ -3,34 +3,33 @@ require("hs.window")
 require("hs.screen")
 require("hs.mouse")
 require("hs.timer")
+require("hs.spaces")
 
--- pr_router.lua — route a PR URL to open on the operator's current screen.
+-- pr_router.lua — route a PR URL to open on the operator's current screen + Space.
 --
--- Usage from hs CLI (requires "Install Command Line Tool" in Hammerspoon menu):
+-- Usage from hs CLI (requires `hs.ipc.cliInstall()` once):
 --   hs -c "openPR('https://github.com/org/repo/pull/123')"
 --
--- Logic:
---   current screen = screen of focused window (mouse screen as fallback)
---   if any browser window already exists on current screen → open there
---   otherwise → open on the second monitor (non-primary screen)
+-- Rule:
+--   current screen = screen containing the focused window (mouse screen as fallback)
+--   if a Firefox window is visible on the current screen AND current Space → focus it,
+--     and the URL lands as a new tab in that window (`open -a Firefox URL` adds to active).
+--   otherwise → spawn a new Firefox window (`open -na ... --new-window`), let it land on
+--     the current macOS Space (default behavior for new windows), and nudge it to the
+--     current screen if Firefox restored it to a previous screen position.
 
 local M = {}
 
-local BROWSER_BUNDLES = {
-  "com.google.Chrome",
-  "com.brave.Browser",
-  "company.thebrowser.Browser",
-  "com.apple.Safari",
+local FIREFOX_BUNDLES = {
   "org.mozilla.firefox",
   "org.mozilla.firefoxdeveloperedition",
 }
 
-local function isBrowserWindow(win)
+local function isFirefox(win)
   local app = win:application()
   if not app then return false end
-  local bid = app:bundleID()
-  for _, b in ipairs(BROWSER_BUNDLES) do
-    if bid == b then return true end
+  for _, b in ipairs(FIREFOX_BUNDLES) do
+    if app:bundleID() == b then return true end
   end
   return false
 end
@@ -41,55 +40,59 @@ local function currentScreen()
   return hs.mouse.getCurrentScreen() or hs.screen.mainScreen()
 end
 
-local function secondScreen()
-  local all = hs.screen.allScreens()
-  if #all >= 2 then
-    local primary = hs.screen.primaryScreen()
-    for _, s in ipairs(all) do
-      if s ~= primary then return s end
-    end
-  end
-  return hs.screen.mainScreen()
-end
-
-local function browserOnScreen(screen)
-  for _, w in ipairs(hs.window.allWindows()) do
-    if isBrowserWindow(w) and w:screen() == screen then
-      return true
-    end
+local function listContains(list, x)
+  for _, v in ipairs(list or {}) do
+    if v == x then return true end
   end
   return false
 end
 
-local function newestBrowserWindow()
-  -- Hammerspoon doesn't expose window creation time.
-  -- Best proxy: the frontmost browser app's focused window, else any browser window.
+-- Returns a Firefox window visible on the given screen AND on the current Space, or nil.
+local function firefoxOnCurrentScreenAndSpace(screen)
+  local current_space = hs.spaces.focusedSpace()
+  for _, w in ipairs(hs.window.allWindows()) do
+    if isFirefox(w) and w:screen() == screen then
+      local spaces = hs.spaces.windowSpaces(w)
+      if listContains(spaces, current_space) then
+        return w
+      end
+    end
+  end
+  return nil
+end
+
+local function newestFirefoxWindow()
   for _, w in ipairs(hs.window.orderedWindows()) do
-    if isBrowserWindow(w) then return w end
+    if isFirefox(w) then return w end
   end
   return nil
 end
 
 function M.open(url)
-  local target = currentScreen()
-  if not browserOnScreen(target) then
-    target = secondScreen()
-  end
-
-  -- Shell-escape single quotes in the URL for the shell command.
+  local screen = currentScreen()
   local escaped = url:gsub("'", "'\\''")
-  hs.execute("open '" .. escaped .. "'")
+  local existing = firefoxOnCurrentScreenAndSpace(screen)
 
-  -- After the OS creates the window, move it to target if needed.
-  hs.timer.doAfter(0.8, function()
-    local win = newestBrowserWindow()
-    if win then
-      if win:screen() ~= target then
-        win:moveToScreen(target, false, true)
+  if existing then
+    -- Bring the visible Firefox forward; `open -a Firefox URL` (no -n) then adds a tab to it.
+    existing:focus()
+    hs.timer.doAfter(0.1, function()
+      hs.execute("open -a 'Firefox' '" .. escaped .. "'")
+    end)
+  else
+    -- Spawn a new Firefox window. New windows open on the current macOS Space by default;
+    -- still nudge to current screen in case Firefox restored a previous screen position.
+    hs.execute("open -na 'Firefox' --args --new-window '" .. escaped .. "'")
+    hs.timer.doAfter(0.8, function()
+      local win = newestFirefoxWindow()
+      if win then
+        if win:screen() ~= screen then
+          win:moveToScreen(screen, false, true)
+        end
+        win:focus()
       end
-      win:focus()
-    end
-  end)
+    end)
+  end
 end
 
 -- Global entry point callable from `hs -c`
