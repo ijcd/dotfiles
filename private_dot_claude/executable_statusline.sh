@@ -109,7 +109,47 @@ fi
 IFS=' | '
 echo "${parts[*]}"
 
-# Kitty tab coloring moved to ccrider (https://github.com/ijcd/ccrider).
-# The menu-bar shell owns tab paint as a side effect of its sessions --watch
-# stream; see ccrider's ADR-0009 for the rationale. Without ccrider running,
-# kitty tabs simply aren't colored — runclaude still sets the title.
+# ─── Kitty tab rendering (broad mode: busy=🟡, idle=🔴) ───
+# Statusline runs on every Claude Code UI update, so this is effectively a live
+# state monitor. We read .status from ~/.claude/sessions/<pid>.json (matched by
+# sessionId) and reflect it on the kitty tab — title prefix + tab background tint.
+# A small state-cache file avoids redundant kitty @ calls when nothing changed.
+
+if [ -n "${KITTY_LISTEN_ON:-}" ] && [ -n "${KITTY_WINDOW_ID:-}" ] && [ -n "$session" ]; then
+    # Live session status; falls back to "unknown" for older Claude versions or fresh sessions.
+    status=$(jq -r --arg sid "$session" 'select(.sessionId == $sid) | .status // "unknown"' \
+                ~/.claude/sessions/*.json 2>/dev/null | head -1)
+    [ -z "$status" ] && status="unknown"
+
+    # Saturated bg in the state's hue; active fg is white (high-contrast for the
+    # focused tab where you're reading), inactive fg is a dim shade of the ball
+    # color (state-coded for peripheral scanning of unfocused tabs).
+    case "$status" in
+        busy) emoji="🟡"; active_bg="#5e4818"; inactive_bg="#3e3008"; active_fg="#ffffff"; inactive_fg="#cc9030" ;;
+        idle) emoji="🔴"; active_bg="#5e2424"; inactive_bg="#3e1818"; active_fg="#ffffff"; inactive_fg="#cc4040" ;;
+        *)    emoji="" ;;  # status field missing (older Claude Code) — leave tab unchanged
+    esac
+
+    if [ -n "$emoji" ]; then
+        # Cache last-applied state to skip redundant kitty calls on every render.
+        # Key includes all colors so editing the palette auto-invalidates the cache
+        # — otherwise a color tweak with the same emoji wouldn't re-render.
+        state_file="/tmp/claude-tabstate-${session}"
+        state_key="${emoji}|${active_bg}|${inactive_bg}|${active_fg}|${inactive_fg}"
+        if [ "$state_key" != "$(cat "$state_file" 2>/dev/null)" ]; then
+            echo "$state_key" > "$state_file"
+
+            cur=$(kitty @ ls 2>/dev/null | jq -r --argjson wid "$KITTY_WINDOW_ID" \
+                  '.[].tabs[] | select(.windows[].id == $wid) | .title' 2>/dev/null)
+            # strip any leading status prefix (current + legacy markers)
+            base="$cur"
+            base="${base#🟢 }"; base="${base#🟡 }"; base="${base#🔴 }"
+            base="${base#⏳ }"; base="${base#… }"
+
+            kitty @ set-tab-title --match "window_id:$KITTY_WINDOW_ID" "$emoji $base" 2>/dev/null
+            kitty @ set-tab-color --match "window_id:$KITTY_WINDOW_ID" \
+                active_bg="$active_bg" inactive_bg="$inactive_bg" \
+                active_fg="$active_fg" inactive_fg="$inactive_fg" 2>/dev/null
+        fi
+    fi
+fi
