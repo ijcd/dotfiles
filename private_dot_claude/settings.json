@@ -1,31 +1,4 @@
 {
-  "statusLine": {
-    "type": "command",
-    "command": "/Users/ijcd/.claude/statusline.sh"
-  },
-  "enabledPlugins": {
-    "sentry@claude-plugins-official": true,
-    "superpowers@claude-plugins-official": true,
-    "frontend-design@claude-plugins-official": true,
-    "code-review@claude-plugins-official": true,
-    "feature-dev@claude-plugins-official": true,
-    "typescript-lsp@claude-plugins-official": true,
-    "security-guidance@claude-plugins-official": true,
-    "code-simplifier@claude-plugins-official": true,
-    "ralph-loop@claude-plugins-official": true,
-    "explanatory-output-style@claude-plugins-official": true,
-    "greptile@claude-plugins-official": true,
-    "learning-output-style@claude-plugins-official": true,
-    "gopls-lsp@claude-plugins-official": true,
-    "slack@claude-plugins-official": true,
-    "rust-analyzer-lsp@claude-plugins-official": true
-  },
-  "skipDangerousModePermissionPrompt": true,
-  "sandbox": {
-    "filesystem": {
-      "allowRead": ["/private/tmp/claude-501/"]
-    }
-  },
   "hooks": {
     "SessionStart": [
       {
@@ -68,5 +41,45 @@
         ]
       }
     ]
-  }
+  },
+  "statusLine": {
+    "type": "command",
+    "command": "/Users/ijcd/.claude/statusline.sh"
+  },
+  "enabledPlugins": {
+    "sentry@claude-plugins-official": true,
+    "superpowers@claude-plugins-official": true,
+    "frontend-design@claude-plugins-official": true,
+    "code-review@claude-plugins-official": true,
+    "feature-dev@claude-plugins-official": true,
+    "typescript-lsp@claude-plugins-official": true,
+    "security-guidance@claude-plugins-official": true,
+    "code-simplifier@claude-plugins-official": true,
+    "ralph-loop@claude-plugins-official": true,
+    "explanatory-output-style@claude-plugins-official": true,
+    "greptile@claude-plugins-official": true,
+    "learning-output-style@claude-plugins-official": true,
+    "gopls-lsp@claude-plugins-official": true,
+    "slack@claude-plugins-official": true,
+    "rust-analyzer-lsp@claude-plugins-official": true,
+    "claude-status@claude-status-marketplace": true
+  },
+  "extraKnownMarketplaces": {
+    "claude-status-marketplace": {
+      "source": {
+        "source": "directory",
+        "path": "/Users/ijcd/Library/Developer/Xcode/DerivedData/Claude_Status-fmymerrlowtbuzhcyoejbrgwjbdc/Build/Products/Debug/Claude Status.app/Contents/Resources/claude-status-plugin"
+      }
+    }
+  },
+  "sandbox": {
+    "filesystem": {
+      "allowRead": [
+        "/private/tmp/claude-501/"
+      ]
+    }
+  },
+  "skipDangerousModePermissionPrompt": true,
+  "inputNeededNotifEnabled": true,
+  "agentPushNotifEnabled": true
 }
