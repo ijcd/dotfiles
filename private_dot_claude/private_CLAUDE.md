@@ -65,6 +65,45 @@
   or sources. "Are these equal?" is a question whose answer differs by
   representation; "Are their canonical forms equal?" doesn't.
 
+## Decision records (ADRs)
+
+Non-trivial projects keep per-decision records at `docs/decisions/NNNN-kebab-title.md`. Modmacs-shaped:
+
+```md
+# N. Title
+
+**Status**: Accepted (YYYY-MM-DD)
+
+## Context
+Why this came up. What constraints apply.
+
+## Decision
+What we chose. Imperative, short.
+
+## Alternatives considered
+Each rejected alternative + why. One line each if possible.
+
+## Consequences
+What this commits us to. Cross-reference other ADRs by number.
+```
+
+Rules:
+
+- One ADR per decision. Numbered sequentially (`0001`, `0002`, …). Filename matches `# N. Title`.
+- Immutable once Accepted. To reverse, write a new ADR; set the old one's `**Status**: Superseded by ADR-NNNN`.
+- Cross-reference by number, e.g. "see ADR-0003".
+- Write them when a decision is made, not in a paperwork pass weeks later. Fresh > comprehensive.
+
+## Architecture docs
+
+`docs/architecture/` holds current-state diagrams and system overviews. **Mutable** — edited as the system changes. ASCII diagrams live here, not in ADRs (so they don't fossilize).
+
+- ADRs reference architecture docs for visuals.
+- Architecture docs reference ADRs for rationale.
+- No diagram in two places.
+
+Brainstorm-output design docs (`docs/superpowers/specs/...`) are thin indices over ADRs + architecture, not the canonical source.
+
 ## Visual Companion
 
 - In brainstorming, default-on. Never ask for consent — start the server and
@@ -105,6 +144,11 @@ were added or bugs were fixed.
 ## GitHub
 
 - Your primary method for interacting with GitHub should be the GitHub CLI.
+- After creating any PR with `gh pr create`, **always** request a Copilot review immediately:
+  ```bash
+  gh pr edit <PR-NUMBER> --add-reviewer @copilot
+  ```
+  Every PR, no exceptions. Don't ask first.
 
 ## PR Forks (upstream contributions)
 
