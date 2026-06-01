@@ -22,9 +22,9 @@ if [ -n "${KITTY_LISTEN_ON:-}" ]; then
 fi
 
 # Claude Code's session storage: ~/.claude/projects/<encoded-cwd>/*.jsonl
-# where encoded-cwd is $PWD with '/' and '.' replaced by '-'.
-# e.g. /Users/foo/.bar/baz → -Users-foo--bar-baz
-encoded="$(echo "$PWD" | sed 's|[/.]|-|g')"
+# where encoded-cwd is $PWD with '/', '.', and '_' replaced by '-'.
+# e.g. /Users/foo/.bar/baz_qux → -Users-foo--bar-baz-qux
+encoded="$(echo "$PWD" | sed 's|[/._]|-|g')"
 project_dir="$HOME/.claude/projects/$encoded"
 
 # Decide --continue vs fresh based on whether any session jsonl exists.
