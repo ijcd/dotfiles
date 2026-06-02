@@ -1,11 +1,21 @@
 ---
 name: treehouse-firewall-debug
-description: Debug ERR_EMPTY_RESPONSE / connection reset on Treehouse loopback aliases (127.0.0.x). Covers the full stack - loopback aliases, pf hairpin NAT, dns-sd mDNS, macOS Application Firewall, nix binary codesigning.
+description: Debug Treehouse / per-branch loopback dev networking on macOS — hairpin routing, hairpin NAT, ERR_EMPTY_RESPONSE / "Empty reply from server" / connection reset on 127.0.0.x loopback aliases, broken after reboot, Phoenix returns nothing on a .local hostname. Covers all 5 layers: loopback aliases, pf hairpin NAT (loopback_dev anchor), pf enabled, dns-sd mDNS, macOS Application Firewall + nix binary codesigning.
 ---
 
 # Treehouse + macOS Networking Debugging
 
-When a dev server returns ERR_EMPTY_RESPONSE, connection reset, or empty replies on a Treehouse loopback alias IP, follow this diagnostic flow through all 5 layers.
+When a dev server returns ERR_EMPTY_RESPONSE, connection reset, or "Empty reply from server" on a Treehouse loopback alias IP (`127.0.0.10–99`), follow this diagnostic flow through all 5 layers.
+
+## Did the user say "after a reboot"?
+
+If yes — **start at Layer 2** and explicitly ask for sudo to run the kernel-anchor check (see "Sudo discipline" below). The Layer 5 codesigning case (most-common cause normally) persists across reboots — so post-reboot it is almost never that. Post-reboot triage order is `2 → 3 → 1 → 4 → 5`, not `1 → 5`.
+
+Specifically: the nix-darwin `pf-loopback` launchd daemon that loads `/etc/pf.anchors/loopback_dev` at boot suppresses stderr and has no retry. If anything goes wrong at boot (e.g. nix `/etc/static` not yet materialized when the daemon fires), the anchor file stays valid on disk but the kernel anchor is empty. `pf` is still enabled (Apple's own pfctl service runs independently), so `pfctl -s info` shows "Enabled" — but `pfctl -a loopback_dev -s nat` shows nothing. **One-line fix: `sudo pfctl -f /etc/pf.conf`.** Survives until next reboot.
+
+## Sudo discipline
+
+Layers 2 and 3 need sudo. **If sudo prompts for a password, ASK THE USER for it — do not skip these checks and jump to application-layer hypotheses (Phoenix crash, etc.).** Skipping cheap discriminating tests because of a password prompt is the failure mode that wastes the most time. The application layer almost never causes "Empty reply from server" on a stack with these symptoms.
 
 ## Background: The Full Stack
 
@@ -14,12 +24,29 @@ Treehouse uses per-branch loopback IPs for isolated dev environments. The networ
 | Layer | What | Managed by | Check command |
 |-------|------|-----------|---------------|
 | 1. Loopback aliases | `ifconfig lo0 alias 127.0.0.X` (.10-.99) | nix-darwin | `ifconfig lo0 \| grep "inet 127.0.0"` |
-| 2. Hairpin NAT | `nat on lo0 from X to X -> 127.0.0.1` | nix-darwin (`/etc/pf.anchors/loopback_dev`) | `sudo pfctl -a loopback_dev -s nat` |
+| 2. Hairpin NAT in kernel | `nat on lo0 from X to X -> 127.0.0.1` LOADED into pf | nix-darwin (`/etc/pf.anchors/loopback_dev`) | `sudo pfctl -a loopback_dev -s nat` |
 | 3. pf enabled | Packet filter must be running | nix-darwin | `sudo pfctl -s info` (Status: Enabled) |
 | 4. mDNS | `dns-sd -P` maps `branch.project.local` → IP | Treehouse | `dns-sd -G v4 <hostname>` |
 | 5. App Firewall | `socketfilterfw` blocks unsigned binaries | **Nothing** (gap!) | `codesign -v <binary>` |
 
-Layer 5 is the most common failure on macOS Sequoia 15.4+.
+**Common failure profiles:**
+- **Fresh after reboot:** Layer 2 (kernel anchor empty though file exists). Fix: `sudo pfctl -f /etc/pf.conf`.
+- **After nix store rebuild:** Layer 5 (new binary path needs re-signing). Fix: `devenv script sign-beam`.
+- **First-time setup:** Layer 5 (codesigning) — most common on macOS Sequoia 15.4+.
+
+## The Layer-2 trap (file present ≠ kernel rules loaded)
+
+Layers 2 and 3 look independent in the table but the dangerous combination is **"pf is enabled AND the anchor file exists AND the kernel anchor is empty."** All three can be true at once after the silent nix-darwin boot failure described above. The check that distinguishes this:
+
+```bash
+# Anchor file on disk (file exists, content valid):
+cat /etc/pf.anchors/loopback_dev | wc -l      # should be 90
+
+# Anchor LOADED in kernel (this is what actually matters):
+sudo pfctl -a loopback_dev -s nat | wc -l     # should be 90; if 0, this is the bug
+```
+
+If kernel count is 0 while file count is 90 → `sudo pfctl -f /etc/pf.conf` and re-test.
 
 ## Diagnostic Steps (check all layers in order)
 
@@ -159,3 +186,19 @@ sudo pfctl -f /etc/pf.conf  # reload rules including loopback_dev anchor
 - Don't look for error logs — macOS doesn't log Application Firewall blocks on loopback
 - Don't assume it's your app code — test a simple server on the same IP first
 - Don't confuse `pf` (packet filter, Layer 2-3) with `socketfilterfw` (Application Firewall, Layer 5)
+- **Don't silently skip Layer 2 or Layer 3 because sudo prompts** — ask the user for the password. Application-layer hypotheses (Phoenix crash, codegen drift, etc.) almost never produce "Empty reply from server" on this network stack; if you find yourself there without having run `sudo pfctl -a loopback_dev -s nat`, you're guessing.
+- **Don't assume `pfctl -s info` = "Enabled" means rules are loaded** — Apple's own pfctl service enables pf at boot independently of whether your anchor loaded. Always check `pfctl -a loopback_dev -s nat` separately.
+- **Don't trust nc-vs-Phoenix asymmetry as proof it's the application** — partial NAT (some rules loaded, others not; or rules loaded but Apple's pf service re-flushed) can produce surface-level "nc works, Phoenix doesn't" without the application being at fault.
+
+## Why the nix-darwin daemon may silently fail at boot
+
+The `com.local.pf-loopback` launchd daemon (in `dot_config/nix/darwin/local-dev.nix`) does:
+
+```sh
+/sbin/pfctl -f /etc/pf.conf 2>/dev/null
+/sbin/pfctl -e 2>/dev/null || true
+```
+
+Three problems stacked: `2>/dev/null` swallows stderr, the plist has no `StandardErrorPath`, and there's no post-condition check that the anchor actually loaded. If `/etc/static/pf.anchors/loopback_dev` (a nix store symlink) isn't materialized when the daemon fires at `RunAtLoad`, `pfctl -f` errors out and we never know. The anchor file path resolves correctly *later* — but the daemon never re-runs.
+
+When the kernel anchor is empty post-reboot and you see no relevant entries in `log show --predicate 'eventMessage CONTAINS "pf-loopback"'` beyond the spawn, this is the failure mode. Manual fix is `sudo pfctl -f /etc/pf.conf`; durable fix is to update the daemon to log stderr, verify the anchor loaded, and retry on failure.
