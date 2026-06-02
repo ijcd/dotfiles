@@ -61,16 +61,7 @@
     "learning-output-style@claude-plugins-official": true,
     "gopls-lsp@claude-plugins-official": true,
     "slack@claude-plugins-official": true,
-    "rust-analyzer-lsp@claude-plugins-official": true,
-    "claude-status@claude-status-marketplace": true
-  },
-  "extraKnownMarketplaces": {
-    "claude-status-marketplace": {
-      "source": {
-        "source": "directory",
-        "path": "/Users/ijcd/Library/Developer/Xcode/DerivedData/Claude_Status-fmymerrlowtbuzhcyoejbrgwjbdc/Build/Products/Debug/Claude Status.app/Contents/Resources/claude-status-plugin"
-      }
-    }
+    "rust-analyzer-lsp@claude-plugins-official": true
   },
   "sandbox": {
     "filesystem": {
