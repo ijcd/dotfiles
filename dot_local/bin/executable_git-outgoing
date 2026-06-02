@@ -43,8 +43,11 @@ fi
 if $diff; then
     git diff "$1"...HEAD
 else
+    # git cherry -v output: "<marker> <40-char-sha> <subject>"
+    # Reformat to "<marker> <7-char-sha> <subject>" using awk so it's portable
+    # across BSD and GNU coreutils (cut can't pick two disjoint char ranges).
     git cherry -v "$@" |
-        cut -c1-9 -c43- |
+        awk '{print $1, substr($2,1,7), substr($0, length($1)+length($2)+3)}' |
         sed -e "s/^\(.\) \(.......\)/\1 $SHA\2$RESET/" |
         sed -e "s/^-/$REM-$RESET/" -e "s/^+/$ADD+$RESET/"
 fi
