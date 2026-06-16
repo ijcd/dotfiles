@@ -10,6 +10,7 @@
       wget
       rsync
       tree
+      eza                # modern ls replacement (used by chpwd hook)
       htop
       pstree             # process tree viewer
       watch
@@ -82,6 +83,7 @@
       # ─────────────────────────────────────────────────────────────────────────
       overmind           # Procfile manager
       hivemind           # Procfile runner
+      pm2                # Node.js process manager (used by cortextos)
 
       # ─────────────────────────────────────────────────────────────────────────
       # Media & graphics
@@ -91,6 +93,7 @@
       yt-dlp             # youtube downloader
       mpv                # media player (audio/video)
       sox                # audio processing
+      whisper-cpp        # speech-to-text (used by cortextos for voice messages)
       graphviz           # graph visualization
       poppler-utils      # PDF utilities
 

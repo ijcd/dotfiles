@@ -1,0 +1,53 @@
+" ~/.vim/vimrc — minimal vim config kept by chezmoi.
+" Purpose: redirect vim state out of $HOME into XDG dirs + sensible defaults.
+
+" ────────────────────────────────────────────────────────────────────────────
+" XDG state redirects — keep $HOME clean of .viminfo, swap files, .netrwhist
+" ────────────────────────────────────────────────────────────────────────────
+
+let s:state = $HOME . '/.local/state/vim'
+for s:d in ['', '/swap', '/backup', '/undo']
+  if !isdirectory(s:state . s:d) | call mkdir(s:state . s:d, 'p', 0700) | endif
+endfor
+
+set viminfofile=$HOME/.local/state/vim/viminfo
+set directory=$HOME/.local/state/vim/swap//   " swap files (`//` = full path encoding)
+set backupdir=$HOME/.local/state/vim/backup// " backup files
+set undodir=$HOME/.local/state/vim/undo//     " persistent undo
+set undofile                                   " enable persistent undo
+let g:netrw_home = $HOME . '/.local/state/vim' " .netrwhist lives here too
+
+" ────────────────────────────────────────────────────────────────────────────
+" Sensible defaults
+" ────────────────────────────────────────────────────────────────────────────
+
+set nocompatible            " no vi compat (also implied by having a vimrc)
+syntax enable
+filetype plugin indent on
+
+set number                  " line numbers
+set ruler                   " cursor position in status line
+set showcmd                 " partial command in status line
+set wildmenu                " tab completion menu
+set hidden                  " switch buffers without saving
+
+set incsearch               " incremental search
+set hlsearch                " highlight matches
+set ignorecase smartcase    " case-insensitive unless query has caps
+
+set expandtab               " spaces, not tabs
+set tabstop=2 shiftwidth=2 softtabstop=2
+set autoindent smartindent
+
+set scrolloff=3             " keep 3 lines visible above/below cursor
+set sidescrolloff=5
+set wrap linebreak
+
+set mouse=a                 " mouse in all modes
+set clipboard=unnamed       " yank to system clipboard (macOS)
+
+set termguicolors           " 24-bit colors if terminal supports
+set background=dark
+
+set encoding=utf-8
+set fileformats=unix,dos,mac

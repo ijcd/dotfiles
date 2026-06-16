@@ -74,3 +74,35 @@ source $ZDOTDIR/functions/dircolor
 _dircolor_chpwd() { dircolor apply }
 add-zsh-hook chpwd _dircolor_chpwd
 dircolor apply  # apply on shell start
+
+###########################################
+# Auto-listing on directory change
+###########################################
+# Show pwd + listing after every cd. Three tiers based on entry count:
+#   <= 100        normal eza grid
+#   101–500       abbreviated single-column head -20 with indicator
+#   > 500         skipped with indicator
+# Falls back to `ls` if eza isn't installed.
+_ll_chpwd() {
+  emulate -L zsh
+  print -P "%F{75}%~%f"
+  local n
+  n=$(command ls -A1 2>/dev/null | wc -l | tr -d ' ')
+  local lister="eza --group-directories-first --icons=auto"
+  (( $+commands[eza] )) || lister="ls -A"
+  if (( n == 0 )); then
+    print -P "  %F{244}(empty)%f"
+  elif (( n <= 100 )); then
+    ${=lister}
+  elif (( n <= 500 )); then
+    print -P "  %F{220}⋯ showing 20 of $n%f %F{244}(\`eza\` for all)%f"
+    if (( $+commands[eza] )); then
+      eza -1 --group-directories-first --icons=auto | head -20
+    else
+      ls -A1 | head -20
+    fi
+  else
+    print -P "  %F{203}⊘ $n entries — too many to list%f %F{244}(\`eza\` or \`ls\` to view)%f"
+  fi
+}
+add-zsh-hook chpwd _ll_chpwd

@@ -5,8 +5,9 @@
 ###########################################
 
 # History
-HISTFILE=$HOME/.zsh_history
+HISTFILE=$HOME/.local/state/zsh/history
 HISTSIZE=20000
+MAILCHECK=0   # suppress "You have mail." (read /var/mail/$USER with `mail`)
 SAVEHIST=10000
 setopt HIST_REDUCE_BLANKS       # Remove superfluous blanks from history
 
