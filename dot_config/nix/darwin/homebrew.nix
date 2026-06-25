@@ -21,6 +21,7 @@ in
 
     taps = [
       "nikitabobko/tap" # for aerospace
+      "raine/workmux" # for workmux (brews list references raine/workmux/workmux)
     ];
 
     brews = [
