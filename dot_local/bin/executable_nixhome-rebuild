@@ -8,7 +8,10 @@ set -uo pipefail
 # ─── Config ───
 CHEZMOI_REPO="$HOME/.local/share/chezmoi"
 LOCK_DEST="$HOME/.config/nix/flake.lock"
-HOST="bearcat"
+# Host = this machine's name (NOT hardcoded — a hardcode once switched blackbird
+# to the bearcat x86 config). Override with NIXHOME_HOST=<name> if hostname is
+# wrong. darwin-rebuild resolves the same way (scutil LocalHostName).
+HOST="${NIXHOME_HOST:-$(scutil --get LocalHostName)}"
 BREW_CACHE="$HOME/Library/Caches/Homebrew/api/cask.jws.json"
 SELF="$HOME/.local/bin/nixhome-rebuild"
 
