@@ -1,0 +1,16 @@
+# Managed by chezmoi (source: private_dot_ssh/private_config).
+#
+# Client-side agent + keychain handling, so EVERY ssh consumer benefits
+# (git, cron, launchd, GUI clients, IDEs) — not just interactive login shells.
+# The zlogin hook stays as a belt-and-suspenders eager loader + ssh-reagent
+# socket reuse; this config makes key-loading work everywhere else too.
+#
+#   AddKeysToAgent  load the key into the agent on first use (lazy)
+#   UseKeychain     read/store the passphrase from the macOS keychain
+#   IgnoreUnknown   UseKeychain is macOS-only — ignore (don't error) on Linux
+Host *
+  IgnoreUnknown UseKeychain
+  AddKeysToAgent yes
+  UseKeychain yes
+  IdentityFile ~/.ssh/id_ed25519
+  IdentityFile ~/.ssh/id_rsa

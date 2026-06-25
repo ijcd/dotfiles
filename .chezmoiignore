@@ -65,6 +65,7 @@ work
 .nix-defexpr                      # Nix manages these
 .nix-profile                      # Nix manages these
 .pgadmin                          # DB tool state
-.ssh                              # Never commit private keys
+.ssh/*                            # Never commit private keys
+!.ssh/config                      # ...except the managed agent/keychain config
 .vscode                           # Syncs via account
 .zsh_history                      # History
