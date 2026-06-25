@@ -81,7 +81,9 @@ fi
 
 hr "darwin-rebuild switch"
 # Absolute nix + explicit flakeref (no reliance on sudo PATH or a registry alias).
-sudo -H "$NIX" run "nix-darwin/master#darwin-rebuild" -- switch --flake "$HOME/.config/nix#$HOST" -L \
+# No -H: keep the user's $HOME so brew finds ~/.config/homebrew/trust.json. With
+# -H, HOME=/var/root and trusted taps (raine/workmux) fail to load mid-bundle.
+sudo "$NIX" run "nix-darwin/master#darwin-rebuild" -- switch --flake "$HOME/.config/nix#$HOST" -L \
     || die "darwin-rebuild failed; lock NOT re-imported"
 
 # Hash source lock before/after re-add so we can detect "did THIS RUN mutate

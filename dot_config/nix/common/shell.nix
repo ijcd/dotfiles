@@ -4,10 +4,10 @@
   # ~/.zshenv is a symlink managed by chezmoi, so HM doesn't touch it
   programs.zsh = {
     enable = true;
-    # dotDir is RELATIVE to $HOME (per HM docs). An absolute path stopped
-    # generating ~/.local/share/hm-zsh/.zshrc on current home-manager, which
-    # broke starship in subshells (fell back to tools.zsh's guarded init).
-    dotDir = ".local/share/hm-zsh";
+    # Absolute path — current home-manager DEPRECATED relative dotDir. HM writes
+    # its integration zshrc here; ~/.config/zsh/.zshrc sources it (see zshrc).
+    # (The cm-cd subshell prompt fix is the tools.zsh starship guard, not this.)
+    dotDir = "${config.home.homeDirectory}/.local/share/hm-zsh";
     enableCompletion = false;  # Zim handles completion
   };
 
