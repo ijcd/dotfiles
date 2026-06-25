@@ -12,6 +12,9 @@ LOCK_DEST="$HOME/.config/nix/flake.lock"
 # to the bearcat x86 config). Override with NIXHOME_HOST=<name> if hostname is
 # wrong. darwin-rebuild resolves the same way (scutil LocalHostName).
 HOST="${NIXHOME_HOST:-$(scutil --get LocalHostName)}"
+# Absolute nix path: sudo's sanitized PATH (secure_path) doesn't include the
+# Determinate nix profile, so bare `sudo nix` fails with "command not found".
+NIX="$(command -v nix || echo /nix/var/nix/profiles/default/bin/nix)"
 BREW_CACHE="$HOME/Library/Caches/Homebrew/api/cask.jws.json"
 SELF="$HOME/.local/bin/nixhome-rebuild"
 
@@ -77,7 +80,8 @@ if [ "${NIXHOME_REBUILD_REEXECED:-}" != "1" ]; then
 fi
 
 hr "darwin-rebuild switch"
-sudo -H nix run nix-darwin -- switch --flake "$HOME/.config/nix#$HOST" \
+# Absolute nix + explicit flakeref (no reliance on sudo PATH or a registry alias).
+sudo -H "$NIX" run "nix-darwin/master#darwin-rebuild" -- switch --flake "$HOME/.config/nix#$HOST" -L \
     || die "darwin-rebuild failed; lock NOT re-imported"
 
 # Hash source lock before/after re-add so we can detect "did THIS RUN mutate
