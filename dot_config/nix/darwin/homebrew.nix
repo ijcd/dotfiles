@@ -26,6 +26,17 @@ in
 
     brews = [
       # ─────────────────────────────────────────────────────────────────────────
+      # Native-build toolchain — leaf deps for compiling tools via mise/asdf
+      # (postgres, erlang, etc.). MUST be brew, not nix: mise's postgres plugin
+      # probes Homebrew paths (/opt/homebrew/opt/{openssl@3,icu4c}). Not runtimes
+      # themselves — just the libs/tools source builds link against.
+      # ─────────────────────────────────────────────────────────────────────────
+      "pkg-config"       # configure scripts need it (postgres build fails without)
+      "icu4c"            # postgres ICU support (icu-uc/icu-i18n)
+      "openssl@3"        # TLS for postgres/erlang source builds
+      "gnupg"            # gpg — node/asdf plugin key verification
+
+      # ─────────────────────────────────────────────────────────────────────────
       # Docker (better via brew on macOS for socket/VM integration)
       # ─────────────────────────────────────────────────────────────────────────
       "docker"
