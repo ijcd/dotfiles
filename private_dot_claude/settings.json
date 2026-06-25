@@ -71,6 +71,8 @@
     }
   },
   "skipDangerousModePermissionPrompt": true,
+  "theme": "auto",
   "inputNeededNotifEnabled": true,
-  "agentPushNotifEnabled": true
+  "agentPushNotifEnabled": true,
+  "tui": "fullscreen"
 }
