@@ -34,6 +34,12 @@
       # disable warning about */.node-version files
       mise settings add idiomatic_version_file_enable_tools "[]"
 
+      # Install mise's direnv integration so `use mise` works in .envrc.
+      # `use_mise` is NOT a direnv builtin — mise generates it into direnv's lib
+      # dir. (direnv itself is current; this is the missing piece, not a version.)
+      mkdir -p "$HOME/.config/direnv/lib"
+      mise direnv activate > "$HOME/.config/direnv/lib/use_mise.sh"
+
       # set global tool versions (auto_install will handle installation)
       # mise use --global node@lts
       # mise use --global bun@latest
