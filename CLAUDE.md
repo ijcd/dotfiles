@@ -74,11 +74,20 @@ The ignore file mixes two things: (1) repo-only directories (`archive/`, `plans/
 - `scripts/` — sourceable helper scripts (chezmoi/darwin reports)
 
 Where to add things:
-- CLI tool → `common/packages.nix`
-- GUI app → `darwin/homebrew.nix` (casks)
+- CLI tool / leaf tool-dep → `common/packages.nix`
+- GUI app → `darwin/homebrew.nix` (casks); grouped in `darwin/cask-groups.nix`
 - macOS UI default → `darwin/settings.nix`
-- Dev runtime (node, python version) → `common/mise.nix`
+- mise (the version *manager*) config → `common/mise.nix`
 - Per-machine package or override → `hosts/<host>/configuration.nix`
+
+**Runtimes & services with project-specific versions** (language toolchains,
+databases) do NOT go in the base — the project owns them via `.tool-versions`
+(mise), devenv, or a project flake. The base ships only the version *managers*
+(mise) and leaf tool-deps + clients (e.g. the `psql` client in
+`common/packages.nix` — no global server). A host that genuinely wants an
+always-on global service imports the relevant module from its
+`hosts/<host>/configuration.nix` (see `hosts/bearcat` re-importing
+`darwin/postgres.nix`).
 
 Notable nix quirks documented in comments: nix is installed externally (`nix.enable = false`); some packages disabled on `x86_64-darwin` (folly/watchman build failures); `mise` comes from homebrew because the nix derivation is broken on x86_64-darwin.
 

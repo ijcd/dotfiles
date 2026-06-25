@@ -27,8 +27,9 @@
   # activation script to set up mise configuration (uses homebrew mise)
   home.activation.setupMise = lib.hm.dag.entryAfter [ "writeBoundary" ] ''
     if command -v mise >/dev/null 2>&1; then
-      # enable corepack (pnpm, yarn, etc.)
-      mise set MISE_NODE_COREPACK=true
+      # corepack is NOT forced globally. pnpm/yarn versioning is per-project:
+      # via .tool-versions (mise) or package.json packageManager (corepack,
+      # opt-in per project). Forcing it machine-wide double-manages pnpm.
 
       # disable warning about */.node-version files
       mise settings add idiomatic_version_file_enable_tools "[]"

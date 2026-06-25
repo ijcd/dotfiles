@@ -30,7 +30,8 @@
       # ─────────────────────────────────────────────────────────────────────────
       vim
       tmux
-      nodejs             # copilot.el language server
+      # nodejs moved to emacs.nix (it's copilot.el's LSP dep, not a runtime).
+      # Project node versions come from .tool-versions via mise.
 
       # ─────────────────────────────────────────────────────────────────────────
       # Git & version control
@@ -62,7 +63,9 @@
       # ─────────────────────────────────────────────────────────────────────────
       # Databases
       # ─────────────────────────────────────────────────────────────────────────
-      postgresql_17      # PostgreSQL 17
+      postgresql_18      # psql/pg_dump CLIENT only — no global server here;
+                         # projects run their own server (mise/devenv/flake).
+                         # Bump major to track latest.
       mysql84            # MySQL 8.4
       sqlite             # SQLite
 

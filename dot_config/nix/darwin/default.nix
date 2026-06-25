@@ -11,7 +11,11 @@
     ./homebrew.nix
     ./nix-store-fallback.nix
     ./performance.nix
-    ./postgres.nix
+    # ./postgres.nix — demoted: not a base default. A host that wants an
+    # always-on global PostgreSQL server imports it from its host module
+    # (see hosts/bearcat). Projects with version-specific needs run their own
+    # (mise .tool-versions / devenv / flake). The base ships only the psql
+    # client (common/packages.nix).
     ./settings.nix
     inputs.home-manager.darwinModules.home-manager
     inputs.nix-homebrew.darwinModules.nix-homebrew

@@ -47,6 +47,7 @@ in
     chown ${primaryUser} ${logDir}
   '';
 
-  # Just the postgres package for CLI tools (psql, pg_dump, etc.)
-  environment.systemPackages = [ pkgs.postgresql_17 ];
+  # No CLI package here: the psql/pg_dump CLIENT comes from the base
+  # (common/packages.nix, postgresql_18). This module only runs the server
+  # service. Two postgresql packages in systemPackages would collide on psql.
 }
