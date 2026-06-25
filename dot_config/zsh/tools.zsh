@@ -57,7 +57,10 @@ compdef _zoxide_complete j z zi
 # starship - fast, customizable prompt written in Rust
 # Config lives at ~/.config/starship.toml
 # https://starship.rs
-if (( $+commands[starship] )) && [[ -z "$STARSHIP_SESSION_KEY" ]]; then
+# Guard on the precmd FUNCTION (per-shell), not $STARSHIP_SESSION_KEY (exported,
+# so inherited by subshells → `chezmoi cd` got a bare prompt). Functions don't
+# cross exec, so a fresh subshell re-inits; a same-shell double-init is skipped.
+if (( $+commands[starship] )) && (( ! $+functions[starship_precmd] )); then
   eval "$(starship init zsh)"
 fi
 
