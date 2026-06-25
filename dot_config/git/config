@@ -9,12 +9,23 @@
     useConfigOnly = true
 
 # ─────────────────────────────────────────────────────────────────────────────
-# Per-directory identity (uncomment and customize as needed)
+# Per-directory identity. With useConfigOnly=true and no email above, a repo
+# OUTSIDE every tree below fails to commit until you add a tree here or set a
+# repo-local user.email. Paths are relative to this file (~/.config/git/).
+# Order matters: later matches win, so more-specific subtrees come last.
 # ─────────────────────────────────────────────────────────────────────────────
-# [includeIf "gitdir:~/work/"]
-#     path = ~/.gitconfig-work
-# [includeIf "gitdir:~/personal/"]
-#     path = ~/.gitconfig-personal
+# ~/work's DEFAULT identity is machine-specific (Lunar on the work laptop,
+# personal at home) — set in git-machine, which chezmoi renders per host.
+[include]
+    path = git-machine
+# Fixed cross-machine trees (identical on every host). Listed AFTER the machine
+# default so the specific subtree wins even where ~/work defaults to personal.
+[includeIf "gitdir:~/work/lunar/"]
+    path = git-work-lunar
+[includeIf "gitdir:~/src/"]
+    path = git-ijcd
+[includeIf "gitdir:~/.local/share/chezmoi/"]
+    path = git-ijcd
 
 # ─────────────────────────────────────────────────────────────────────────────
 # Core settings

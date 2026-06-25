@@ -1,0 +1,3 @@
+# Lunar work identity. Included by ~/.config/git/config via includeIf.
+[user]
+	email = ian@golunar.com

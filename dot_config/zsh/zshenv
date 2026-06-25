@@ -40,11 +40,11 @@ export IRCNAME=${FULLNAME}
 export DEBEMAIL=$EMAIL
 export DEBFULLNAME=$FULLNAME
 
-# Git
-export GIT_AUTHOR_NAME=$FULLNAME
-export GIT_COMMITTER_NAME=$FULLNAME
-export GIT_AUTHOR_EMAIL=$EMAIL
-export GIT_COMMITTER_EMAIL=$EMAIL
+# Git identity is intentionally NOT exported here. GIT_AUTHOR_EMAIL /
+# GIT_COMMITTER_EMAIL override git config and would defeat the fail-closed guard
+# (user.useConfigOnly=true). Identity comes from per-tree includeIf in
+# ~/.config/git/config -> git-ijcd / git-work-lunar. A repo outside a configured
+# tree fails to commit until an identity is chosen (tree or repo-local).
 
 # Prevent ZSH from stating all of Maildir
 export MAILCHECK=0
