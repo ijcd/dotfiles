@@ -81,9 +81,11 @@ fi
 
 hr "darwin-rebuild switch"
 # Absolute nix + explicit flakeref (no reliance on sudo PATH or a registry alias).
-# No -H: keep the user's $HOME so brew finds ~/.config/homebrew/trust.json. With
-# -H, HOME=/var/root and trusted taps (raine/workmux) fail to load mid-bundle.
-sudo "$NIX" run "nix-darwin/master#darwin-rebuild" -- switch --flake "$HOME/.config/nix#$HOST" -L \
+# HOMEBREW_REQUIRE_TAP_TRUST= disables brew 6.0's per-formula tap-trust gate for
+# the bundle. Our DECLARED tap list (homebrew.nix) is the trust boundary; brew's
+# trust.json persistence is unreliable in this activation env. (No -H, so $HOME
+# stays the user's.) The env var propagates down into `brew bundle`.
+sudo HOMEBREW_REQUIRE_TAP_TRUST= "$NIX" run "nix-darwin/master#darwin-rebuild" -- switch --flake "$HOME/.config/nix#$HOST" -L \
     || die "darwin-rebuild failed; lock NOT re-imported"
 
 # Hash source lock before/after re-add so we can detect "did THIS RUN mutate
