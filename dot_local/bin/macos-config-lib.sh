@@ -50,11 +50,14 @@ mc_manifest_rows() {
 # mc_opt "<opts>" <key> -> value or empty
 mc_opt() {
   local opts="$1" key="$2" tok
+  set -f
   for tok in $opts; do
+    set +f
     case "$tok" in
       "$key"=*) printf '%s' "${tok#*=}"; return 0 ;;
     esac
   done
+  set +f
   return 0
 }
 

@@ -29,6 +29,19 @@ EOF
   [ -z "$(mc_opt 'restart=Hazel' missing)" ]
 }
 
+@test "mc_opt returns literal glob when cwd contains matching files" {
+  # Create a file matching *.hazelrules so an unguarded $opts expansion would
+  # replace the glob with the filename instead of the literal token.
+  local glob_dir="$BATS_TEST_TMPDIR/glob_test"
+  mkdir -p "$glob_dir"
+  touch "$glob_dir/MyRules.hazelrules"
+  (
+    cd "$glob_dir"
+    result="$(mc_opt 'match=*.hazelrules restart=Hazel' match)"
+    [ "$result" = "*.hazelrules" ]
+  )
+}
+
 @test "exclude matches exact domain and domain:key" {
   run mc_is_excluded com.apple.dock;                       [ "$status" -eq 0 ]
   run mc_is_excluded NSGlobalDomain:EnableTilingByEdgeDrag; [ "$status" -eq 0 ]
