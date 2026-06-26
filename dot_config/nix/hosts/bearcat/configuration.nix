@@ -15,7 +15,14 @@ in
   # global PostgreSQL server on THIS machine, or would rather have projects
   # bring their own (mise .tool-versions / devenv / flake) like blackbird does.
   # This was kept on 2026-06-25 as a "for now" decision without checking usage.
-  imports = [ ../../darwin/postgres.nix ];
+  #
+  # Spotlight management (exclusions) is demoted from the base too — it needs
+  # Full Disk Access or it fails the switch under SIP. bearcat opts in here
+  # (it has FDA); blackbird deliberately does not touch Spotlight.
+  imports = [
+    ../../darwin/postgres.nix
+    ../../darwin/spotlight.nix
+  ];
 
   # bearcat is the home machine: add personal/creative groups + heavy SDKs on
   # top of the shared base from darwin/homebrew.nix. (Lists concatenate.)
