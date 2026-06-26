@@ -3,6 +3,7 @@ archive/
 ideas/
 legacy/
 plans/
+macos-config                      # repo-only: capture/apply source, not deployed
 *.txt
 
 # Home Directories
