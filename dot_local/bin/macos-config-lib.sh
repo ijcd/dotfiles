@@ -89,3 +89,23 @@ mc_capture_defaults() {
   rm -f "$tmp"
   printf 'captured %s\n' "$domain"
 }
+
+# Import stored plist into the live domain. Pass --dry-run to only print.
+mc_apply_defaults() {
+  local domain="$1" dry=0 src restart
+  shift || true
+  [ "${1:-}" = "--dry-run" ] && dry=1
+  src="$(mc_defaults_dir)/$domain.plist"
+  [ -f "$src" ] || { mc_warn "no captured plist for $domain"; return 1; }
+  if ! plutil -lint "$src" >/dev/null 2>&1; then
+    mc_warn "invalid plist for $domain"; return 1
+  fi
+  if [ "$dry" -eq 1 ]; then printf 'would import %s\n' "$domain"; return 0; fi
+  defaults import "$domain" "$src"
+  # find restart hook for this domain in the manifest
+  restart="$(mc_manifest_rows | awk -F"$(printf '\t')" -v d="$domain" '$1=="defaults"&&$2==d{print $3}')"
+  restart="$(mc_opt "$restart" restart)"
+  killall cfprefsd >/dev/null 2>&1 || true
+  [ -n "$restart" ] && { killall "$restart" >/dev/null 2>&1 || true; }
+  printf 'applied %s\n' "$domain"
+}
