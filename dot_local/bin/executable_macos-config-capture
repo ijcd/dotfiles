@@ -12,7 +12,7 @@ mc_manifest_rows | while IFS="$(printf '\t')" read -r tier id opts; do
   fi
   case "$tier" in
     defaults) mc_capture_defaults "$id" || true ;;
-    file)     : ;;
+    file)     mc_capture_file "$id" "$opts" || true ;;
     exclude)  : ;;
   esac
 done

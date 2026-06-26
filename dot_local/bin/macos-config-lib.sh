@@ -109,3 +109,41 @@ mc_apply_defaults() {
   [ -n "$restart" ] && { killall "$restart" >/dev/null 2>&1 || true; }
   printf 'applied %s\n' "$domain"
 }
+
+# Filesystem-safe slug: "/" -> "_", " " -> "-".
+mc_slug() { printf '%s' "$1" | sed 's#/#_#g; s/ /-/g'; }
+
+# Copy matching files from $HOME/<relpath> into repo files/<slug>/.
+mc_capture_file() {
+  local rel="$1" opts="$2" glob src dst
+  glob="$(mc_opt "$opts" match)"; [ -z "$glob" ] && glob="*"
+  src="$HOME/$rel"; dst="$(mc_files_dir)/$(mc_slug "$rel")"
+  [ -e "$src" ] || { mc_warn "skip $rel (not present)"; return 1; }
+  mkdir -p "$dst"
+  if [ -d "$src" ]; then
+    ( cd "$src" && find . -maxdepth 1 -name "$glob" -type f -print0 ) \
+      | while IFS= read -r -d '' f; do cp -p "$src/${f#./}" "$dst/${f#./}"; done
+  else
+    cp -p "$src" "$dst/"
+  fi
+  printf 'captured %s\n' "$rel"
+}
+
+# Copy files back from repo to $HOME. Refuses to overwrite existing unless --force.
+mc_apply_file() {
+  local rel="$1" opts="$2"; shift 2 || true
+  local dry=0 force=0 a src dstdir f base
+  for a in "$@"; do [ "$a" = "--dry-run" ] && dry=1; [ "$a" = "--force" ] && force=1; done
+  src="$(mc_files_dir)/$(mc_slug "$rel")"; dstdir="$HOME/$rel"
+  [ -d "$src" ] || { mc_warn "no captured files for $rel"; return 1; }
+  mkdir -p "$dstdir"
+  for f in "$src"/*; do
+    [ -e "$f" ] || continue
+    base="$(basename "$f")"
+    if [ "$dry" -eq 1 ]; then printf 'would write %s/%s\n' "$rel" "$base"; continue; fi
+    if [ -e "$dstdir/$base" ] && [ "$force" -ne 1 ]; then
+      mc_warn "refuse overwrite $rel/$base (use --force)"; continue
+    fi
+    cp -p "$f" "$dstdir/$base"
+  done
+}
