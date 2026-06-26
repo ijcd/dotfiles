@@ -3,25 +3,145 @@ set -uo pipefail
 # shellcheck disable=SC1091
 source "$(cd "$(dirname "$0")" && pwd)/macos-config-lib.sh"
 
-ddir="$(mc_defaults_dir)"
-printf '%-40s %-8s %-9s %s\n' "ITEM" "TIER" "CAPTURED" "RESTART"
-seen=""
-while IFS="$(printf '\t')" read -r tier id opts; do
-  [ "$tier" = "exclude" ] && continue
-  case "$tier" in
-    defaults) [ -f "$ddir/$id.plist" ] && cap="✓" || cap="✗ missing" ;;
-    file)     [ -d "$(mc_files_dir)/$(mc_slug "$id")" ] && cap="✓" || cap="✗ missing" ;;
-    *)        cap="?" ;;
+# ---- flag parsing ----
+filter=""
+for _arg in "$@"; do
+  case "$_arg" in
+    --captured) filter="captured" ;;
+    --missing)  filter="missing" ;;
+    --orphans)  filter="orphans" ;;
   esac
-  printf '%-40s %-8s %-9s %s\n' "$id" "$tier" "$cap" "$(mc_opt "$opts" restart)"
-  seen="$seen $id"
+done
+
+# Cache repo dir once so _last_captured doesn't shell out per-item.
+_REPO_DIR="$(mc_repo_dir)"
+
+# Print the git short-date for a repo-relative path, or em-dash when unavailable.
+_last_captured() {
+  local relpath="$1" d
+  d="$(git -C "$_REPO_DIR" log -1 --format=%cd --date=short -- "$relpath" 2>/dev/null || true)"
+  if [ -z "${d:-}" ]; then printf '—'; else printf '%s' "$d"; fi
+}
+
+ddir="$(mc_defaults_dir)"
+fdir="$(mc_files_dir)"
+
+# ---- Pass 1: tally counts and build lookup strings ----
+n_declared=0
+n_captured=0
+n_excluded=0
+excluded_ids=""
+seen_defaults=" "
+seen_file_slugs=" "
+
+while IFS="$(printf '\t')" read -r tier id _opts; do
+  if [ "$tier" = "exclude" ]; then
+    n_excluded=$((n_excluded + 1))
+    excluded_ids="${excluded_ids}${id}
+"
+    continue
+  fi
+  n_declared=$((n_declared + 1))
+  case "$tier" in
+    defaults)
+      seen_defaults="$seen_defaults$id "
+      [ -f "$ddir/$id.plist" ] && n_captured=$((n_captured + 1))
+      ;;
+    file)
+      seen_file_slugs="$seen_file_slugs$(mc_slug "$id") "
+      [ -d "$fdir/$(mc_slug "$id")" ] && n_captured=$((n_captured + 1))
+      ;;
+  esac
 done < <(mc_manifest_rows)
 
-# orphans: stored defaults plists with no manifest entry
+n_missing=$((n_declared - n_captured))
+
+# ---- Orphan collection (needs complete seen lists from Pass 1) ----
+n_orphans=0
+orphan_defaults=""
+orphan_files=""
+
 if [ -d "$ddir" ]; then
-  for f in "$ddir"/*.plist; do
-    [ -e "$f" ] || continue
-    dom="$(basename "$f" .plist)"
-    case " $seen " in *" $dom "*) : ;; *) echo "orphan (no manifest entry): $dom" ;; esac
+  for _f in "$ddir"/*.plist; do
+    [ -e "$_f" ] || continue
+    _dom="$(basename "$_f" .plist)"
+    case "$seen_defaults" in *" $_dom "*) : ;; *)
+      orphan_defaults="${orphan_defaults}${_dom}
+"
+      n_orphans=$((n_orphans + 1))
+    ;; esac
   done
+fi
+if [ -d "$fdir" ]; then
+  for _d in "$fdir"/*/; do
+    [ -d "$_d" ] || continue
+    _slug="$(basename "${_d%/}")"
+    case "$seen_file_slugs" in *" $_slug "*) : ;; *)
+      orphan_files="${orphan_files}${_slug}
+"
+      n_orphans=$((n_orphans + 1))
+    ;; esac
+  done
+fi
+
+# ---- Pass 2: print table ----
+if [ "$filter" != "orphans" ]; then
+  printf '%-40s %-8s %-9s %-13s %s\n' "ITEM" "TIER" "CAPTURED" "LAST CAPTURED" "RESTART"
+  while IFS="$(printf '\t')" read -r tier id opts; do
+    [ "$tier" = "exclude" ] && continue
+    cap="?"
+    last="—"
+    case "$tier" in
+      defaults)
+        if [ -f "$ddir/$id.plist" ]; then
+          cap="✓"
+          last="$(_last_captured "macos-config/defaults/$id.plist")"
+        else
+          cap="✗ missing"
+        fi
+        ;;
+      file)
+        _slug="$(mc_slug "$id")"
+        if [ -d "$fdir/$_slug" ]; then
+          cap="✓"
+          last="$(_last_captured "macos-config/files/$_slug")"
+        else
+          cap="✗ missing"
+        fi
+        ;;
+    esac
+    case "$filter" in
+      captured) [ "$cap" = "✓" ] || continue ;;
+      missing)  [ "$cap" = "✓" ] && continue ;;
+    esac
+    printf '%-40s %-8s %-9s %-13s %s\n' "$id" "$tier" "$cap" "$last" "$(mc_opt "$opts" restart)"
+  done < <(mc_manifest_rows)
+fi
+
+# ---- Excluded section (full view only) ----
+if [ "$filter" = "" ] && [ -n "$excluded_ids" ]; then
+  printf '\nexcluded (owned by settings.nix):\n'
+  while IFS= read -r _eid; do
+    [ -n "$_eid" ] && printf '  %s\n' "$_eid"
+  done <<< "$excluded_ids"
+fi
+
+# ---- Orphan section ----
+if [ "$filter" = "" ] || [ "$filter" = "orphans" ]; then
+  if [ -n "$orphan_defaults" ]; then
+    while IFS= read -r _o; do
+      [ -n "$_o" ] && printf 'orphan (no manifest entry): %s\n' "$_o"
+    done <<< "$orphan_defaults"
+  fi
+  if [ -n "$orphan_files" ]; then
+    while IFS= read -r _o; do
+      [ -n "$_o" ] && printf 'orphan file (no manifest entry): %s\n' "$_o"
+    done <<< "$orphan_files"
+  fi
+fi
+
+# ---- Summary ----
+if [ "$filter" != "orphans" ]; then
+  printf '\nsummary: %d declared · %d captured · %d missing · %d excluded · %d orphans\n' \
+    "$n_declared" "$n_captured" "$n_missing" "$n_excluded" "$n_orphans"
 fi
