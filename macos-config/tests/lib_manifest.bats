@@ -48,3 +48,13 @@ EOF
   run mc_is_excluded NSGlobalDomain:KeyRepeat;             [ "$status" -ne 0 ]
   run mc_is_excluded com.example.App;                      [ "$status" -ne 0 ]
 }
+
+@test "bare-domain is excluded when any key-level exclude covers that domain" {
+  # NSGlobalDomain:EnableTilingByEdgeDrag is in the manifest (set up in setup())
+  # Capturing the whole NSGlobalDomain would sweep in that excluded key — must refuse
+  run mc_is_excluded NSGlobalDomain
+  [ "$status" -eq 0 ]
+  # A bare domain with no exclude rows of any kind is not excluded
+  run mc_is_excluded com.example.App
+  [ "$status" -ne 0 ]
+}

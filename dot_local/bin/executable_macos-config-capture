@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
 set -euo pipefail
+# shellcheck disable=SC1091
 source "$(cd "$(dirname "$0")" && pwd)/macos-config-lib.sh"
 
 # Usage: macos-config-capture [item...]   (no items = all manifest entries)

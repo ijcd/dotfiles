@@ -66,9 +66,20 @@ mc_is_excluded() {
   local target="$1" tier id opts
   while IFS="$(printf '\t')" read -r tier id opts; do
     [ "$tier" = "exclude" ] || continue
+    # Exact match; or id is bare domain that matches the domain part of a domain:key target
     if [ "$id" = "$target" ] || [ "$id" = "${target%%:*}" ]; then
       return 0
     fi
+    # Bare-domain target: excluded if any key-level exclude covers the same domain
+    # (capturing the whole domain would sweep in an excluded key)
+    case "$target" in
+      *:*) ;;  # domain:key target — already handled by the id==${target%%:*} check above
+      *)
+        case "$id" in
+          "$target":*) return 0 ;;
+        esac
+        ;;
+    esac
   done < <(mc_manifest_rows)
   return 1
 }
@@ -85,7 +96,9 @@ mc_capture_defaults() {
   if ! defaults export "$domain" "$tmp" 2>/dev/null; then
     mc_warn "skip $domain (no such domain)"; rm -f "$tmp"; return 1
   fi
-  plutil -convert xml1 -o "$out" "$tmp"
+  if ! plutil -convert xml1 -o "$out" "$tmp"; then
+    mc_warn "failed to convert plist for $domain"; rm -f "$tmp"; return 1
+  fi
   rm -f "$tmp"
   printf 'captured %s\n' "$domain"
 }

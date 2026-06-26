@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
 set -uo pipefail
+# shellcheck disable=SC1091
 source "$(cd "$(dirname "$0")" && pwd)/macos-config-lib.sh"
 
 ddir="$(mc_defaults_dir)"

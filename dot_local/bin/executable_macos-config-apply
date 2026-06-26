@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
 set -euo pipefail
+# shellcheck disable=SC1091
 source "$(cd "$(dirname "$0")" && pwd)/macos-config-lib.sh"
 
 # Usage: macos-config-apply [--dry-run] [--force] [item...]
@@ -12,14 +13,16 @@ for a in "$@"; do
   esac
 done
 
-mc_manifest_rows | while IFS="$(printf '\t')" read -r tier id opts; do
+rc=0
+while IFS="$(printf '\t')" read -r tier id opts; do
   if [ "${#items[@]}" -gt 0 ]; then
     skip=1; for a in "${items[@]}"; do [ "$a" = "$id" ] && skip=0; done
     [ "$skip" -eq 1 ] && continue
   fi
   case "$tier" in
-    defaults) mc_apply_defaults "$id" $dry || true ;;
-    file)     mc_apply_file "$id" "$opts" $dry $force || true ;;  # Task 7
+    defaults) mc_apply_defaults "$id" $dry || rc=1 ;;
+    file)     mc_apply_file "$id" "$opts" $dry $force || rc=1 ;;
     exclude)  : ;;
   esac
-done
+done < <(mc_manifest_rows)
+exit $rc

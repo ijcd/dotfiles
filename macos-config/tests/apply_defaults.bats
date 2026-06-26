@@ -26,3 +26,14 @@ teardown() { defaults delete "$DOMAIN" 2>/dev/null || true; }
   mc_apply_defaults "$DOMAIN" --dry-run
   [ "$(defaults read "$DOMAIN" greeting)" = "local-edit" ]
 }
+
+@test "macos-config-apply exits non-zero when a domain has no stored plist, still processes others" {
+  local domain2="com.ijcd.mctest.missing"
+  # manifest: DOMAIN (valid plist in setup) + domain2 (no plist)
+  printf 'defaults %s\ndefaults %s\n' "$DOMAIN" "$domain2" \
+    > "$MC_REPO_DIR/macos-config/manifest.conf"
+  run "$REPO/dot_local/bin/executable_macos-config-apply"
+  [ "$status" -ne 0 ]
+  # DOMAIN should still have been applied (stored greeting restored)
+  [ "$(defaults read "$DOMAIN" greeting 2>/dev/null)" = "stored" ]
+}
