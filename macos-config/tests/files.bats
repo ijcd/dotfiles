@@ -20,6 +20,15 @@ setup() {
   [ ! -f "$(mc_files_dir)/src/b.txt" ]
 }
 
+@test "apply --dry-run does not create destination directory" {
+  mc_capture_file "src" "match=*.rules"
+  rm -rf "$HOME/src"
+  run mc_apply_file "src" "match=*.rules" --dry-run
+  [ "$status" -eq 0 ]
+  [ ! -d "$HOME/src" ]
+  echo "$output" | grep -q "would write src/a.rules"
+}
+
 @test "apply --force copies files back, plain apply refuses overwrite" {
   mc_capture_file "src" "match=*.rules"
   rm -f "$HOME/src/a.rules"

@@ -122,7 +122,7 @@ mc_capture_file() {
   mkdir -p "$dst"
   if [ -d "$src" ]; then
     ( cd "$src" && find . -maxdepth 1 -name "$glob" -type f -print0 ) \
-      | while IFS= read -r -d '' f; do cp -p "$src/${f#./}" "$dst/${f#./}"; done
+      | while IFS= read -r -d '' f; do cp -p "$src/${f#./}" "$dst/${f#./}" || mc_warn "failed to copy $f"; done
   else
     cp -p "$src" "$dst/"
   fi
@@ -136,11 +136,11 @@ mc_apply_file() {
   for a in "$@"; do [ "$a" = "--dry-run" ] && dry=1; [ "$a" = "--force" ] && force=1; done
   src="$(mc_files_dir)/$(mc_slug "$rel")"; dstdir="$HOME/$rel"
   [ -d "$src" ] || { mc_warn "no captured files for $rel"; return 1; }
-  mkdir -p "$dstdir"
   for f in "$src"/*; do
     [ -e "$f" ] || continue
     base="$(basename "$f")"
     if [ "$dry" -eq 1 ]; then printf 'would write %s/%s\n' "$rel" "$base"; continue; fi
+    mkdir -p "$dstdir"
     if [ -e "$dstdir/$base" ] && [ "$force" -ne 1 ]; then
       mc_warn "refuse overwrite $rel/$base (use --force)"; continue
     fi
