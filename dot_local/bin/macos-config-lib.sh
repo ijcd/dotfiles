@@ -72,3 +72,20 @@ mc_is_excluded() {
   done < <(mc_manifest_rows)
   return 1
 }
+
+# Export a defaults domain to repo as XML plist. Refuses excluded domains.
+mc_capture_defaults() {
+  local domain="$1" dir out tmp
+  if mc_is_excluded "$domain"; then
+    mc_warn "skip $domain (excluded — owned by settings.nix)"; return 1
+  fi
+  dir="$(mc_defaults_dir)"; mkdir -p "$dir"
+  out="$dir/$domain.plist"
+  tmp="$(mktemp)"
+  if ! defaults export "$domain" "$tmp" 2>/dev/null; then
+    mc_warn "skip $domain (no such domain)"; rm -f "$tmp"; return 1
+  fi
+  plutil -convert xml1 -o "$out" "$tmp"
+  rm -f "$tmp"
+  printf 'captured %s\n' "$domain"
+}
