@@ -1,0 +1,25 @@
+#!/usr/bin/env bash
+set -uo pipefail
+source "$(cd "$(dirname "$0")" && pwd)/macos-config-lib.sh"
+
+# Usage: macos-config-diff [item...]   exit 1 if anything differs
+items=("$@")
+rc=0
+while IFS="$(printf '\t')" read -r tier id opts; do
+  [ "$tier" = "defaults" ] || continue
+  if [ "${#items[@]}" -gt 0 ]; then
+    skip=1; for a in "${items[@]}"; do [ "$a" = "$id" ] && skip=0; done
+    [ "$skip" -eq 1 ] && continue
+  fi
+  stored="$(mc_defaults_dir)/$id.plist"
+  [ -f "$stored" ] || { echo "## $id: not captured"; rc=1; continue; }
+  live="$(mktemp)"
+  if defaults export "$id" - 2>/dev/null | plutil -convert xml1 -o "$live" - 2>/dev/null; then
+    if ! diff -u "$stored" "$live" >/tmp/mcdiff.$$ 2>/dev/null; then
+      echo "## $id"; sed "s#$live#(live)#" /tmp/mcdiff.$$; rc=1
+    fi
+    rm -f /tmp/mcdiff.$$
+  fi
+  rm -f "$live"
+done < <(mc_manifest_rows)
+exit $rc
