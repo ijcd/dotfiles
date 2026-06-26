@@ -1,0 +1,22 @@
+#!/usr/bin/env bash
+set -uo pipefail
+source "$(cd "$(dirname "$0")" && pwd)/macos-config-lib.sh"
+
+[ "$#" -eq 1 ] || mc_die "usage: macos-config-show <item>"
+item="$1"
+row="$(mc_manifest_rows | awk -F"$(printf '\t')" -v i="$item" '$2==i{print; exit}')"
+tier="$(printf '%s' "$row" | cut -f1)"
+case "$tier" in
+  file)
+    dir="$(mc_files_dir)/$(mc_slug "$item")"
+    echo "# $item (Tier 2 — binary blob, not renderable)"
+    [ -d "$dir" ] && ls -lhR "$dir" || echo "(not captured)"
+    ;;
+  *)
+    f="$(mc_defaults_dir)/$item.plist"
+    [ -f "$f" ] || mc_die "not captured: $item"
+    n="$(plutil -convert xml1 -o - "$f" | grep -c '<key>')"
+    echo "# $item ($n keys)"
+    plutil -p "$f"
+    ;;
+esac

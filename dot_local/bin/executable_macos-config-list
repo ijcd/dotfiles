@@ -1,0 +1,26 @@
+#!/usr/bin/env bash
+set -uo pipefail
+source "$(cd "$(dirname "$0")" && pwd)/macos-config-lib.sh"
+
+ddir="$(mc_defaults_dir)"
+printf '%-40s %-8s %-9s %s\n' "ITEM" "TIER" "CAPTURED" "RESTART"
+seen=""
+while IFS="$(printf '\t')" read -r tier id opts; do
+  [ "$tier" = "exclude" ] && continue
+  case "$tier" in
+    defaults) [ -f "$ddir/$id.plist" ] && cap="✓" || cap="✗ missing" ;;
+    file)     [ -d "$(mc_files_dir)/$(mc_slug "$id")" ] && cap="✓" || cap="✗ missing" ;;
+    *)        cap="?" ;;
+  esac
+  printf '%-40s %-8s %-9s %s\n' "$id" "$tier" "$cap" "$(mc_opt "$opts" restart)"
+  seen="$seen $id"
+done < <(mc_manifest_rows)
+
+# orphans: stored defaults plists with no manifest entry
+if [ -d "$ddir" ]; then
+  for f in "$ddir"/*.plist; do
+    [ -e "$f" ] || continue
+    dom="$(basename "$f" .plist)"
+    case " $seen " in *" $dom "*) : ;; *) echo "orphan (no manifest entry): $dom" ;; esac
+  done
+fi
