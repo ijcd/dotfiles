@@ -15,10 +15,21 @@ while IFS="$(printf '\t')" read -r tier id opts; do
   [ -f "$stored" ] || { echo "## $id: not captured"; rc=1; continue; }
   live="$(mktemp)"
   if defaults export "$id" - 2>/dev/null | plutil -convert xml1 -o "$live" - 2>/dev/null; then
-    if ! diff -u "$stored" "$live" >/tmp/mcdiff.$$ 2>/dev/null; then
-      echo "## $id"; sed "s#$live#(live)#" /tmp/mcdiff.$$; rc=1
+    difftmp="$(mktemp)"
+    diff_rc=0
+    diff -u "$stored" "$live" >"$difftmp" || diff_rc=$?
+    if [ "$diff_rc" -eq 1 ]; then
+      echo "## $id"
+      awk -v path="$live" '{ gsub(path, "(live)"); print }' "$difftmp"
+      rc=1
+    elif [ "$diff_rc" -eq 2 ]; then
+      echo "## $id: diff error" >&2
+      rc=1
     fi
-    rm -f /tmp/mcdiff.$$
+    rm -f "$difftmp"
+  else
+    echo "## $id: live export failed"
+    rc=1
   fi
   rm -f "$live"
 done < <(mc_manifest_rows)
