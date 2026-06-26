@@ -79,6 +79,7 @@ Where to add things:
 - macOS UI default → `darwin/settings.nix`
 - mise (the version *manager*) config → `common/mise.nix`
 - Per-machine package or override → `hosts/<host>/configuration.nix`
+- macOS app/system config you tune live and capture back → `macos-config/` toolkit (`macos-config-capture/apply/list/show/diff`). When you add a declarative key to `settings.nix`, add a matching `exclude` line to `macos-config/manifest.conf` so the toolkit never captures nix-owned keys.
 
 **Runtimes & services with project-specific versions** (language toolchains,
 databases) do NOT go in the base — the project owns them via `.tool-versions`
