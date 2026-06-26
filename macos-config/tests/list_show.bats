@@ -71,3 +71,13 @@ setup() {
   [ "$status" -eq 0 ]
   echo "$output" | grep "com.example.uncaptured" | grep -q "—"
 }
+
+@test "--orphans shows only orphans, not the declared table" {
+  run "$REPO/dot_local/bin/executable_macos-config-list" --orphans
+  [ "$status" -eq 0 ]
+  # orphan should be reported
+  echo "$output" | grep -q "com.orphan.App"
+  # declared items (captured and missing) should NOT appear
+  ! echo "$output" | grep -q "$DOMAIN"
+  ! echo "$output" | grep -q "com.example.uncaptured"
+}
