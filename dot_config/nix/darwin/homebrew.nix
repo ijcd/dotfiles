@@ -9,7 +9,11 @@ in
     onActivation = {
       autoUpdate = false;            # skip `brew update` on rebuild; run manually
       upgrade = false;               # skip `brew upgrade` on rebuild; run manually
-      cleanup = "uninstall";         # one of "none", "uninstall", "zap"
+      # "none" — do NOT clean up on every switch. brew 6.0 deprecated the
+      # activation `--cleanup` switch (it now dry-runs + interactively prompts
+      # every run and never completes). Periodic cleanup is handled on a cadence
+      # by nixhome-rebuild instead (`brew bundle cleanup` every ~7 days).
+      cleanup = "none";              # one of "none", "uninstall", "zap"
       extraFlags = [ "--verbose" ];  # stream per-package progress during `darwin-rebuild switch`
     };
 

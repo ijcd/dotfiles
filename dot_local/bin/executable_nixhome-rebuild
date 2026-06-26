@@ -17,6 +17,12 @@ HOST="${NIXHOME_HOST:-$(scutil --get LocalHostName)}"
 NIX="$(command -v nix || echo /nix/var/nix/profiles/default/bin/nix)"
 BREW_CACHE="$HOME/Library/Caches/Homebrew/api/cask.jws.json"
 SELF="$HOME/.local/bin/nixhome-rebuild"
+# Periodic brew cleanup: nix's onActivation.cleanup is "none" (the every-switch
+# --cleanup is deprecated + prompts). Prune undeclared brew packages here, but
+# only every N days, tracked by a stamp file. Override the cadence with
+# NIXHOME_CLEANUP_DAYS; force it now with NIXHOME_CLEANUP_DAYS=0.
+CLEANUP_DAYS="${NIXHOME_CLEANUP_DAYS:-7}"
+CLEANUP_STAMP="$HOME/.cache/nixhome/last-brew-cleanup"
 
 # ─── Helpers ───
 hr()  { printf '\n── %s ──\n' "$1"; }
@@ -87,6 +93,26 @@ hr "darwin-rebuild switch"
 # `chezmoi apply` step above, so it's fresh before the bundle reads it.
 sudo "$NIX" run "nix-darwin/master#darwin-rebuild" -- switch --flake "$HOME/.config/nix#$HOST" -L \
     || die "darwin-rebuild failed; lock NOT re-imported"
+
+# ─── Periodic brew cleanup (cadence-gated) ───
+# Runs `brew bundle cleanup` (prunes packages not in the Brewfile) only if it
+# hasn't run in CLEANUP_DAYS days — so it happens without remembering, but not
+# every rebuild. `brew bundle cleanup` is the standalone command brew points you
+# to now that the inline --cleanup switch is deprecated.
+hr "brew cleanup (every ${CLEANUP_DAYS}d)"
+cleanup_last=$(mtime "$CLEANUP_STAMP")
+cleanup_now=$(date +%s)
+if [ -n "$cleanup_last" ] && [ "$CLEANUP_DAYS" -gt 0 ] \
+   && [ $((cleanup_now - cleanup_last)) -lt $((CLEANUP_DAYS * 86400)) ]; then
+    echo "  last ran $(hum_age $((cleanup_now - cleanup_last))) ago (< ${CLEANUP_DAYS}d) — skipping"
+elif [ -n "${HOMEBREW_BUNDLE_FILE:-}" ] && [ -f "${HOMEBREW_BUNDLE_FILE:-}" ]; then
+    echo "  pruning brew packages not in the Brewfile..."
+    brew bundle cleanup --force --file="$HOMEBREW_BUNDLE_FILE" || true
+    mkdir -p "$(dirname "$CLEANUP_STAMP")"
+    touch "$CLEANUP_STAMP"
+else
+    echo "  HOMEBREW_BUNDLE_FILE unset/missing — skipping (open a fresh shell?)"
+fi
 
 # Hash source lock before/after re-add so we can detect "did THIS RUN mutate
 # the source?" — distinct from "source is uncommitted vs HEAD." The banner
