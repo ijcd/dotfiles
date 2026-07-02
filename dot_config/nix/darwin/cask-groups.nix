@@ -9,6 +9,7 @@
     "onyx" # system maintenance / cleanup
     { name = "1password"; greedy = true; } # password manager
     "lastpass" # password manager (legacy, still in use)
+    "jumpcut" # clipboard history (was in legacy/Brewfile, dropped in nix migration)
   ];
 
   terminals = [
