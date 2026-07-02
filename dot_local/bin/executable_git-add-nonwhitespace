@@ -1,0 +1,25 @@
+#!/bin/sh
+# git-add-nonwhitespace - Stage real changes, leave whitespace-only edits unstaged.
+#
+# Usage: git add-nonwhitespace [pathspec...]
+#
+# For every file that differs from HEAD -- staged OR unstaged -- files with real
+# content changes get staged; files whose changes are entirely whitespace are
+# left (or moved back) UNSTAGED. Lets you commit the meaningful edits while
+# keeping whitespace noise out of the commit.
+#
+# File-level (see git-cleanup-whitespace for why). Untracked files are not
+# added -- add those yourself.
+#
+# Examples:
+#   git add-nonwhitespace
+#   git add-nonwhitespace src/
+set -eu
+
+git diff HEAD --name-only -- "$@" | while IFS= read -r f; do
+    if git diff HEAD -w --quiet -- "$f"; then
+        git restore --staged -- "$f" 2>/dev/null || true   # whitespace-only: keep unstaged
+    else
+        git add -- "$f"                                     # real edits: stage them
+    fi
+done

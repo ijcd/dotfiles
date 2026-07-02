@@ -1,11 +1,96 @@
 #!/bin/sh
-# git-cleanup-whitespace - Remove whitespace-only changes from working tree
+# git-cleanup-whitespace - Discard whitespace-only changes, keeping real edits.
 #
-# Usage: git-cleanup-whitespace [files...]
+# Usage: git cleanup-whitespace [--staged|--unstaged] [pathspec...]
 #
-# Reverts whitespace-only changes while keeping content changes.
+# Removes whitespace-only changes (trailing whitespace, reindents, blank-line
+# churn) from staged and/or unstaged changes while keeping real content edits.
+#
+# Hunk-level via a zero-context diff (`git diff -U0`): each contiguous change
+# block becomes its own hunk, and only hunks whose entire change is whitespace
+# are reverse-applied. Whitespace churn isolated from real edits is stripped;
+# whitespace churn in the SAME contiguous block as a real edit is KEPT (it
+# rides along with the content hunk). New-file, deleted-file and real-content
+# hunks are never whitespace-only, so they are always kept.
+#
+# Scope (default: both, staged pass first so a purely-staged whitespace change
+# is cleaned from index AND working tree):
+#   --staged / --cached   clean the index vs HEAD
+#   --unstaged            clean the working tree vs the index
+#
+# Examples:
+#   git cleanup-whitespace              # whole repo, staged + unstaged
+#   git cleanup-whitespace --unstaged   # working tree only
+#   git cleanup-whitespace --staged src/
+set -eu
 
-git diff HEAD -w "$@" >/tmp/patch.$$
-git diff | patch -R -p1
-patch -p1 </tmp/patch.$$
-rm -f /tmp/patch.$$
+usage() {
+    sed -n '2,22p' "$0" | sed 's/^# \{0,1\}//'
+}
+
+do_staged=0
+do_unstaged=0
+scope_set=0
+
+while [ $# -gt 0 ]; do
+    case "$1" in
+        --staged|--cached) do_staged=1; scope_set=1; shift ;;
+        --unstaged) do_unstaged=1; scope_set=1; shift ;;
+        -h|--help) usage; exit 0 ;;
+        --) shift; break ;;
+        -*) printf '%s: unknown option: %s\n' "git cleanup-whitespace" "$1" >&2; exit 2 ;;
+        *) break ;;
+    esac
+done
+
+if [ "$scope_set" -eq 0 ]; then
+    do_staged=1
+    do_unstaged=1
+fi
+
+# Keep only whitespace-only hunks from a zero-context (-U0) diff. A hunk is
+# whitespace-only iff its removed-line contents equal its added-line contents
+# after stripping all spaces and tabs.
+ws_filter() {
+    awk '
+    function flush(){ if(nh){ r=rem;a=add;gsub(/[ \t]/,"",r);gsub(/[ \t]/,"",a);
+                              if(r==a) out=out hb } hb="";rem="";add="";nh=0 }
+    /^diff --git/{ flush(); if(out!=""){printf "%s",fh out} fh=$0"\n"; out=""; inh=1; next }
+    inh && /^@@/{ inh=0 }
+    inh{ fh=fh $0"\n"; next }
+    /^@@/{ flush(); hb=$0"\n"; nh=1; next }
+    { if(nh){ hb=hb $0"\n"; c=substr($0,1,1);
+              if(c=="-")rem=rem substr($0,2) "\x1e";
+              else if(c=="+")add=add substr($0,2) "\x1e" } }
+    END{ flush(); if(out!="")printf "%s",fh out }
+    '
+}
+
+clean_pass() {
+    # $1: "staged" or "unstaged"; remaining args: pathspec
+    kind=$1
+    shift
+    if [ "$kind" = staged ]; then
+        patch=$(git diff -U0 --cached -- "$@" | ws_filter)
+    else
+        patch=$(git diff -U0 -- "$@" | ws_filter)
+    fi
+
+    # Empty patch: nothing whitespace-only to revert. Skip (piping an empty
+    # patch to `git apply` errors "No valid patches in input").
+    [ -n "$patch" ] || return 0
+
+    if [ "$kind" = staged ]; then
+        printf '%s\n' "$patch" | git apply -R --cached --unidiff-zero --whitespace=nowarn
+    else
+        printf '%s\n' "$patch" | git apply -R --unidiff-zero --whitespace=nowarn
+    fi
+}
+
+# Staged first (see Scope note above).
+if [ "$do_staged" -eq 1 ]; then
+    clean_pass staged "$@"
+fi
+if [ "$do_unstaged" -eq 1 ]; then
+    clean_pass unstaged "$@"
+fi
