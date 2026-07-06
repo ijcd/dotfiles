@@ -137,7 +137,7 @@
 
       ### SECURITY / NETWORKING / PRIVACY
       "protonvpn" # secure VPN client for Proton VPN
-      "tailscale" # WireGuard-based mesh VPN + Tailscale SSH; ships CLI at /Applications/Tailscale.app/Contents/MacOS/Tailscale (symlinked to /usr/local/bin/tailscale by cask on Intel Macs; /opt/homebrew/bin/tailscale on Apple Silicon)
+      "tailscale-app" # WireGuard-based mesh VPN + Tailscale SSH; ships CLI at /Applications/Tailscale.app/Contents/MacOS/Tailscale (symlinked to /usr/local/bin/tailscale by cask on Intel Macs; /opt/homebrew/bin/tailscale on Apple Silicon). Formerly the "tailscale" cask — renamed 2026.
     ];
   };
 }
