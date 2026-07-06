@@ -13,13 +13,22 @@
   # Appends to postActivation (nix-darwin merges `types.lines`), sitting
   # alongside darwin/performance.nix which also writes there.
   system.activationScripts.postActivation.text = ''
-    echo "bearcat: pmset — remote-access role (AC only)"
-    /usr/bin/pmset -c autorestart  1   # come back after power blip
+    echo "bearcat: pmset — AC (remote-access role at home)"
     /usr/bin/pmset -c womp         1   # wake-on-magic-packet (Ethernet reliable, Wi-Fi flaky)
-    /usr/bin/pmset -c disablesleep 1   # NEVER sleep on AC (lid-closed clamshell OK)
-    /usr/bin/pmset -c sleep        0
-    /usr/bin/pmset -c disksleep    0
+    /usr/bin/pmset -c sleep        0   # never idle-sleep on AC
+    /usr/bin/pmset -c disksleep    0   # never spin down disks on AC
     /usr/bin/pmset -c displaysleep 10  # display can sleep — GPU stays live
+    # NOTE: `pmset -c disablesleep 1` is silently rejected on macOS 26.x
+    #       (Apple locked it down). Lid-closed-on-AC will sleep unless an
+    #       external display is connected (clamshell mode). No software fix.
+    # NOTE: `pmset -c autorestart 1` is a Desktops-only setting — MacBook
+    #       silently ignores it. Removed to keep this list honest.
+
+    echo "bearcat: pmset — battery (bag-friendly)"
+    /usr/bin/pmset -b sleep         3   # idle-sleep after 3 min (was macOS default 15)
+    /usr/bin/pmset -b disablesleep  0   # explicit: never block sleep on battery
+    /usr/bin/pmset -b tcpkeepalive  0   # skip TCP-triggered wakes in the bag
+    #     Trade-off: Handoff-to-iPhone-while-asleep stops working on battery.
 
     echo "bearcat: enable Screen Sharing (VNC) daemon"
     /bin/launchctl enable   system/com.apple.screensharing 2>/dev/null || true
