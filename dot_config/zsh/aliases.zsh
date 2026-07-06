@@ -39,6 +39,12 @@ alias fn='find . -name'
 # ripgrep (ignore)
 alias rgi="rg --no-ignore"
 
+# Tailscale
+alias ts='tailscale'
+alias tsstatus='tailscale status'
+alias tsnetcheck='tailscale netcheck'
+alias tspong='tailscale ping'      # verify direct P2P (not DERP-relayed)
+
 # diff variants
 alias ddiff="/usr/bin/diff"
 alias udiff="/usr/bin/diff -urN"
