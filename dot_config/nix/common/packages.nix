@@ -96,6 +96,8 @@
       whisper-cpp        # speech-to-text (used by cortextos for voice messages)
       graphviz           # graph visualization
       poppler-utils      # PDF utilities
+      tesseract          # OCR engine
+      ocrmypdf           # add OCR text layer to scanned PDFs
 
       # ─────────────────────────────────────────────────────────────────────────
       # Nix tooling
