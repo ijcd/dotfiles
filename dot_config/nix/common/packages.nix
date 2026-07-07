@@ -1,4 +1,4 @@
-{ pkgs, ... }:
+{ pkgs, inputs, ... }:
 {
   home = {
     packages = with pkgs; [
@@ -42,6 +42,7 @@
       git-filter-repo    # history rewriting
       jujutsu            # jj: git-compatible VCS (config via chezmoi ~/.config/jj)
       git-branchless     # smartlog + `git undo`; run `git branchless init` per repo
+      inputs.jj-spr.packages.${pkgs.stdenv.hostPlatform.system}.default  # jj-spr: stacked GitHub PRs for jj (flake input; not in nixpkgs)
 
       # ─────────────────────────────────────────────────────────────────────────
       # Dev environment

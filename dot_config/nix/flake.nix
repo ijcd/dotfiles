@@ -32,6 +32,12 @@
     # fixes the heredoc bug.
     nixpkgs-bash52.url = "github:nixos/nixpkgs/nixos-25.05";
 
+    # jj-spr: submit Jujutsu changes as GitHub stacked PRs (not in nixpkgs).
+    # Upstream flake exposes packages.<system>.default; follow our nixpkgs so it
+    # builds against the same tree (no second nixpkgs eval).
+    jj-spr.url = "github:jennings/jj-spr";
+    jj-spr.inputs.nixpkgs.follows = "nixpkgs";
+
   };
 
   outputs =
