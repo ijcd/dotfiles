@@ -40,6 +40,8 @@
       gh                 # GitHub CLI
       delta              # better git diffs
       git-filter-repo    # history rewriting
+      jujutsu            # jj: git-compatible VCS (config via chezmoi ~/.config/jj)
+      git-branchless     # smartlog + `git undo`; run `git branchless init` per repo
 
       # ─────────────────────────────────────────────────────────────────────────
       # Dev environment

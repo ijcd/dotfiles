@@ -1,0 +1,27 @@
+# jj (Jujutsu) config — managed by chezmoi (source: dot_config/jj/config.toml).
+#
+# Mirrors the git identity setup in ~/.config/git/config: `user.name` is global,
+# but `user.email` is chosen per-tree via jj scoped config ([[--scope]] with
+# --when.repositories) — the jj analogue of git's `includeIf "gitdir:..."`.
+#
+# Like git's `useConfigOnly = true`, there is deliberately NO default email:
+# outside the trees below, jj warns (empty email) until you pick one, so a commit
+# can't be silently mis-attributed. Set one ad hoc with:
+#   jj config set --repo user.email you@example.com
+#
+# Paths are prefix-matched and `~` expands to $HOME (per jj docs).
+
+[user]
+name = "Ian Duggan"
+
+# Personal identity — matches git-ijcd (gitdir: ~/src/, ~/.local/share/chezmoi/).
+[[--scope]]
+--when.repositories = ["~/src", "~/.local/share/chezmoi"]
+[--scope.user]
+email = "ian@ianduggan.net"
+
+# Lunar work identity — matches git-work-lunar (gitdir: ~/work/lunar/).
+[[--scope]]
+--when.repositories = ["~/work/lunar"]
+[--scope.user]
+email = "ian@golunar.com"
