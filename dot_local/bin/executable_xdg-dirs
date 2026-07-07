@@ -1,0 +1,80 @@
+#!/bin/sh
+# xdg-dirs - List/check/ensure the XDG dirs the nix config expects to exist
+#
+# Usage: xdg-dirs <command>
+#
+# Commands:
+#   list     Print the expected dirs (the manifest, one per line).
+#   check    Print dirs that are missing; exit 1 if any missing, else 0.
+#   ensure   mkdir -p the missing dirs; report what was created; exit 0.
+#   -h       Show this help.
+#
+# The expected set is derived from the nix config (home.sessionVariables,
+# tier-2 relocation targets, and an explicit extras list) and written to
+# ${XDG_CONFIG_HOME:-$HOME/.config}/xdg-dirs/manifest on `darwin-rebuild
+# switch`. This CLI only reads that manifest.
+#
+# Examples:
+#   $ xdg-dirs list
+#   /Users/ijcd/.local/share/cargo
+#   ...
+#
+#   $ xdg-dirs check && echo "all present"
+#
+#   $ xdg-dirs ensure
+#   created: /Users/ijcd/.local/state/zsh
+
+set -eu
+
+manifest="${XDG_CONFIG_HOME:-$HOME/.config}/xdg-dirs/manifest"
+
+usage() {
+  sed -n '2,25p' "$0" | sed 's/^# \{0,1\}//'
+}
+
+require_manifest() {
+  if [ ! -f "$manifest" ]; then
+    echo "xdg-dirs: manifest not found: $manifest" >&2
+    echo "xdg-dirs: run 'darwin-rebuild switch' (nixhome-switch) to generate it." >&2
+    exit 1
+  fi
+}
+
+cmd="${1:-}"
+case "$cmd" in
+  ""|-h|--help|help)
+    usage
+    ;;
+  list)
+    require_manifest
+    cat "$manifest"
+    ;;
+  check)
+    require_manifest
+    missing=0
+    while IFS= read -r dir; do
+      [ -n "$dir" ] || continue
+      if [ ! -d "$dir" ]; then
+        echo "$dir"
+        missing=1
+      fi
+    done < "$manifest"
+    exit "$missing"
+    ;;
+  ensure)
+    require_manifest
+    while IFS= read -r dir; do
+      [ -n "$dir" ] || continue
+      if [ ! -d "$dir" ]; then
+        mkdir -p "$dir"
+        echo "created: $dir"
+      fi
+    done < "$manifest"
+    exit 0
+    ;;
+  *)
+    echo "xdg-dirs: unknown command: $cmd" >&2
+    echo "xdg-dirs: try 'xdg-dirs -h'" >&2
+    exit 2
+    ;;
+esac
