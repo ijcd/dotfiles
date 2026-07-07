@@ -66,8 +66,26 @@ if [ "${NIXHOME_REBUILD_REEXECED:-}" != "1" ]; then
     DIFF_OUT=$(chezmoi --color=on diff 2>&1 || true)
     if [ -n "$DIFF_OUT" ]; then
         echo "$DIFF_OUT"
+        # Local edits that apply will DECIMATE: chezmoi status column 1 (M/D)
+        # means the live file drifted from source, and `chezmoi apply` overwrites
+        # it silently — this is how OrbStack's ~/.ssh/config Include got wiped.
+        # A big diff scrolls this off screen, so we (a) box it, and (b) fold the
+        # count into the confirm prompt itself — the last line before input, so
+        # it's unmissable no matter how much diff you paged through.
+        DECIMATE=$(chezmoi status 2>/dev/null | awk 'substr($0,1,1) ~ /[MD]/ {print "      " $0}')
+        prompt="Proceed with apply + rebuild? [y/N] "
+        if [ -n "$DECIMATE" ]; then
+            n=$(printf '%s\n' "$DECIMATE" | grep -c .)
+            bar='══════════════════════════════════════════════════════════════════════'
+            printf '\n  %s\n' "$bar"
+            printf '  ⚠  %s LOCAL EDIT(S) NOT IN YOUR SOURCE — apply will OVERWRITE them:\n' "$n"
+            printf '  %s\n%s\n' "$bar" "$DECIMATE"
+            printf '     keep them first:  chezmoi re-add <path>   (then re-run)\n'
+            printf '  %s\n' "$bar"
+            prompt="⚠  $n local edit(s) WILL BE LOST — proceed with apply + rebuild anyway? [y/N] "
+        fi
         if [ "${1:-}" != "-y" ] && [ "${NIXHOME_REBUILD_YES:-0}" != "1" ]; then
-            confirm_or_exit "Proceed with apply + rebuild? [y/N] "
+            confirm_or_exit "$prompt"
         fi
     else
         echo "  (nothing pending in source — destination already matches)"

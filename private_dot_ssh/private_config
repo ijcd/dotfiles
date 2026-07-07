@@ -1,3 +1,10 @@
+# Added by OrbStack: 'orb' SSH host for Linux machines. MUST stay at the very
+# top, before any Host block. OrbStack writes this once and won't re-add it if
+# removed, so we track it here in chezmoi instead of letting it drift (it got
+# wiped once by `chezmoi apply`). ssh silently ignores a missing Include, so
+# this is harmless on hosts without OrbStack.
+Include ~/.orbstack/ssh/config
+
 # Managed by chezmoi (source: private_dot_ssh/private_config).
 #
 # Client-side agent + keychain handling, so EVERY ssh consumer benefits
