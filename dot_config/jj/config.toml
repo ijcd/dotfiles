@@ -20,8 +20,10 @@ name = "Ian Duggan"
 [--scope.user]
 email = "ian@ianduggan.net"
 
-# Lunar work identity — matches git-work-lunar (gitdir: ~/work/lunar/).
+# Lunar work identity. The repo now lives at ~/work/repos/quinhealth/lunar;
+# jj workspaces go under ~/work/lunar/<workspace>. Both prefixes -> work email.
+# (Broaden to ~/work/repos/quinhealth if all company repos share this identity.)
 [[--scope]]
---when.repositories = ["~/work/lunar"]
+--when.repositories = ["~/work/repos/quinhealth/lunar", "~/work/lunar"]
 [--scope.user]
 email = "ian@golunar.com"
