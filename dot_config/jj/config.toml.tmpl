@@ -1,0 +1,37 @@
+# jj (Jujutsu) config — managed by chezmoi (source: dot_config/jj/config.toml.tmpl).
+#
+# Per-host, mirroring ~/.config/git/config + git-machine: user.name global,
+# user.email chosen per-tree via jj scoped config ([[--scope]]). FAIL-LOUD like
+# git's useConfigOnly — NO default email; outside the trees below jj warns until
+# a scope matches or you run:
+#   jj config set --repo user.email you@example.com   (--repo, NOT --user)
+#
+# Paths are prefix-matched and `~` expands to $HOME (per jj docs).
+
+[user]
+name = "Ian Duggan"
+
+{{ if eq .chezmoi.hostname "blackbird" -}}
+# blackbird (work laptop): ALL of ~/work -> golunar; personal in ~/src/ijcd + chezmoi.
+[[--scope]]
+--when.repositories = ["~/work"]
+[--scope.user]
+email = "ian@golunar.com"
+
+[[--scope]]
+--when.repositories = ["~/src/ijcd", "~/.local/share/chezmoi"]
+[--scope.user]
+email = "ian@ianduggan.net"
+{{- else -}}
+# home / other machines (e.g. bearcat): Lunar only under ~/work/lunar -> golunar;
+# ~/src and chezmoi personal. (~/work non-lunar stays fail-loud here.)
+[[--scope]]
+--when.repositories = ["~/work/lunar"]
+[--scope.user]
+email = "ian@golunar.com"
+
+[[--scope]]
+--when.repositories = ["~/src", "~/.local/share/chezmoi"]
+[--scope.user]
+email = "ian@ianduggan.net"
+{{- end }}

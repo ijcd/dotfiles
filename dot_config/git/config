@@ -4,28 +4,17 @@
 
 [user]
     name = Ian Duggan
-    # No email here! Use includeIf or per-repo config.
-    # This prevents accidentally committing with wrong identity.
+    # No default email -> FAIL-LOUD: a repo outside every tree below refuses to
+    # commit (useConfigOnly) until it matches a tree or you set a repo-local
+    # user.email.
     useConfigOnly = true
 
 # ─────────────────────────────────────────────────────────────────────────────
-# Per-directory identity. With useConfigOnly=true and no email above, a repo
-# OUTSIDE every tree below fails to commit until you add a tree here or set a
-# repo-local user.email. Paths are relative to this file (~/.config/git/).
-# Order matters: later matches win, so more-specific subtrees come last.
+# Per-host identity trees — rendered by chezmoi from the hostname, so blackbird
+# (work laptop) and bearcat (home) differ. Rules live in git-machine.tmpl.
 # ─────────────────────────────────────────────────────────────────────────────
-# ~/work's DEFAULT identity is machine-specific (Lunar on the work laptop,
-# personal at home) — set in git-machine, which chezmoi renders per host.
 [include]
     path = git-machine
-# Fixed cross-machine trees (identical on every host). Listed AFTER the machine
-# default so the specific subtree wins even where ~/work defaults to personal.
-[includeIf "gitdir:~/work/lunar/"]
-    path = git-work-lunar
-[includeIf "gitdir:~/src/"]
-    path = git-ijcd
-[includeIf "gitdir:~/.local/share/chezmoi/"]
-    path = git-ijcd
 
 # ─────────────────────────────────────────────────────────────────────────────
 # Core settings
