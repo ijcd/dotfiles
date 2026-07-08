@@ -106,3 +106,14 @@ _ll_chpwd() {
   fi
 }
 add-zsh-hook chpwd _ll_chpwd
+
+###########################################
+# Recover terminal after a suspended TUI (Ctrl-Z)
+###########################################
+# Claude Code (and other fullscreen TUIs) turn on SGR mouse tracking. Ctrl-Z
+# suspends them WITHOUT restoring it, so the shell inherits mouse mode and
+# trackpad scroll arrives as arrow keys -> zsh history nav instead of scrollback.
+# Disable the mouse-tracking modes before each prompt: idempotent (a no-op when
+# nothing leaked), and the TUI re-enables them for itself when you `fg` back in.
+_reset_mouse_modes() { print -n '\e[?1000l\e[?1002l\e[?1003l\e[?1006l'; }
+add-zsh-hook precmd _reset_mouse_modes
