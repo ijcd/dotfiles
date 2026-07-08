@@ -1,0 +1,57 @@
+#!/bin/sh
+# jj-refresh-workspaces - refresh stale jj workspaces after an edit you want to
+# "flow through", skipping (with a warning) any that have work in progress.
+#
+# Enumerates every workspace of the current repo straight from jj
+# (`jj workspace list`), so it covers all of them wherever they live -- including
+# the `default`/main-repo workspace -- not just one directory. Run it from inside
+# any workspace of the repo:
+#     jj-refresh-workspaces
+#
+# Per workspace:
+#   * working-copy commit @ has changes -> SKIP with a warning (you have work
+#                                          there; refresh it yourself)
+#   * @ is empty                        -> `jj workspace update-stale`
+#                                          (refreshes it if stale; a verified-safe
+#                                           no-op if it is not stale)
+#
+# BLIND SPOT (a jj limitation, accepted): a file edited *directly in a workspace
+# while that workspace is already stale* was never snapshotted -- being stale
+# blocks snapshotting -- so its @ still reads empty and `update-stale` will
+# OVERWRITE the edit, unrecoverably (it never reached the op log). This can't be
+# detected cheaply. Rule of thumb: after editing, run any `jj` command in that
+# workspace to lock the change into @ before refreshing; never hand-edit a
+# workspace you know is stale.
+set -eu
+
+# `jj workspace list` runs against the repo containing the current directory.
+# --ignore-working-copy keeps it read-only and stale-proof. Emits one
+# "<name>\t<absolute-root>" line per workspace.
+ws_list=$(jj workspace list --ignore-working-copy \
+              -T 'name ++ "\t" ++ root ++ "\n"' 2>/dev/null) || {
+    echo "jj-refresh-workspaces: run this from inside a jj repo/workspace." >&2
+    exit 1
+}
+[ -n "$ws_list" ] || { echo "jj-refresh-workspaces: no workspaces found." >&2; exit 1; }
+
+printf '%s\n' "$ws_list" | while IFS="$(printf '\t')" read -r name root; do
+    [ -n "${root:-}" ] || continue
+
+    # Read-only probe of the workspace's recorded working-copy commit.
+    wip=$(jj -R "$root" --ignore-working-copy log --no-graph -r @ \
+              -T 'if(empty, "no", "yes")' 2>/dev/null || echo err)
+
+    case "$wip" in
+        yes)
+            printf '  skip(WIP)  %-30s @ has changes -- refresh by hand\n' "$name" >&2 ;;
+        no)
+            out=$( cd "$root" && jj workspace update-stale 2>&1 || true )
+            case "$out" in
+                *"not stale"*) printf '  ok         %-30s up to date\n' "$name" ;;
+                *)             printf '  refreshed  %-30s\n' "$name"
+                               [ -n "$out" ] && printf '%s\n' "$out" | sed 's/^/                /' ;;
+            esac ;;
+        *)
+            printf '  skip(?)    %-30s could not read @\n' "$name" >&2 ;;
+    esac
+done
