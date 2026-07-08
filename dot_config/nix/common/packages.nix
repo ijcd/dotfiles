@@ -77,6 +77,7 @@
       # ─────────────────────────────────────────────────────────────────────────
       nmap               # network scanner
       mtr                # traceroute + ping
+      mosh               # resilient SSH replacement (UDP, roams networks); server side ships mosh-server
 
       # ─────────────────────────────────────────────────────────────────────────
       # Process managers
