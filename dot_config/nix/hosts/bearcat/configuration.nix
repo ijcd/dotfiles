@@ -30,7 +30,7 @@
     /usr/bin/pmset -b tcpkeepalive  0   # skip TCP-triggered wakes in the bag
     #     Trade-off: Handoff-to-iPhone-while-asleep stops working on battery.
 
-    echo "bearcat: Screen Sharing (VNC) daemon — port 5900 for `vnc://bearcat`"
+    echo "bearcat: Screen Sharing (VNC) daemon — port 5900 for vnc://bearcat"
     # macOS 13+ ties Screen Sharing enablement to a TCC-gated toggle in
     # System Settings → General → Sharing → Screen Sharing. The FIRST-TIME
     # enable must be done there manually — nix-darwin can't grant TCC to
