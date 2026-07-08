@@ -35,3 +35,12 @@ email = "ian@golunar.com"
 [--scope.user]
 email = "ian@ianduggan.net"
 {{- end }}
+
+# Workflow aliases (host-independent). `mine` = my ijcd/ bookmarks; the restack
+# aliases rebase that whole set onto trunk() / local main.
+[revset-aliases]
+'mine' = 'bookmarks(regex:"^ijcd/")'
+
+[aliases]
+restack-mine-to-trunk = ["rebase", "-b", "mine", "-d", "trunk()"]
+restack-mine = ["rebase", "-b", "mine", "-d", "local/main"]
