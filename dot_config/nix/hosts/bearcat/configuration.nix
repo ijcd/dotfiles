@@ -30,9 +30,20 @@
     /usr/bin/pmset -b tcpkeepalive  0   # skip TCP-triggered wakes in the bag
     #     Trade-off: Handoff-to-iPhone-while-asleep stops working on battery.
 
-    echo "bearcat: enable Screen Sharing (VNC) daemon"
-    /bin/launchctl enable   system/com.apple.screensharing 2>/dev/null || true
+    echo "bearcat: Screen Sharing (VNC) daemon — port 5900 for `vnc://bearcat`"
+    # macOS 13+ ties Screen Sharing enablement to a TCC-gated toggle in
+    # System Settings → General → Sharing → Screen Sharing. The FIRST-TIME
+    # enable must be done there manually — nix-darwin can't grant TCC to
+    # itself. After that one manual toggle, these commands keep the daemon
+    # enabled + running through OS updates, rebuilds, and reboots.
+    /bin/launchctl enable system/com.apple.screensharing 2>/dev/null || true
+    /bin/launchctl bootstrap system /System/Library/LaunchDaemons/com.apple.screensharing.plist 2>/dev/null || \
+      /bin/launchctl load -w /System/Library/LaunchDaemons/com.apple.screensharing.plist 2>/dev/null || true
     /bin/launchctl kickstart -k system/com.apple.screensharing 2>/dev/null || true
+
+    # Ensure the primary user is in the Screen Sharing access group.
+    # Without this, the daemon runs but macOS refuses VNC logins.
+    /usr/sbin/dseditgroup -o edit -a ${primaryUser} -t user com.apple.access_screensharing 2>/dev/null || true
 
     echo "bearcat: enable Remote Login (sshd) — fallback if Tailscale SSH is off"
     # `systemsetup -setremotelogin on` may require Full Disk Access on
