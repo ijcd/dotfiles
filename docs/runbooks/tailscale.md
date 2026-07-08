@@ -20,21 +20,37 @@
 
 ---
 
+## SSH mechanism — sandboxed cask can't do Tailscale SSH
+
+**Important**: the `tailscale-app` cask (what we install) is a sandboxed macOS build. Running `sudo tailscale set --ssh` returns:
+
+> `The Tailscale SSH server does not run in sandboxed Tailscale GUI builds.`
+
+Tailscale SSH (ACL-managed, no key wrangling) requires the non-sandboxed `brew install tailscale` formula instead of the cask — which would trade away the GUI menu bar. For a 2-node personal tailnet, not worth it.
+
+**We use regular macOS sshd instead**: `system.activationScripts.postActivation` enables `systemsetup -setremotelogin on` so `sshd` runs on port 22. Tailscale routes the traffic; macOS handles auth via `~/.ssh/authorized_keys`. You manage keys the traditional way — add public keys of connecting peers to bearcat's `authorized_keys`.
+
 ## First-time setup on bearcat
 
 After `nixhome-rebuild` has installed the cask:
 
-```sh
-# One-time auth. --ssh enables Tailscale SSH (ACL-managed, no key wrangling).
-sudo tailscale up --ssh --accept-routes=false
-# Browser opens → click "Sign in with passkey" → Touch ID → done.
-# (If your Tailscale tailnet doesn't exist yet, create it here — pick passkey
-# as the account identity, NOT GitHub, so the tailnet is passkey-rooted.)
+1. **Approve the system extension** — critical, and buried in macOS UI:
+   - Open `open "x-apple.systempreferences:com.apple.LoginItems-Settings.extension"`
+   - Under **Extensions → Network Extensions**, click the `(i)` next to Tailscale and enable
+   - Verify: `systemextensionsctl list | grep tailscale` → want `[activated enabled]`
 
-# Confirm the node is up and has a tailnet IP.
-tailscale status
-# expect: 100.x.y.z bearcat ijcd@ macOS -
-```
+2. **Sign in via CLI** (more reliable than GUI's "Add Account" flow):
+   ```sh
+   sudo tailscale up --accept-routes=false
+   # Browser opens → "Sign up with Apple" for a fresh tailnet
+   # (creates iCloud-backed passkey via Sign in with Apple)
+   ```
+
+3. Confirm:
+   ```sh
+   tailscale status
+   # expect: 100.x.y.z bearcat ijcd@ macOS -
+   ```
 
 In the [admin console](https://login.tailscale.com/admin):
 1. **DNS** → enable **MagicDNS** → enable **HTTPS certs**.
