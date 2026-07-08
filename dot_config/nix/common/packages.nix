@@ -42,7 +42,13 @@
       git-filter-repo    # history rewriting
       jujutsu            # jj: git-compatible VCS (config via chezmoi ~/.config/jj)
       git-branchless     # smartlog + `git undo`; run `git branchless init` per repo
-      inputs.jj-spr.packages.${pkgs.stdenv.hostPlatform.system}.default  # jj-spr: stacked GitHub PRs for jj (flake input; not in nixpkgs)
+      # jj-spr: stacked GitHub PRs for jj (flake input; not in nixpkgs). Skip the
+      # upstream test suite: 2 config tests shell out to the `jj` binary + write a
+      # config, neither of which exists in nix's hermetic build sandbox, so they
+      # fail there. The binary builds fine (buildPhase + 66/68 tests pass).
+      (inputs.jj-spr.packages.${pkgs.stdenv.hostPlatform.system}.default.overrideAttrs (_: {
+        doCheck = false;
+      }))
 
       # ─────────────────────────────────────────────────────────────────────────
       # Dev environment
