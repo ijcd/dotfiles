@@ -172,11 +172,31 @@ When forking a repo to submit a PR:
    ```
 4. **Find all PR forks**: `gh repo list ijcd --topic pr-fork`
 
-## Git
+## Version control (jj-first)
 
-- When creating branches, prefix them with ijcd/ to indicate they come from me.
-- Do not add "Generated with Claude Code" or Co-Authored-By lines to commit messages.
-- After each commit, show the commit message and --stat output inline in the response (not just as tool output). 
+Most repos here use **jj (jujutsu)** over a git backend. Detect: `jj root`
+succeeds (or a `.jj/` dir exists up-tree) → jj repo. Plain-git repos — this
+chezmoi repo and `~/work/prs/*` PR forks — have a `.git` and no `.jj` → use git.
+
+### jj repos
+- No staging area: jj auto-snapshots the working copy at the START of every
+  command. Never `git add`; don't reach for `git` to mutate a jj repo at all.
+- "Commit" = finalize the current change with a description AND move to a fresh
+  empty change: `jj commit -m "msg"` (describes `@`, creates a new empty `@`).
+  Equivalent: `jj describe -m "msg"` then `jj new`.
+- Branches are **bookmarks** (`jj bookmark`); prefix mine with `ijcd/`. Bookmarks
+  do NOT auto-advance with the working copy — move them explicitly, e.g.
+  `jj bookmark set ijcd/x -r @-`.
+- After each commit, show the description + `jj show --stat @-` inline (once the
+  new empty `@` exists, the change you just described is `@-`).
+
+### git repos
+- When creating branches, prefix them with `ijcd/`.
+- After each commit, show the commit message + `--stat` inline (not just tool output).
+
+### Both
+- Commit or push **only when I ask**.
+- Never add "Generated with Claude Code" or `Co-Authored-By` lines to commit messages.
 
 ## Principia
 
