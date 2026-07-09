@@ -10,7 +10,8 @@
 #                                  showing a --stat of each one's changes.
 #   jj-refresh-workspaces -p       for WIP workspaces, show the full diff (-p /
 #                                  --patch) instead of just --stat.
-#   jj-refresh-workspaces --force  ALSO refresh WIP workspaces (see below).
+#   jj-refresh-workspaces -f       ALSO refresh WIP workspaces (-f / --force;
+#                                  see below).
 #
 # Per workspace:
 #   * @ empty              -> `jj workspace update-stale` (refresh; a verified-safe
@@ -36,7 +37,7 @@ usage() { awk 'NR==1{next} !/^#/{exit} {sub(/^# ?/,""); print}' "$0"; }
 while [ $# -gt 0 ]; do
     case "$1" in
         -p|--patch) show=patch; shift ;;
-        --force)    force=1; shift ;;
+        -f|--force) force=1; shift ;;
         -h|--help)  usage; exit 0 ;;
         --) shift; break ;;
         -*) printf 'jj-refresh-workspaces: unknown option: %s\n' "$1" >&2; exit 2 ;;
