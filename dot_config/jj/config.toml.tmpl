@@ -37,9 +37,11 @@ email = "ian@ianduggan.net"
 {{- end }}
 
 # Workflow aliases (host-independent). `mine` = my ijcd/ bookmarks; the restack
-# aliases rebase that whole set onto trunk() / local main.
+# aliases rebase that whole set onto trunk() / local main. `sincemain` = my work
+# since local main (swap `local/main` for `trunk()` to measure from remote master).
 [revset-aliases]
 'mine' = 'bookmarks(regex:"^ijcd/")'
+'sincemain' = 'local/main..@'
 
 [aliases]
 restack-mine-to-trunk = ["rebase", "-b", "mine", "-d", "trunk()"]
