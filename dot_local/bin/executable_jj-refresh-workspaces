@@ -19,15 +19,15 @@
 #   * @ has changes (WIP)  -> default: skip + show what's there. --force: refresh
 #                            it too.
 #
-# --force is SAFE for SNAPSHOTTED WIP: update-stale rebases the workspace, so the
-# undescribed change rides along on top of the refreshed history. If it clashes
-# with the incoming rewrite, jj records an in-commit conflict -- nothing is lost,
-# and `jj op log` / `jj op restore` undoes the whole run.
+# It first runs a plain `jj status` in each workspace, which SNAPSHOTS the working
+# copy -- so any on-disk edits (e.g. files a coding agent just laid down) are
+# captured into that workspace's @ BEFORE update-stale touches it. Verified: this
+# prevents the clobber that would otherwise eat an un-snapshotted edit in a stale
+# workspace (straight-to-update-stale loses it; snapshot-first preserves it).
 #
-# BLIND SPOT (unchanged by --force): a file edited directly in a workspace while
-# that workspace is ALREADY stale was never snapshotted (stale blocks it), so its
-# @ reads empty and update-stale overwrites it, unrecoverably. Run any `jj`
-# command in a workspace after editing to lock the change into @ first.
+# --force additionally runs update-stale on WIP workspaces: it rebases them so the
+# change rides on top of the refreshed history. A clash becomes an in-commit
+# conflict, never a loss; `jj op log` / `jj op restore` undoes the whole run.
 set -eu
 
 show=stat
@@ -63,6 +63,14 @@ ws_list=$(jj workspace list --ignore-working-copy \
 
 printf '%s\n' "$ws_list" | while IFS="$(printf '\t')" read -r name root; do
     [ -n "${root:-}" ] || continue
+
+    # Snapshot first: capture any on-disk edits (e.g. from a coding agent) into @
+    # so the update-stale below can't clobber them (verified). A failure here
+    # means the workspace itself is broken/dead -> skip it.
+    if ! jj -R "$root" status >/dev/null 2>&1; then
+        printf '  skip(?)    %-30s could not snapshot (dead workspace? `jj workspace forget %s`)\n' "$name" "$name" >&2
+        continue
+    fi
 
     state=$(jj -R "$root" --ignore-working-copy log --no-graph -r @ \
                 -T 'if(empty, "clean", "wip")' 2>/dev/null || echo err)
