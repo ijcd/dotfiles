@@ -46,4 +46,9 @@ email = "ian@ianduggan.net"
 [aliases]
 restack-mine-to-trunk = ["rebase", "-b", "mine", "-d", "trunk()"]
 restack-mine = ["rebase", "-b", "mine", "-d", "local/main"]
-restack = ["rebase", "-s", "local/main", "-d", "trunk()"]
+# restack: -s from the ROOT of the personal stack, NOT local/main's tip. `-s
+# local/main` shears the tip + its descendants off a multi-commit base, orphaning
+# the base (e.g. settings.json below env-setup) every run. roots(trunk()..local/main)
+# = the bottom commit, so -s lifts the whole stack as one unit (works for a 1- or
+# N-commit local/main; roots of a single commit is itself). Verified in a scratch repo.
+restack = ["rebase", "-s", "roots(trunk()..local/main)", "-d", "trunk()"]
