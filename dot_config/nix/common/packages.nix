@@ -89,6 +89,7 @@
       # ─────────────────────────────────────────────────────────────────────────
       nmap               # network scanner
       mtr                # traceroute + ping
+      mosh               # resilient SSH replacement (UDP, roams networks); server side ships mosh-server
 
       # ─────────────────────────────────────────────────────────────────────────
       # Process managers
@@ -108,6 +109,8 @@
       whisper-cpp        # speech-to-text (used by cortextos for voice messages)
       graphviz           # graph visualization
       poppler-utils      # PDF utilities
+      tesseract          # OCR engine
+      ocrmypdf           # add OCR text layer to scanned PDFs
 
       # ─────────────────────────────────────────────────────────────────────────
       # Nix tooling

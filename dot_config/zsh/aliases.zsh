@@ -39,6 +39,12 @@ alias fn='find . -name'
 # ripgrep (ignore)
 alias rgi="rg --no-ignore"
 
+# Tailscale
+alias ts='tailscale'
+alias tsstatus='tailscale status'
+alias tsnetcheck='tailscale netcheck'
+alias tspong='tailscale ping'      # verify direct P2P (not DERP-relayed)
+
 # diff variants
 alias ddiff="/usr/bin/diff"
 alias udiff="/usr/bin/diff -urN"
@@ -46,6 +52,13 @@ alias gdiff="git diff --no-index --color-words"
 
 # Lock the screen (when going AFK)
 alias afk='osascript -e "tell application \"System Events\" to keystroke \"q\" using {control down, command down}"'
+
+# sleepnow: kill any lingering caffeinate holders (Claude Code, etc.) and force
+# immediate sleep. Use before putting the laptop in a bag so it doesn't stew.
+sleepnow() {
+  killall -q caffeinate 2>/dev/null
+  sudo pmset sleepnow
+}
 
 # Change directory to the selected directory using fd and fzf
 alias ff='cd $(fd --type d | fzf)'

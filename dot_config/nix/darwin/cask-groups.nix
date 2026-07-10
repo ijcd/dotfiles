@@ -88,6 +88,7 @@
   personalInfra = [
     "backblaze" # offsite backup
     "protonvpn" # personal VPN
+    "tailscale-app" # WireGuard mesh VPN / tailnet peer (bearcat = remote-access host; renamed from "tailscale" 2026). Move to `base` for a universal tailnet.
     "teamviewer" # remote desktop
   ];
 

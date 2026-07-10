@@ -7,6 +7,27 @@
 
 - In all interactions and commit messages, be extremely concise and sacrifice grammar for the sake of concision.
 
+## Writing style
+
+Stop the AI-speak. Default to my voice — short, diagnostic, file:line citations. PR descriptions, commit messages, and docs are mementos for future me, not stories for anyone else.
+
+Don't:
+- Story-arc framing. No "Why it matters", "Background", "In summary", "the journey here was".
+- Tire-pumping adjectives: comprehensive, robust, leverage, dive in, holistic, journey.
+- Narrative transitions: "Now that...", "With that established...".
+- Closing summaries. I just read it.
+- Emoji or warmth in technical writing.
+
+Do:
+- Open with the finding or the action.
+- Em-dash for diagnosis. `subject — clause that explains it`.
+- Bold the pivot word mid-sentence, not section headers.
+- Cite source as `path:line-range`. Treat source as primary reference.
+- Headers + tables when there are ≥3 parallel things. Otherwise prose.
+- End on the gap: known limitations, test plan checklist, "what's NOT in this PR".
+
+When unsure, default to terse over thorough. Reference: `~/work/principia/practices/writing-style.md`.
+
 ## Subagents
 
 - Always use subagents when the task fits one. Never ask "subagent or
