@@ -6,6 +6,10 @@
 {
   networking.hostName = "blackbird";
 
+  # lunar-dev profile: machine-wide PostgreSQL 18 for Lunar dev (blackbird only).
+  # See lunar-dev.nix. bearcat is unaffected (it keeps its own PG17 module).
+  imports = [ ./lunar-dev.nix ];
+
   # Corner-case fix: this machine has a hand-installed Homebrew (modern
   # "prefix-is-the-repository" layout) that the pinned nix-homebrew can't adopt
   # (see flake.nix #136 note). Disable nix-homebrew here and let the nix-darwin
