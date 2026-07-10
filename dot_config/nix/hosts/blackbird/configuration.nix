@@ -20,6 +20,9 @@
 
   # host-specific home-manager configuration
   home-manager.users.${primaryUser} = {
+    # Lunar pgAdmin connection (declarative servers.json + importer).
+    imports = [ ./pgadmin-lunar.nix ];
+
     programs.zsh.initContent = ''
       source ${./shell-functions.sh}
     '';
