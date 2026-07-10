@@ -42,6 +42,7 @@ email = "ian@ianduggan.net"
 [revset-aliases]
 'mine' = 'bookmarks(regex:"^ijcd/")'
 'sincemain' = 'local/main..@'
+'sincemaster' = 'trunk()..@'
 
 [aliases]
 restack-mine-to-trunk = ["rebase", "-b", "mine", "-d", "trunk()"]
