@@ -1,0 +1,14 @@
+# Personal identity (ijcd). Included by ~/.config/git/config via includeIf.
+[user]
+	email = ian@ianduggan.net
+{{ if eq .chezmoi.hostname "blackbird" }}
+# blackbird (work laptop) only: the default github.com key here is the golunar
+# work key (id_rsa), which can't push to personal ijcd repos. Route GitHub in
+# ijcd-scoped trees through the ijcd key via the `github-ijcd` SSH alias
+# (~/.ssh/config), rewriting both SSH and HTTPS remotes. Scoped to this file's
+# includeIf, so ~/work/* keeps the work key. bearcat needs no rewrite (its
+# default key already is ijcd) — hence blackbird-only.
+[url "git@github-ijcd:"]
+	insteadOf = git@github.com:
+	insteadOf = https://github.com/
+{{ end -}}

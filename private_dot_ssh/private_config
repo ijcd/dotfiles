@@ -5,6 +5,18 @@
 # this is harmless on hosts without OrbStack.
 Include ~/.orbstack/ssh/config
 
+# Personal GitHub identity (ijcd) — used on this work laptop, where github.com
+# defaults to the golunar work key (id_rsa) that can't push to personal repos.
+# Git remotes in ijcd-scoped trees get rewritten to git@github-ijcd: (see
+# ~/.config/git/git-ijcd url.insteadOf, blackbird-only), routing those pushes
+# through the ijcd key below. MUST precede `Host *` so the ijcd key is offered
+# first. Inert on machines where nothing rewrites to this alias (e.g. bearcat).
+Host github-ijcd
+  HostName github.com
+  User git
+  IdentityFile ~/.ssh/id_lunar_github_ijcd
+  IdentitiesOnly yes
+
 # Managed by chezmoi (source: private_dot_ssh/private_config).
 #
 # Client-side agent + keychain handling, so EVERY ssh consumer benefits
@@ -19,5 +31,9 @@ Host *
   IgnoreUnknown UseKeychain
   AddKeysToAgent yes
   UseKeychain yes
-  IdentityFile ~/.ssh/id_ed25519
-  IdentityFile ~/.ssh/id_rsa
+  # NO global IdentityFile here on purpose. A `Host *` IdentityFile leaks into
+  # EVERY host (incl. github-ijcd) and, being agent-loaded, gets offered first —
+  # which silently defeats per-host key selection (github-ijcd would auth as the
+  # work key). ssh already tries the default keys (~/.ssh/id_rsa, id_ed25519) for
+  # hosts without their own block, so github.com (work) still uses id_rsa;
+  # github-ijcd (IdentitiesOnly + its own key) now uses only the ijcd key.
