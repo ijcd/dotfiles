@@ -74,5 +74,6 @@
   "theme": "auto",
   "inputNeededNotifEnabled": true,
   "agentPushNotifEnabled": true,
+  "remoteControlAtStartup": true,
   "tui": "fullscreen"
 }
