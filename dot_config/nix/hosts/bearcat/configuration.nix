@@ -57,8 +57,6 @@ in
     echo "bearcat: pmset — battery (bag-friendly)"
     /usr/bin/pmset -b sleep         3   # idle-sleep after 3 min (was macOS default 15)
     /usr/bin/pmset -b disablesleep  0   # explicit: never block sleep on battery
-    /usr/bin/pmset -b tcpkeepalive  0   # skip TCP-triggered wakes in the bag
-    #     Trade-off: Handoff-to-iPhone-while-asleep stops working on battery.
 
     echo "bearcat: Screen Sharing (VNC) daemon — port 5900 for vnc://bearcat"
     # macOS 13+ ties Screen Sharing enablement to a TCC-gated toggle in
