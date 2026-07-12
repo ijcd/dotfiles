@@ -1,0 +1,67 @@
+#!/usr/bin/env bash
+# tunnel-vnc — open a macOS Screen Sharing (VNC) session through an SSH tunnel.
+#
+# Forwards the remote's VNC port (default :5900) over ssh — honoring any
+# ProxyJump / Host config in ~/.ssh/config — then points the Screen Sharing
+# client at the local end. Works for hosts whose VNC is firewalled to loopback
+# (the forward terminates on the remote's own 127.0.0.1), e.g. blackbird, whose
+# pf only lets :5900 in from loopback + the OrbStack network.
+#
+# Usage: tunnel-vnc <ssh-host> [remote-port] [local-port]
+#   tunnel-vnc blackbird            # :5900 over `ssh blackbird` -> vnc://localhost:5901
+#   tunnel-vnc user@box 5900 5905   # explicit remote/local ports
+#
+# Tunnel runs in the foreground; Ctrl-C tears it down (no orphaned forwards).
+# Local port auto-selects from 5901 up when omitted. Assumes key/agent auth
+# (the ~/.ssh/config Host * block loads keys via the agent + keychain).
+set -euo pipefail
+
+case ${1:-} in
+  -h | --help | '')
+    cat >&2 <<'EOF'
+tunnel-vnc — VNC/Screen Sharing to a host through an SSH tunnel.
+
+Usage: tunnel-vnc <ssh-host> [remote-port] [local-port]
+
+  tunnel-vnc blackbird            # :5900 over `ssh blackbird` -> vnc://localhost:5901
+  tunnel-vnc user@box 5900 5905   # explicit remote/local ports
+
+Honors ~/.ssh/config (ProxyJump etc.). Foreground; Ctrl-C closes the tunnel.
+Local port auto-picks from 5901 up when omitted.
+EOF
+    exit 0
+    ;;
+esac
+
+host=$1
+rport=${2:-5900}
+lport=${3:-}
+
+port_busy() { nc -z localhost "$1" >/dev/null 2>&1; }
+
+if [[ -z $lport ]]; then
+  lport=5901
+  while port_busy "$lport"; do lport=$((lport + 1)); done
+fi
+
+echo "tunnel-vnc: $host:$rport  ->  vnc://localhost:$lport"
+
+# Background the forward. -N: no remote shell. ExitOnForwardFailure: a taken port
+# or a broken jump fails loudly instead of leaving us opening a dead viewer.
+ssh -o ExitOnForwardFailure=yes -N -L "${lport}:localhost:${rport}" "$host" &
+tunnel=$!
+trap 'kill "$tunnel" 2>/dev/null || true' EXIT
+
+# Wait for the local end to come up (jump + auth can take a beat).
+for _ in $(seq 1 50); do
+  port_busy "$lport" && break
+  kill -0 "$tunnel" 2>/dev/null || {
+    echo "tunnel-vnc: ssh exited before the forward came up" >&2
+    exit 1
+  }
+  sleep 0.2
+done
+
+open "vnc://localhost:${lport}"
+echo "tunnel-vnc: connected — Ctrl-C to close the tunnel."
+wait "$tunnel"
