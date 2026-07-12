@@ -17,6 +17,17 @@ Host github-ijcd
   IdentityFile ~/.ssh/id_lunar_github_ijcd
   IdentitiesOnly yes
 
+# blackbird via the nixos-antares jump box. antares is an OrbStack Linux VM
+# running ON blackbird, reachable over the tailnet; from there host.orb.internal
+# resolves to the blackbird Mac host. ProxyJump hop 1 rides tailscale; the target
+# name is resolved ON antares (host.orb.internal is OrbStack's guest→host name),
+# which is why a bare `blackbird` alias fails there but this works. Inert on
+# blackbird itself (you'd never jump-to-self). MUST precede `Host *`.
+Host blackbird
+  HostName host.orb.internal
+  ProxyJump nixos-antares
+  User ijcd
+
 # Managed by chezmoi (source: private_dot_ssh/private_config).
 #
 # Client-side agent + keychain handling, so EVERY ssh consumer benefits
