@@ -30,5 +30,17 @@
 
     # create .hushlogin file to suppress login messages
     file.".hushlogin".text = "";
+
+    # kitty.terminfo (packages.nix) lands in the nix PROFILE terminfo dir, which
+    # ncurses only finds via $TERMINFO_DIRS — and Home Manager exports that in
+    # hm-session-vars.sh, TOO LATE for the login shell's terminfo init over ssh
+    # (fails → "can't find terminal definition for xterm-kitty" → zsh ZLE inits
+    # degraded → double echo). ~/.terminfo is searched FIRST, unconditionally, no
+    # env var needed. Symlink the compiled entries there so login-time lookup
+    # resolves xterm-kitty before any profile script runs.
+    file.".terminfo" = {
+      source = "${pkgs.kitty.terminfo}/share/terminfo";
+      recursive = true;
+    };
   };
 }
