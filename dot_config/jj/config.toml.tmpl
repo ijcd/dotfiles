@@ -43,6 +43,8 @@ email = "ian@ianduggan.net"
 'mine' = 'bookmarks(regex:"^ijcd/")'
 'sincemain' = 'local/main..@'
 'sincemaster' = 'trunk()..@'
+# closest_bookmark(to) = the nearest bookmark at-or-behind `to` (used by `jj tug`).
+'closest_bookmark(to)' = 'heads(::to & bookmarks())'
 
 [aliases]
 restack-mine-to-trunk = ["rebase", "-b", "mine", "-d", "trunk()"]
@@ -53,3 +55,13 @@ restack-mine = ["rebase", "-b", "mine", "-d", "local/main"]
 # = the bottom commit, so -s lifts the whole stack as one unit (works for a 1- or
 # N-commit local/main; roots of a single commit is itself). Verified in a scratch repo.
 restack = ["rebase", "-s", "roots(trunk()..local/main)", "-d", "trunk()"]
+# tug: move the nearest bookmark up to @- (the last real commit; @ is the empty
+# working-copy commit). Standard jj idiom for "advance my branch to here".
+tug = ["bookmark", "move", "--from", "closest_bookmark(@-)", "--to", "@-"]
+# rp/lp: patch logs. rp = work since local main with --stat; lp = plain -p.
+rp = ["log", "--no-graph", "-r", "sincemain", "--stat", "-p"]
+lp = ["log", "--no-graph", "-p"]
+
+[ui]
+diff-formatter = ":git" # jj's own git-style diff
+pager = "delta"
