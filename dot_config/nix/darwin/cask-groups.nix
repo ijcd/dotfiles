@@ -36,6 +36,7 @@
     "pgadmin4" # Postgres admin GUI
     "sourcetree" # Git GUI
     "livebook" # Elixir notebooks
+    "jollysfastvnc" # VNC/ARD viewer — reach a Mac's Screen Sharing over an ssh tunnel (e.g. tunnel-vnc blackbird). Third-party client needed: Apple's Screen Sharing.app can't tunnel the modern high-perf auth.
   ];
 
   windowMgmt = [
