@@ -12,6 +12,7 @@
   imports = [
     ./lunar-dev.nix
     ./remote-access.nix
+    ./firewall.nix
   ];
 
   # Corner-case fix: this machine has a hand-installed Homebrew (modern
