@@ -30,6 +30,11 @@
       # ─────────────────────────────────────────────────────────────────────────
       vim
       tmux
+      kitty.terminfo     # xterm-kitty terminfo ONLY (no GUI) — so incoming ssh
+                         # sessions from a kitty client resolve $TERM. The kitty
+                         # app is the Homebrew cask (cask-groups.nix); its terminfo
+                         # is trapped in the app bundle, invisible to sshd. Both
+                         # hosts are ssh targets (see docs/runbooks/tailscale.md).
       # nodejs moved to emacs.nix (it's copilot.el's LSP dep, not a runtime).
       # Project node versions come from .tool-versions via mise.
 
