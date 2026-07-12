@@ -8,7 +8,11 @@
 
   # lunar-dev profile: machine-wide PostgreSQL 18 for Lunar dev (blackbird only).
   # See lunar-dev.nix. bearcat is unaffected (it keeps its own PG17 module).
-  imports = [ ./lunar-dev.nix ];
+  # remote-access: sshd + Screen Sharing so the nixos-antares VM can jump in.
+  imports = [
+    ./lunar-dev.nix
+    ./remote-access.nix
+  ];
 
   # Corner-case fix: this machine has a hand-installed Homebrew (modern
   # "prefix-is-the-repository" layout) that the pinned nix-homebrew can't adopt
