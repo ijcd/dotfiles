@@ -122,8 +122,8 @@ _dircolor_auto_apply() {
   local h=$(_dircolor_auto_hue "$dir")
   local s l
   case $_DIRCOLOR_MODE in
-    light) s=25 l=88 ;;   # subtle pastel bg for light mode
-    *)     s=50 l=15 ;;   # muted dark bg for dark mode
+    light) s=55 l=82 ;;   # punchy pastel bg for light mode
+    *)     s=75 l=22 ;;   # saturated dark bg for dark mode (still text-readable)
   esac
   _dircolor_hsl_to_rgb "$h" "$s" "$l"
   printf '\033]11;rgb:%02x/%02x/%02x\033\\' \
