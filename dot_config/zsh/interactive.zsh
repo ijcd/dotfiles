@@ -76,6 +76,46 @@ add-zsh-hook chpwd _dircolor_chpwd
 dircolor apply  # apply on shell start
 
 ###########################################
+# SSH remote-session indicator (peer-visible background tint)
+###########################################
+# When this shell is running as an incoming SSH session, paint a distinct
+# background so nested hops (kitty → antares → bearcat → …) are obvious at
+# a glance. Color derived from short-hostname hash — stable per host,
+# distinct across hosts, no config table. Override with $SSH_TINT_HEX
+# (e.g. 1e3a5f) if the auto color is bad.
+#
+# Trades vs dircolor: dircolor picks a color per DIRECTORY (local only,
+# see functions/dircolor SSH short-circuit); this picks a color per HOST
+# (remote only). One or the other paints, never both.
+if [ -n "$SSH_CONNECTION" ]; then
+  if [ -n "$SSH_TINT_HEX" ]; then
+    _SSH_TINT_HEX=$SSH_TINT_HEX
+  else
+    # shasum hostname → 6 hex chars → halve each channel so it stays dark
+    # enough behind light-on-dark text. `${HOST%%.*}` = short hostname.
+    _hex=$(printf '%s' "${HOST%%.*}" | shasum | cut -c1-6)
+    _r=$(( 16#${_hex:0:2} / 2 ))
+    _g=$(( 16#${_hex:2:2} / 2 ))
+    _b=$(( 16#${_hex:4:2} / 2 ))
+    _SSH_TINT_HEX=$(printf '%02x%02x%02x' "$_r" "$_g" "$_b")
+    unset _hex _r _g _b
+  fi
+  typeset -g _SSH_TINT_HEX
+
+  _ssh_apply_tint() { printf '\033]11;#%s\033\\' "$_SSH_TINT_HEX" }
+  _ssh_apply_tint  # initial paint
+
+  # Re-emit on every prompt so nested ssh subshells that clobber OSC 11
+  # only steal the background for the duration of their inner session.
+  add-zsh-hook precmd _ssh_apply_tint
+
+  # Reset to terminal default when this shell exits — outer shell (or the
+  # terminal itself) can re-establish its own preferred background.
+  _ssh_reset_tint() { printf '\033]111\033\\' }
+  zshexit_functions+=(_ssh_reset_tint)
+fi
+
+###########################################
 # Auto-listing on directory change
 ###########################################
 # Show pwd + listing after every cd. Three tiers based on entry count:
