@@ -107,25 +107,58 @@ _dircolor_hsl_to_rgb() {
   _dircolor_b=$(( (Bp+M) * 255 / 1000 ))
 }
 
-# Auto-pick a color for a dir with no explicit mapping.
-# Sets _dircolor_r/_g/_b as a side effect (for `dircolor show` reuse) and
-# emits the OSC 11 sequence.
+# Auto-pick a color for a dir with no explicit mapping. Sets _dircolor_r/g/b
+# as a side effect (for `dircolor show`/`preview` reuse) and emits OSC 11.
+#
+# Uses 3 independent bytes of the SHA to spread colors across THREE axes:
+#   - hue (first 4 chars → 0-359°) — 360-way variation
+#   - lightness delta (next 2 chars → ±L_range) — extra variation so
+#     hue-collisions differ in brightness
+#   - saturation delta (next 2 chars → ±S_range) — extra vividness spread
+# End result: even directories that hash to nearly the same hue look
+# distinct because they land on different L / S values.
+
 _dircolor_auto_hue() {
   local dir=$1
-  # Take first 4 hex chars of shasum → 0-65535 → mod 360 for hue.
   local hash=$(printf '%s' "$dir" | shasum | cut -c1-4)
   print -- $(( 16#$hash % 360 ))
 }
 
+# Sets $reply=(h s l) for a dir. Used by _dircolor_auto_apply, show, preview.
+_dircolor_auto_hsl() {
+  local dir=$1
+  local hash=$(printf '%s' "$dir" | shasum | cut -c1-8)
+  local h=$(( 16#${hash:0:4} % 360 ))
+
+  local l_base l_range l_min l_max
+  local s_base s_range s_min s_max
+  case $_DIRCOLOR_MODE in
+    light)
+      l_base=82; l_range=14; l_min=72; l_max=93     # ±7
+      s_base=55; s_range=30; s_min=35; s_max=85     # ±15
+      ;;
+    *)
+      l_base=22; l_range=22; l_min=11; l_max=35     # ±11 — meaningful darkness variation
+      s_base=75; s_range=30; s_min=45; s_max=95     # ±15
+      ;;
+  esac
+  local ld=$(( 16#${hash:4:2} % l_range - l_range/2 ))
+  local sd=$(( 16#${hash:6:2} % s_range - s_range/2 ))
+  local l=$(( l_base + ld ))
+  local s=$(( s_base + sd ))
+  (( l < l_min )) && l=$l_min
+  (( l > l_max )) && l=$l_max
+  (( s < s_min )) && s=$s_min
+  (( s > s_max )) && s=$s_max
+
+  reply=( "$h" "$s" "$l" )
+}
+
 _dircolor_auto_apply() {
   local dir=$1
-  local h=$(_dircolor_auto_hue "$dir")
-  local s l
-  case $_DIRCOLOR_MODE in
-    light) s=55 l=82 ;;   # punchy pastel bg for light mode
-    *)     s=75 l=22 ;;   # saturated dark bg for dark mode (still text-readable)
-  esac
-  _dircolor_hsl_to_rgb "$h" "$s" "$l"
+  local reply
+  _dircolor_auto_hsl "$dir"
+  _dircolor_hsl_to_rgb "${reply[1]}" "${reply[2]}" "${reply[3]}"
   printf '\033]11;rgb:%02x/%02x/%02x\033\\' \
     "$_dircolor_r" "$_dircolor_g" "$_dircolor_b"
 }
@@ -318,17 +351,42 @@ _dircolor_show() {
     echo "$dir -> $best_name ($hex)"
   else
     # Auto-color: compute + describe
-    local h=$(_dircolor_auto_hue "$dir")
-    local s l
-    case $_DIRCOLOR_MODE in
-      light) s=25 l=88 ;;
-      *)     s=50 l=15 ;;
-    esac
-    _dircolor_hsl_to_rgb "$h" "$s" "$l"
-    printf '%s -> auto (hue %d°, %s mode) #%02x%02x%02x\n' \
-      "$dir" "$h" "$_DIRCOLOR_MODE" \
+    local reply
+    _dircolor_auto_hsl "$dir"
+    _dircolor_hsl_to_rgb "${reply[1]}" "${reply[2]}" "${reply[3]}"
+    printf '%s -> auto (h=%d° s=%d%% l=%d%%, %s mode) #%02x%02x%02x\n' \
+      "$dir" "${reply[1]}" "${reply[2]}" "${reply[3]}" "$_DIRCOLOR_MODE" \
       "$_dircolor_r" "$_dircolor_g" "$_dircolor_b"
   fi
+}
+
+# ─── preview: swatch every subdir of a target (or ~/work by default) ───
+_dircolor_preview() {
+  local target=${1:-$PWD}
+  target=${target/#\~/$HOME}
+  if [[ ! -d $target ]]; then
+    echo "Not a directory: $target" >&2
+    return 1
+  fi
+  local reply
+  _dircolor_auto_hsl "$target"
+  _dircolor_hsl_to_rgb "${reply[1]}" "${reply[2]}" "${reply[3]}"
+  printf '  \033[48;2;%d;%d;%dm     ●     \033[0m  h=%3d° s=%d%% l=%d%%  #%02x%02x%02x  %s (SELF)\n' \
+    "$_dircolor_r" "$_dircolor_g" "$_dircolor_b" \
+    "${reply[1]}" "${reply[2]}" "${reply[3]}" \
+    "$_dircolor_r" "$_dircolor_g" "$_dircolor_b" \
+    "$target"
+
+  local d
+  for d in $target/*(N/); do
+    _dircolor_auto_hsl "$d"
+    _dircolor_hsl_to_rgb "${reply[1]}" "${reply[2]}" "${reply[3]}"
+    printf '  \033[48;2;%d;%d;%dm     ●     \033[0m  h=%3d° s=%d%% l=%d%%  #%02x%02x%02x  %s\n' \
+      "$_dircolor_r" "$_dircolor_g" "$_dircolor_b" \
+      "${reply[1]}" "${reply[2]}" "${reply[3]}" \
+      "$_dircolor_r" "$_dircolor_g" "$_dircolor_b" \
+      "${d##*/}"
+  done
 }
 
 dircolor() {
@@ -340,6 +398,7 @@ dircolor() {
     pick)  _dircolor_pick ;;
     apply) _dircolor_apply ;;
     mode)  _dircolor_mode "$2" ;;
-    *)     echo "Usage: dircolor [list|set NAME|clear|show|pick|mode]" >&2 ;;
+    preview) _dircolor_preview "$2" ;;
+    *)     echo "Usage: dircolor [list|set NAME|clear|show|pick|mode|preview]" >&2 ;;
   esac
 }
