@@ -1,4 +1,4 @@
-# dircolor - per-directory terminal background colors
+# dircolor - per-directory terminal background colors, OKLab-based auto-color
 #
 # Usage:
 #   dircolor            pick a color for current directory
@@ -22,6 +22,9 @@
 _DIRCOLOR_DIR="${XDG_CONFIG_HOME:-$HOME/.config}/dircolor"
 _DIRCOLOR_PALETTE="$_DIRCOLOR_DIR/dir-palette"
 _DIRCOLOR_MAP="$_DIRCOLOR_DIR/dir-colors"
+
+# OKLab → sRGB math needs sin/cos/pow. mathfunc is a zsh core module.
+zmodload zsh/mathfunc 2>/dev/null
 
 _dircolor_ensure_map() {
   [[ -f $_DIRCOLOR_MAP ]] || touch "$_DIRCOLOR_MAP"
@@ -77,46 +80,68 @@ _dircolor_detect_mode() {
 }
 _DIRCOLOR_MODE=$(_dircolor_detect_mode)
 
-# ─── HSL → RGB integer math (× 1000 for precision) ─────────────────────────
-# Given hue (0-359), saturation (0-100), lightness (0-100), sets
-# _dircolor_r/_g/_b in 0-255. Integer-only so it works in any zsh.
-_dircolor_hsl_to_rgb() {
-  local h=$1 s=$2 l=$3
-  local L=$((l*10)) S=$((s*10))
-  local twoL=$((2*L-1000))
-  local absTwoL=$(( twoL<0 ? -twoL : twoL ))
-  local C=$(( (1000-absTwoL)*S/1000 ))
-  local Hp_x100=$(( h*100/60 ))
-  local Hp_mod=$(( Hp_x100 % 200 ))
-  local diff=$(( Hp_mod - 100 ))
-  local absDiff=$(( diff<0 ? -diff : diff ))
-  local X=$(( C*(100-absDiff)/100 ))
-  local M=$(( L - C/2 ))
+# ─── OKLab → sRGB ─────────────────────────────────────────────────────────
+# Björn Ottosson's OKLab (2020). Perceptually uniform: equal distances in
+# OKLab correspond to equal perceived color differences. Which fixes HSL's
+# green/cyan/blue arc feeling less distinct than red/orange/yellow.
+#
+# Input:  L (0-1 perceptual lightness), a (-0.4..0.4), b (-0.4..0.4)
+# Output: _dircolor_r/_g/_b as 0-255 integers via sRGB gamma correction.
+_dircolor_oklab_to_srgb() {
+  local L=$1 a=$2 b=$3
 
-  local Rp Gp Bp
-  if   (( h < 60  )); then Rp=$C; Gp=$X; Bp=0
-  elif (( h < 120 )); then Rp=$X; Gp=$C; Bp=0
-  elif (( h < 180 )); then Rp=0;  Gp=$C; Bp=$X
-  elif (( h < 240 )); then Rp=0;  Gp=$X; Bp=$C
-  elif (( h < 300 )); then Rp=$X; Gp=0;  Bp=$C
-  else                    Rp=$C; Gp=0;  Bp=$X
-  fi
+  # Non-linear cone response (LMS')
+  local l_=$(( L + 0.3963377774 * a + 0.2158037573 * b ))
+  local m_=$(( L - 0.1055613458 * a - 0.0638541728 * b ))
+  local s_=$(( L - 0.0894841775 * a - 1.2914855480 * b ))
 
-  _dircolor_r=$(( (Rp+M) * 255 / 1000 ))
-  _dircolor_g=$(( (Gp+M) * 255 / 1000 ))
-  _dircolor_b=$(( (Bp+M) * 255 / 1000 ))
+  # Cube for LMS
+  local ll=$(( l_ * l_ * l_ ))
+  local mm=$(( m_ * m_ * m_ ))
+  local ss=$(( s_ * s_ * s_ ))
+
+  # Linear sRGB
+  local rl=$((  4.0767416621 * ll - 3.3077115913 * mm + 0.2309699292 * ss ))
+  local gl=$(( -1.2684380046 * ll + 2.6097574011 * mm - 0.3413193965 * ss ))
+  local bl=$(( -0.0041960863 * ll - 0.7034186147 * mm + 1.7076147010 * ss ))
+
+  # Clamp to sRGB gamut [0, 1]
+  (( rl < 0.0 )) && rl=0.0
+  (( rl > 1.0 )) && rl=1.0
+  (( gl < 0.0 )) && gl=0.0
+  (( gl > 1.0 )) && gl=1.0
+  (( bl < 0.0 )) && bl=0.0
+  (( bl > 1.0 )) && bl=1.0
+
+  # Gamma correction: linear → sRGB
+  local rs gs bs
+  if (( rl < 0.0031308 )); then rs=$(( 12.92 * rl ));
+                          else  rs=$(( 1.055 * (rl ** (1.0/2.4)) - 0.055 )); fi
+  if (( gl < 0.0031308 )); then gs=$(( 12.92 * gl ));
+                          else  gs=$(( 1.055 * (gl ** (1.0/2.4)) - 0.055 )); fi
+  if (( bl < 0.0031308 )); then bs=$(( 12.92 * bl ));
+                          else  bs=$(( 1.055 * (bl ** (1.0/2.4)) - 0.055 )); fi
+
+  _dircolor_r=$(( int(rs * 255 + 0.5) ))
+  _dircolor_g=$(( int(gs * 255 + 0.5) ))
+  _dircolor_b=$(( int(bs * 255 + 0.5) ))
+  (( _dircolor_r < 0 ))   && _dircolor_r=0
+  (( _dircolor_r > 255 )) && _dircolor_r=255
+  (( _dircolor_g < 0 ))   && _dircolor_g=0
+  (( _dircolor_g > 255 )) && _dircolor_g=255
+  (( _dircolor_b < 0 ))   && _dircolor_b=0
+  (( _dircolor_b > 255 )) && _dircolor_b=255
 }
 
-# Auto-pick a color for a dir with no explicit mapping. Sets _dircolor_r/g/b
-# as a side effect (for `dircolor show`/`preview` reuse) and emits OSC 11.
-#
-# Uses 3 independent bytes of the SHA to spread colors across THREE axes:
-#   - hue (first 4 chars → 0-359°) — 360-way variation
-#   - lightness delta (next 2 chars → ±L_range) — extra variation so
-#     hue-collisions differ in brightness
-#   - saturation delta (next 2 chars → ±S_range) — extra vividness spread
-# End result: even directories that hash to nearly the same hue look
-# distinct because they land on different L / S values.
+# ─── PWD hash → OKLab (L, C, h) ────────────────────────────────────────────
+# Uses 3 independent bytes of the SHA to spread colors across THREE axes in
+# OKLab (perceptually uniform), so equal hash steps give equal PERCEIVED
+# color differences:
+#   - hue     (first 4 chars → 0-360°) — the color wheel, uniformly perceived
+#   - lightness (next 2 chars → ±L_range) — brightness variation
+#   - chroma  (next 2 chars → ±C_range) — vividness variation
+# Two directories that hash near each other in hue still land on different L
+# and C, so they look distinct.
 
 _dircolor_auto_hue() {
   local dir=$1
@@ -124,41 +149,54 @@ _dircolor_auto_hue() {
   print -- $(( 16#$hash % 360 ))
 }
 
-# Sets $reply=(h s l) for a dir. Used by _dircolor_auto_apply, show, preview.
+# Sets reply=(h_deg L_pct C_pct) — human-scale values for show/preview.
+# L is OKLab perceptual lightness × 100; C is OKLab chroma × 1000.
 _dircolor_auto_hsl() {
   local dir=$1
   local hash=$(printf '%s' "$dir" | shasum | cut -c1-8)
-  local h=$(( 16#${hash:0:4} % 360 ))
+  local hdeg=$(( 16#${hash:0:4} % 360 ))
+  local h_rad=$(( hdeg * 3.14159265358979 / 180.0 ))
 
-  local l_base l_range l_min l_max
-  local s_base s_range s_min s_max
+  # OKLab ranges — chosen so:
+  #   dark:  L 0.20-0.40 (visibly dark→medium), C 0.08-0.22 (muted→vivid)
+  #   light: L 0.82-0.95, C 0.05-0.15
+  local L_base L_range C_base C_range
   case $_DIRCOLOR_MODE in
     light)
-      l_base=82; l_range=22; l_min=68; l_max=93     # ±11
-      s_base=55; s_range=50; s_min=25; s_max=90     # ±25
+      L_base=0.88; L_range=0.12
+      C_base=0.10; C_range=0.10
       ;;
     *)
-      l_base=22; l_range=32; l_min=7;  l_max=40     # ±16 — wide darkness spread
-      s_base=75; s_range=50; s_min=45; s_max=100    # ±25 — muted → maxed-out
+      L_base=0.30; L_range=0.20
+      C_base=0.15; C_range=0.14
       ;;
   esac
-  local ld=$(( 16#${hash:4:2} % l_range - l_range/2 ))
-  local sd=$(( 16#${hash:6:2} % s_range - s_range/2 ))
-  local l=$(( l_base + ld ))
-  local s=$(( s_base + sd ))
-  (( l < l_min )) && l=$l_min
-  (( l > l_max )) && l=$l_max
-  (( s < s_min )) && s=$s_min
-  (( s > s_max )) && s=$s_max
+  # Two hash bytes → [-0.5, +0.5], scaled by range → offset from base
+  local ld=$(( (16#${hash:4:2} - 128) / 256.0 ))
+  local cd=$(( (16#${hash:6:2} - 128) / 256.0 ))
+  local L=$(( L_base + ld * L_range ))
+  local C=$(( C_base + cd * C_range ))
 
-  reply=( "$h" "$s" "$l" )
+  # Guard against out-of-gamut / unusable extremes.
+  (( L < 0.05 )) && L=0.05
+  (( L > 0.98 )) && L=0.98
+  (( C < 0.03 )) && C=0.03
+  (( C > 0.30 )) && C=0.30
+
+  # OKLab a/b from chroma and hue
+  local a=$(( C * cos(h_rad) ))
+  local b=$(( C * sin(h_rad) ))
+
+  _dircolor_oklab_to_srgb "$L" "$a" "$b"
+  # Human-readable reply: hue in degrees, L in %, C in 1/1000ths
+  reply=( "$hdeg" "$(( int(L * 100 + 0.5) ))" "$(( int(C * 1000 + 0.5) ))" )
 }
 
 _dircolor_auto_apply() {
   local dir=$1
   local reply
   _dircolor_auto_hsl "$dir"
-  _dircolor_hsl_to_rgb "${reply[1]}" "${reply[2]}" "${reply[3]}"
+  # _dircolor_auto_hsl already computed + populated _dircolor_r/_g/_b
   printf '\033]11;rgb:%02x/%02x/%02x\033\\' \
     "$_dircolor_r" "$_dircolor_g" "$_dircolor_b"
 }
@@ -350,12 +388,12 @@ _dircolor_show() {
     done < "$_DIRCOLOR_PALETTE"
     echo "$dir -> $best_name ($hex)"
   else
-    # Auto-color: compute + describe
+    # Auto-color: compute + describe (OKLab coordinates)
     local reply
     _dircolor_auto_hsl "$dir"
-    _dircolor_hsl_to_rgb "${reply[1]}" "${reply[2]}" "${reply[3]}"
-    printf '%s -> auto (h=%d° s=%d%% l=%d%%, %s mode) #%02x%02x%02x\n' \
-      "$dir" "${reply[1]}" "${reply[2]}" "${reply[3]}" "$_DIRCOLOR_MODE" \
+    printf '%s -> auto (h=%d° L=%d%% C=%.3f, %s mode) #%02x%02x%02x\n' \
+      "$dir" "${reply[1]}" "${reply[2]}" \
+      "$(( ${reply[3]} / 1000.0 ))" "$_DIRCOLOR_MODE" \
       "$_dircolor_r" "$_dircolor_g" "$_dircolor_b"
   fi
 }
@@ -370,8 +408,7 @@ _dircolor_preview() {
   fi
   local reply
   _dircolor_auto_hsl "$target"
-  _dircolor_hsl_to_rgb "${reply[1]}" "${reply[2]}" "${reply[3]}"
-  printf '  \033[48;2;%d;%d;%dm     ●     \033[0m  h=%3d° s=%d%% l=%d%%  #%02x%02x%02x  %s (SELF)\n' \
+  printf '  \033[48;2;%d;%d;%dm     ●     \033[0m  h=%3d° L=%d%% C=%3d  #%02x%02x%02x  %s (SELF)\n' \
     "$_dircolor_r" "$_dircolor_g" "$_dircolor_b" \
     "${reply[1]}" "${reply[2]}" "${reply[3]}" \
     "$_dircolor_r" "$_dircolor_g" "$_dircolor_b" \
@@ -380,12 +417,12 @@ _dircolor_preview() {
   local d
   for d in $target/*(N/); do
     _dircolor_auto_hsl "$d"
-    _dircolor_hsl_to_rgb "${reply[1]}" "${reply[2]}" "${reply[3]}"
-    printf '  \033[48;2;%d;%d;%dm     ●     \033[0m  h=%3d° s=%d%% l=%d%%  #%02x%02x%02x  %s\n' \
+    local label=${${d%/}##*/}
+    printf '  \033[48;2;%d;%d;%dm     ●     \033[0m  h=%3d° L=%d%% C=%3d  #%02x%02x%02x  %s\n' \
       "$_dircolor_r" "$_dircolor_g" "$_dircolor_b" \
       "${reply[1]}" "${reply[2]}" "${reply[3]}" \
       "$_dircolor_r" "$_dircolor_g" "$_dircolor_b" \
-      "${d##*/}"
+      "$label"
   done
 }
 
