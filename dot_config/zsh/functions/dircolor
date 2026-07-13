@@ -22,10 +22,6 @@ _dircolor_ensure_map() {
 }
 
 _dircolor_apply() {
-  # Skip in SSH sessions — the SSH remote-tint block (interactive.zsh) owns the
-  # background so a fixed per-host color survives cd/nested-ssh without fighting.
-  [ -n "$SSH_CONNECTION" ] && return
-
   local dir=${1:-$PWD}
 
   # Longest-prefix match on directory paths
