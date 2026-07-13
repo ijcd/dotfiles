@@ -6,12 +6,18 @@
 #   dircolor set NAME   set current dir to NAME from palette
 #   dircolor clear      remove color for current dir
 #   dircolor show       show current dir's color
+#   dircolor mode       show or set dark/light mode override
 #   dircolor apply      apply color for current dir (called by chpwd hook)
 #
 # Colors are applied via OSC 11 escape sequences (works in kitty, iTerm2, etc.)
 # Palette:  $XDG_CONFIG_HOME/dircolor/dir-palette  (name:hex, tracked in chezmoi)
 # Mappings: $XDG_CONFIG_HOME/dircolor/dir-colors   (path:name, auto-created)
 # Delimiter is last colon — paths with spaces work fine (macOS forbids : in filenames)
+#
+# When a path has NO explicit mapping in dir-colors, dircolor auto-picks a
+# color derived from the SHA of $PWD: hue from hash (~0-359°), fixed
+# saturation/lightness chosen for dark or light mode. Adjacent paths hash
+# to unrelated hues so distinct dirs look distinct.
 
 _DIRCOLOR_DIR="${XDG_CONFIG_HOME:-$HOME/.config}/dircolor"
 _DIRCOLOR_PALETTE="$_DIRCOLOR_DIR/dir-palette"
@@ -19,6 +25,109 @@ _DIRCOLOR_MAP="$_DIRCOLOR_DIR/dir-colors"
 
 _dircolor_ensure_map() {
   [[ -f $_DIRCOLOR_MAP ]] || touch "$_DIRCOLOR_MAP"
+}
+
+# ─── Dark/light mode detection ─────────────────────────────────────────────
+# The macOS AppleInterfaceStyle reflects SYSTEM UI theme, not what the
+# terminal is actually showing (kitty/ghostty/iTerm background is an
+# independent theme setting). So we ask the terminal directly via OSC 11
+# query: emit `\e]11;?\e\\` and parse the `rgb:RRRR/GGGG/BBBB` response.
+# Perceived luminance decides mode. If no response in ~200ms, default to
+# dark (the pragmatic majority-case for terminal usage).
+#
+# Override: `export DIRCOLOR_MODE=dark` (or `light`) in zshenv skips detection.
+_dircolor_detect_mode() {
+  if [[ -n $DIRCOLOR_MODE ]]; then
+    print -r -- "$DIRCOLOR_MODE"
+    return
+  fi
+
+  # Only query if we have a real controlling terminal
+  if [[ ! -t 1 ]] || [[ ! -c /dev/tty ]]; then
+    print dark; return
+  fi
+
+  local response=""
+  local old_stty
+  old_stty=$(stty -g </dev/tty 2>/dev/null) || { print dark; return }
+  stty -icanon -echo min 0 time 2 </dev/tty 2>/dev/null
+  printf '\033]11;?\033\\' > /dev/tty
+  IFS= read -k 40 -t 0.2 response </dev/tty 2>/dev/null
+  stty "$old_stty" </dev/tty 2>/dev/null
+
+  # Parse the "rgb:RRRR/GGGG/BBBB" (widths vary by terminal, typically 4 hex each)
+  if [[ $response == *rgb:*/*/* ]]; then
+    local rgb=${response#*rgb:}
+    rgb=${rgb%%$'\e'*}
+    rgb=${rgb%%$'\a'*}
+    local r16=${rgb%%/*}
+    local rest=${rgb#*/}
+    local g16=${rest%%/*}
+    local b16=${rest#*/}
+    local r=$(( 16#${r16:0:2} ))
+    local g=$(( 16#${g16:0:2} ))
+    local b=$(( 16#${b16:0:2} ))
+    # BT.601 perceived luminance: 0.299R + 0.587G + 0.114B (× 1000 for int math)
+    local Y=$(( (r*299 + g*587 + b*114) / 1000 ))
+    if (( Y < 128 )); then print dark; else print light; fi
+    return
+  fi
+
+  print dark
+}
+_DIRCOLOR_MODE=$(_dircolor_detect_mode)
+
+# ─── HSL → RGB integer math (× 1000 for precision) ─────────────────────────
+# Given hue (0-359), saturation (0-100), lightness (0-100), sets
+# _dircolor_r/_g/_b in 0-255. Integer-only so it works in any zsh.
+_dircolor_hsl_to_rgb() {
+  local h=$1 s=$2 l=$3
+  local L=$((l*10)) S=$((s*10))
+  local twoL=$((2*L-1000))
+  local absTwoL=$(( twoL<0 ? -twoL : twoL ))
+  local C=$(( (1000-absTwoL)*S/1000 ))
+  local Hp_x100=$(( h*100/60 ))
+  local Hp_mod=$(( Hp_x100 % 200 ))
+  local diff=$(( Hp_mod - 100 ))
+  local absDiff=$(( diff<0 ? -diff : diff ))
+  local X=$(( C*(100-absDiff)/100 ))
+  local M=$(( L - C/2 ))
+
+  local Rp Gp Bp
+  if   (( h < 60  )); then Rp=$C; Gp=$X; Bp=0
+  elif (( h < 120 )); then Rp=$X; Gp=$C; Bp=0
+  elif (( h < 180 )); then Rp=0;  Gp=$C; Bp=$X
+  elif (( h < 240 )); then Rp=0;  Gp=$X; Bp=$C
+  elif (( h < 300 )); then Rp=$X; Gp=0;  Bp=$C
+  else                    Rp=$C; Gp=0;  Bp=$X
+  fi
+
+  _dircolor_r=$(( (Rp+M) * 255 / 1000 ))
+  _dircolor_g=$(( (Gp+M) * 255 / 1000 ))
+  _dircolor_b=$(( (Bp+M) * 255 / 1000 ))
+}
+
+# Auto-pick a color for a dir with no explicit mapping.
+# Sets _dircolor_r/_g/_b as a side effect (for `dircolor show` reuse) and
+# emits the OSC 11 sequence.
+_dircolor_auto_hue() {
+  local dir=$1
+  # Take first 4 hex chars of shasum → 0-65535 → mod 360 for hue.
+  local hash=$(printf '%s' "$dir" | shasum | cut -c1-4)
+  print -- $(( 16#$hash % 360 ))
+}
+
+_dircolor_auto_apply() {
+  local dir=$1
+  local h=$(_dircolor_auto_hue "$dir")
+  local s l
+  case $_DIRCOLOR_MODE in
+    light) s=25 l=88 ;;   # subtle pastel bg for light mode
+    *)     s=50 l=15 ;;   # muted dark bg for dark mode
+  esac
+  _dircolor_hsl_to_rgb "$h" "$s" "$l"
+  printf '\033]11;rgb:%02x/%02x/%02x\033\\' \
+    "$_dircolor_r" "$_dircolor_g" "$_dircolor_b"
 }
 
 _dircolor_apply() {
@@ -39,7 +148,11 @@ _dircolor_apply() {
     done < "$_DIRCOLOR_MAP"
   fi
 
-  [[ -z $best_name ]] && best_name=default
+  # No explicit mapping? Auto-pick from PWD hash, sensitive to dark/light mode.
+  if [[ -z $best_name ]]; then
+    _dircolor_auto_apply "$dir"
+    return
+  fi
 
   # Resolve name to hex from palette
   local hex pline
@@ -55,6 +168,24 @@ _dircolor_apply() {
   # Convert #rrggbb to rr/gg/bb for OSC 11
   local r=${hex:1:2} g=${hex:3:2} b=${hex:5:2}
   printf '\033]11;rgb:%s/%s/%s\033\\' "$r" "$g" "$b"
+}
+
+# Show or override the dark/light mode.
+_dircolor_mode() {
+  case ${1:-} in
+    "") echo "$_DIRCOLOR_MODE" ;;
+    dark|light|auto)
+      if [[ $1 == auto ]]; then
+        unset DIRCOLOR_MODE
+      else
+        export DIRCOLOR_MODE=$1
+      fi
+      _DIRCOLOR_MODE=$(_dircolor_detect_mode)
+      echo "$_DIRCOLOR_MODE"
+      _dircolor_apply
+      ;;
+    *) echo "Usage: dircolor mode [dark|light|auto]" >&2; return 1 ;;
+  esac
 }
 
 _dircolor_list() {
@@ -176,7 +307,28 @@ _dircolor_show() {
       best_len=${#mpath}
     fi
   done < "$_DIRCOLOR_MAP"
-  echo "$dir -> ${best_name:-default}"
+
+  if [[ -n $best_name ]]; then
+    # Resolve to hex for display
+    local hex pline
+    while read -r pline; do
+      [[ -n $pline && $pline != \#* ]] || continue
+      [[ ${pline%:*} == $best_name ]] && { hex=${pline##*:}; break; }
+    done < "$_DIRCOLOR_PALETTE"
+    echo "$dir -> $best_name ($hex)"
+  else
+    # Auto-color: compute + describe
+    local h=$(_dircolor_auto_hue "$dir")
+    local s l
+    case $_DIRCOLOR_MODE in
+      light) s=25 l=88 ;;
+      *)     s=50 l=15 ;;
+    esac
+    _dircolor_hsl_to_rgb "$h" "$s" "$l"
+    printf '%s -> auto (hue %d°, %s mode) #%02x%02x%02x\n' \
+      "$dir" "$h" "$_DIRCOLOR_MODE" \
+      "$_dircolor_r" "$_dircolor_g" "$_dircolor_b"
+  fi
 }
 
 dircolor() {
@@ -187,6 +339,7 @@ dircolor() {
     show)  _dircolor_show ;;
     pick)  _dircolor_pick ;;
     apply) _dircolor_apply ;;
-    *)     echo "Usage: dircolor [list|set NAME|clear|show|pick]" >&2 ;;
+    mode)  _dircolor_mode "$2" ;;
+    *)     echo "Usage: dircolor [list|set NAME|clear|show|pick|mode]" >&2 ;;
   esac
 }
