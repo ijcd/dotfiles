@@ -134,12 +134,12 @@ _dircolor_auto_hsl() {
   local s_base s_range s_min s_max
   case $_DIRCOLOR_MODE in
     light)
-      l_base=82; l_range=14; l_min=72; l_max=93     # ±7
-      s_base=55; s_range=30; s_min=35; s_max=85     # ±15
+      l_base=82; l_range=22; l_min=68; l_max=93     # ±11
+      s_base=55; s_range=50; s_min=25; s_max=90     # ±25
       ;;
     *)
-      l_base=22; l_range=22; l_min=11; l_max=35     # ±11 — meaningful darkness variation
-      s_base=75; s_range=30; s_min=45; s_max=95     # ±15
+      l_base=22; l_range=32; l_min=7;  l_max=40     # ±16 — wide darkness spread
+      s_base=75; s_range=50; s_min=45; s_max=100    # ±25 — muted → maxed-out
       ;;
   esac
   local ld=$(( 16#${hash:4:2} % l_range - l_range/2 ))
