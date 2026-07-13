@@ -36,11 +36,14 @@ email = "ian@golunar.com"
 email = "ian@ianduggan.net"
 {{- end }}
 
-# Workflow aliases (host-independent). `mine` = my ijcd/ bookmarks; the restack
-# aliases rebase that whole set onto trunk() / local main. `sincemain` = my work
-# since local main (swap `local/main` for `trunk()` to measure from remote master).
+# Workflow aliases (host-independent). `mine` = my branches that hang off local/main:
+# bookmarked descendants of local/main's own commits (trunk()..local/main), minus main
+# itself. Topology-based, not naming-based, so a mis-named branch (ijcd- vs ijcd/) can't
+# silently escape restack-mine — it "tugs" whatever is attached to main. The restack
+# aliases rebase that whole set onto trunk() / local main. `sincemain` = my work since
+# local main (swap `local/main` for `trunk()` to measure from remote master).
 [revset-aliases]
-'mine' = 'bookmarks(regex:"^ijcd/")'
+'mine' = 'bookmarks() & descendants(trunk()..local/main) ~ local/main'
 'sincemain' = 'local/main..@'
 'sincemaster' = 'trunk()..@'
 # closest_bookmark(to) = the nearest bookmark at-or-behind `to` (used by `jj tug`).

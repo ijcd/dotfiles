@@ -1,6 +1,7 @@
 #!/bin/sh
-# jj-refresh-workspaces - refresh stale jj workspaces after an edit you want to
-# "flow through", showing (and by default skipping) any with work in progress.
+# jj-refresh-workspaces - refresh stale jj workspaces after a history rewrite you
+# want to "flow through" to every workspace, showing (and by default skipping)
+# any with work in progress.
 #
 # Enumerates every workspace of the current repo via `jj workspace list`, so it
 # covers all of them wherever they live -- including the default/main-repo
@@ -10,24 +11,33 @@
 #                                  showing a --stat of each one's changes.
 #   jj-refresh-workspaces -p       for WIP workspaces, show the full diff (-p /
 #                                  --patch) instead of just --stat.
-#   jj-refresh-workspaces -f       ALSO refresh WIP workspaces (-f / --force;
-#                                  see below).
+#   jj-refresh-workspaces -f       ALSO refresh WIP workspaces (-f / --force).
 #
 # Per workspace:
-#   * @ empty              -> `jj workspace update-stale` (refresh; a verified-safe
-#                            no-op if not stale).
-#   * @ has changes (WIP)  -> default: skip + show what's there. --force: refresh
-#                            it too.
+#   * @ empty                -> `jj workspace update-stale` (refresh; no-op if
+#                              already current).
+#   * @ has changes, CURRENT -> `ok (has WIP)`: nothing to refresh; work left as-is.
+#   * @ has changes, STALE   -> default: skip + show the diff (run -f to refresh).
+#                               --force: update-stale rebases the change onto the
+#                               refreshed history; a clash becomes an in-commit
+#                               conflict, never a loss -- `jj op restore` undoes all.
 #
-# It first runs a plain `jj status` in each workspace, which SNAPSHOTS the working
-# copy -- so any on-disk edits (e.g. files a coding agent just laid down) are
-# captured into that workspace's @ BEFORE update-stale touches it. Verified: this
-# prevents the clobber that would otherwise eat an un-snapshotted edit in a stale
-# workspace (straight-to-update-stale loses it; snapshot-first preserves it).
+# Mechanics: state (empty vs WIP) is read with `--ignore-working-copy`, which works
+# even when the workspace is STALE -- the case that matters, since a rewrite leaves
+# every other workspace stale. A best-effort `jj status` first snapshots on-disk
+# edits into @ when the workspace is current; jj refuses to snapshot a stale
+# workspace, so that step is simply skipped for it and update-stale (what it needs)
+# still runs. All per-workspace jj calls `cd` into the workspace -- `jj -R
+# <workspace>` errors on a stale workspace and does not reliably target its @.
 #
-# --force additionally runs update-stale on WIP workspaces: it rebases them so the
-# change rides on top of the refreshed history. A clash becomes an in-commit
-# conflict, never a loss; `jj op log` / `jj op restore` undoes the whole run.
+# It ends with a brew-doctor-style "next steps" summary of anything still needing a
+# hand: broken paths, stale+WIP workspaces to -f, uncommitted work to commit, and
+# conflicted commits to resolve -- or an all-clear when there's nothing.
+#
+# BLIND SPOT: on-disk edits made in a workspace while it is ALREADY stale were
+# never snapshotted (stale blocks it) and update-stale overwrites them. Snapshot a
+# workspace (run any jj command in it) BEFORE it goes stale -- jj-catch-up does
+# this in its pre-rebase pass.
 set -eu
 
 show=stat
@@ -45,6 +55,12 @@ while [ $# -gt 0 ]; do
     esac
 done
 
+TAB=$(printf '\t')
+
+# Command to suggest for the -f re-run. jj-catch-up overrides this (via env) so
+# the tip names the command the user actually ran, not this inner tool.
+FIX_CMD="${JJRW_FIX_CMD:-jj-refresh-workspaces}"
+
 # Show a WIP workspace's recorded @ change: --stat by default, full diff with -p.
 _show_wip() {  # $1 = workspace root; cd in so paths render workspace-relative
     if [ "$show" = patch ]; then
@@ -61,37 +77,92 @@ ws_list=$(jj workspace list --ignore-working-copy \
 }
 [ -n "$ws_list" ] || { echo "jj-refresh-workspaces: no workspaces found." >&2; exit 1; }
 
-printf '%s\n' "$ws_list" | while IFS="$(printf '\t')" read -r name root; do
-    [ -n "${root:-}" ] || continue
+# Loop over a temp file (not a `cmd | while` pipe) so the accumulated tip-lists
+# survive to the summary below -- a pipe subshell would discard them.
+tmp=$(mktemp) || { echo "jj-refresh-workspaces: mktemp failed." >&2; exit 1; }
+trap 'rm -f "$tmp"' EXIT INT TERM
+printf '%s\n' "$ws_list" > "$tmp"
 
-    # Snapshot first: capture any on-disk edits (e.g. from a coding agent) into @
-    # so the update-stale below can't clobber them (verified). A failure here
-    # means the workspace itself is broken/dead -> skip it.
-    if ! jj -R "$root" status >/dev/null 2>&1; then
-        printf '  skip(?)    %-30s could not snapshot (dead workspace? `jj workspace forget %s`)\n' "$name" "$name" >&2
+bad_path=""      # unreachable recorded path -> forget + re-add
+wip_stale=""     # stale + WIP, skipped -> needs -f
+wip_current=""   # current + WIP -> commit or discard when ready
+
+while IFS="$TAB" read -r name root; do
+    [ -n "${name:-}" ] || continue
+
+    # Unreachable recorded path (missing/unresolvable "<Error ...>").
+    if [ ! -d "$root" ]; then
+        printf '  skip(bad-path) %-28s %s\n' "$name" "$root" >&2
+        bad_path="$bad_path $name"
         continue
     fi
 
-    state=$(jj -R "$root" --ignore-working-copy log --no-graph -r @ \
-                -T 'if(empty, "clean", "wip")' 2>/dev/null || echo err)
+    # Best-effort snapshot: captures on-disk edits into @ when current. jj refuses
+    # to snapshot a STALE workspace, so success/failure doubles as the stale check.
+    if ( cd "$root" && jj status >/dev/null 2>&1 ); then stale=0; else stale=1; fi
+
+    # Read the recorded @ WITHOUT snapshotting -- works even when stale.
+    state=$( cd "$root" && jj --ignore-working-copy log --no-graph -r @ \
+                 -T 'if(empty, "clean", "wip")' 2>/dev/null || echo err )
 
     case "$state" in
         err)
-            printf '  skip(?)    %-30s could not read @ (dead workspace? `jj workspace forget %s`)\n' "$name" "$name" >&2 ;;
+            printf '  skip(?)    %-28s could not read @ (dead? `jj workspace forget %s`)\n' "$name" "$name" >&2 ;;
         clean)
             out=$( cd "$root" && jj workspace update-stale 2>&1 || true )
             case "$out" in
-                *"not stale"*) printf '  ok         %-30s up to date\n' "$name" ;;
-                *)             printf '  refreshed  %-30s\n' "$name" ;;
+                *"not stale"*|*"Nothing changed"*|"") printf '  ok         %-28s up to date\n' "$name" ;;
+                *)                                     printf '  refreshed  %-28s\n' "$name" ;;
             esac ;;
         wip)
-            if [ "$force" -eq 1 ]; then
-                printf '  refreshed  %-30s (had WIP — rebased onto refresh)\n' "$name"
+            if [ "$stale" -eq 0 ]; then
+                printf '  ok         %-28s up to date (has WIP)\n' "$name"
+                wip_current="$wip_current $name"
+            elif [ "$force" -eq 1 ]; then
+                printf '  refreshed  %-28s (was stale + WIP -- rebased onto refresh)\n' "$name"
                 _show_wip "$root"
                 ( cd "$root" && jj workspace update-stale 2>&1 | sed 's/^/               /' ) || true
             else
-                printf '  skip(WIP)  %-30s @ has changes:\n' "$name" >&2
+                printf '  skip(WIP,stale) %-24s stale with changes -- run -f to refresh:\n' "$name" >&2
                 _show_wip "$root"
+                wip_stale="$wip_stale $name"
             fi ;;
     esac
-done
+done < "$tmp"
+
+# --- next steps (brew-doctor style) -----------------------------------------
+conflicted=$(jj log --no-graph -r 'conflicts()' \
+                 -T 'change_id.shortest() ++ " "' 2>/dev/null || true)
+
+if [ -n "$bad_path$wip_stale$wip_current" ] || [ -n "$conflicted" ]; then
+    echo
+    echo "next steps:"
+    if [ -n "$bad_path" ]; then
+        echo "  * broken workspace path (unreachable) -- forget + re-add:"
+        for w in $bad_path; do echo "        $w"; done
+        echo "      \$ jj workspace forget <name> && jj workspace add --name <name> -r <bookmark> <path>"
+        echo
+    fi
+    if [ -n "$wip_stale" ]; then
+        echo "  * stale + uncommitted work (not refreshed):"
+        for w in $wip_stale; do echo "        $w"; done
+        echo "      \$ $FIX_CMD -f"
+        echo
+    fi
+    if [ -n "$wip_current" ]; then
+        echo "  * uncommitted work parked in @ -- commit or discard when ready:"
+        for w in $wip_current; do echo "        $w"; done
+        echo "      \$ cd <ws> && jj commit -m '...'   # keep"
+        echo "      \$ cd <ws> && jj restore <path>    # drop"
+        echo
+    fi
+    if [ -n "$conflicted" ]; then
+        echo "  * conflicted commit(s) present -- resolve:"
+        for c in $conflicted; do echo "        $c"; done
+        echo "      \$ jj log -r 'conflicts()'         # then edit files / jj resolve"
+        echo
+    fi
+else
+    echo
+    echo "all workspaces clean and current -- nothing to do."
+fi

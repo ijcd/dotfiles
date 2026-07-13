@@ -1,0 +1,110 @@
+#!/bin/sh
+# jj-catch-up - pull latest trunk and restack the whole personal stack
+# (local/main + ijcd/* feature branches) onto it, keeping every workspace's
+# working copy usable.
+#
+#   1. list + VALIDATE workspaces (warn on any with an unusable recorded path)
+#   2. snapshot each reachable one  (lock any WIP into @ BEFORE we rewrite
+#      history, so the rebases carry it -- avoids the update-stale blind spot)
+#   3. jj git fetch  ->  jj restack  ->  jj restack-mine  ->  jj-refresh-workspaces
+#
+# A workspace whose recorded path is missing or unresolvable (jj renders it as
+# "<Error ...>", or the path no longer exists) cannot be reached from the main
+# repo. NOTE: `jj workspace update-stale` does NOT repair this -- it only syncs
+# the working copy; the broken path record survives. The fix is forget + re-add
+# (see the warning this prints). Such workspaces are skipped by the catch-up.
+#
+# Run from inside any workspace of the repo.
+#   jj-catch-up          list, snapshot, fetch, restack, refresh (skip WIP)
+#   jj-catch-up -f       also refresh WIP workspaces (jj-refresh-workspaces --force)
+#   jj-catch-up -c       CHECK only: validate workspace paths and exit (no fetch/
+#                        restack). Exits non-zero if any path is broken.
+set -eu
+
+usage() { awk 'NR==1{next} !/^#/{exit} {sub(/^# ?/,"");print}' "$0"; }
+
+refresh_flag=""
+check_only=0
+case "${1:-}" in
+    -f|--force) refresh_flag="-f" ;;
+    -c|--check) check_only=1 ;;
+    -h|--help)  usage; exit 0 ;;
+    "" ) ;;
+    *) printf 'jj-catch-up: unknown arg: %s\n' "$1" >&2; exit 2 ;;
+esac
+
+TAB=$(printf '\t')
+
+ws_list=$(jj workspace list --ignore-working-copy \
+              -T 'name ++ "\t" ++ root ++ "\n"' 2>/dev/null) || {
+    echo "jj-catch-up: run this from inside a jj repo/workspace." >&2
+    exit 1
+}
+[ -n "$ws_list" ] || { echo "jj-catch-up: no workspaces found." >&2; exit 1; }
+
+# --- 1. list + validate ---
+# A root is usable only if it's an existing directory. jj emits "<Error ...>"
+# for a workspace with no/unresolvable recorded path; that also fails -d.
+echo "== workspaces =="
+printf '%s\n' "$ws_list" | while IFS="$TAB" read -r name root; do
+    [ -n "${name:-}" ] || continue
+    if [ -d "$root" ]; then
+        printf '  ok   %-32s %s\n' "$name" "$root"
+    else
+        printf '  BAD  %-32s %s\n' "$name" "$root"
+    fi
+done
+
+# Collect the unreachable ones (captured via cmd-substitution stdout; the `if`
+# form keeps the loop's exit status 0 so `set -e` doesn't trip).
+broken=$(printf '%s\n' "$ws_list" | while IFS="$TAB" read -r name root; do
+    if [ -n "${name:-}" ] && [ ! -d "$root" ]; then printf '%s\n' "$name"; fi
+done)
+
+if [ -n "$broken" ]; then
+    {
+        echo
+        echo "!! WARNING: these workspaces have an UNUSABLE recorded path -- the main"
+        echo "   repo cannot reach them, so the catch-up will SKIP them:"
+        printf '%s\n' "$broken" | sed 's/^/       /'
+        echo "   NOTE: 'jj workspace update-stale' does NOT fix this -- it syncs the"
+        echo "   working copy but leaves the path record broken. Repair each by"
+        echo "   forgetting and re-adding at its real location:"
+        echo "       jj workspace forget <name>"
+        echo "       jj workspace add --name <name> -r <bookmark> <real-path>"
+        echo "   (pin any WIP @ with a bookmark BEFORE forgetting, or it can be lost)."
+        echo
+    } >&2
+fi
+
+# --- check-only mode: report and exit (non-zero if anything is broken) ---
+if [ "$check_only" -eq 1 ]; then
+    if [ -n "$broken" ]; then exit 1; fi
+    echo "all workspace paths resolve."
+    exit 0
+fi
+
+# --- 2. snapshot reachable workspaces (lock WIP into @ before rewriting) ---
+echo "== snapshot =="
+printf '%s\n' "$ws_list" | while IFS="$TAB" read -r name root; do
+    [ -n "${name:-}" ] || continue
+    if [ ! -d "$root" ]; then
+        printf '  skip(bad-path) %s\n' "$name" >&2
+    elif ( cd "$root" && jj status >/dev/null 2>&1 ); then
+        printf '  snapshotted    %s\n' "$name"
+    else
+        printf '  stale          %s (will be caught by refresh / update-stale)\n' "$name" >&2
+    fi
+done
+
+# --- 3. fetch + restack + refresh ---
+echo "== fetch + restack onto latest trunk =="
+set -x
+jj git fetch
+jj restack
+jj restack-mine
+set +x
+echo "== refresh workspaces =="
+# jj-refresh-workspaces ends with its own brew-doctor "next steps" summary
+# (broken paths, stale+WIP to -f, parked WIP to commit, conflicts to resolve).
+JJRW_FIX_CMD=jj-catch-up jj-refresh-workspaces $refresh_flag
