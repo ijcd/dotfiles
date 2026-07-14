@@ -1,0 +1,24 @@
+#!/usr/bin/env bash
+# ai-pull — pull the local models OpenCode/LiteLLM expect. Idempotent (ollama
+# skips already-present blobs). No args = pull the defaults; pass tags to override.
+# Models are multi-GB and NOT pulled at nix/chezmoi apply time — run this once.
+set -euo pipefail
+
+if ! curl -sf http://127.0.0.1:11434/api/tags >/dev/null 2>&1; then
+  echo "ollama not reachable on :11434 — is the launchd agent running?" >&2
+  echo "  check: launchctl list | grep ollama ; tail ~/.local/state/local-ai/ollama.err.log" >&2
+  exit 1
+fi
+
+models=("$@")
+if [ "${#models[@]}" -eq 0 ]; then
+  models=(qwen3-coder:30b qwen3:4b)
+fi
+
+for m in "${models[@]}"; do
+  echo "==> ollama pull $m"
+  ollama pull "$m"
+done
+
+echo "==> installed models:"
+ollama list
