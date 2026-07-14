@@ -1,4 +1,25 @@
 { pkgs, inputs, ... }:
+let
+  # jj-stack: stacked GitHub PRs from jj bookmarks. npm-only (not in nixpkgs or
+  # Homebrew), ReScript→tsc→esbuild build. Packaged inline via buildNpmPackage so
+  # it stays declarative like jj-spr. Bump: change rev/version, then refresh both
+  # hashes — src via `nix-prefetch-url --unpack <tarball>` + `nix hash to-sri`,
+  # npmDepsHash via `nix run nixpkgs#prefetch-npm-deps -- package-lock.json`.
+  jj-stack = pkgs.buildNpmPackage {
+    pname = "jj-stack";
+    version = "1.2.1";
+    src = pkgs.fetchFromGitHub {
+      owner = "keanemind";
+      repo = "jj-stack";
+      rev = "v1.2.1";
+      hash = "sha256-fk+FZv4lu+noM6ig4NFGAlRy4AWdEjkLIDZZ877bKLs=";
+    };
+    npmDepsHash = "sha256-RVOnxdzSpgyxfS+EZS1oIlX+chUl8GyLXKrmVlEmLPg=";
+    # build = res:build (rescript) && tsc && esbuild:build; bins jst + jj-stack
+    # come from package.json "bin". Prebuilt rescript/esbuild binaries run as-is
+    # on darwin (Mach-O, no patchelf needed).
+  };
+in
 {
   home = {
     packages = with pkgs; [
@@ -54,6 +75,8 @@
       (inputs.jj-spr.packages.${pkgs.stdenv.hostPlatform.system}.default.overrideAttrs (_: {
         doCheck = false;
       }))
+      jj-vine            # stacked PRs from jj bookmarks (GitHub/GitLab/Forgejo/Azure)
+      jj-stack           # stacked GitHub PRs from jj bookmarks (jst); npm→buildNpmPackage above
 
       # ─────────────────────────────────────────────────────────────────────────
       # Dev environment

@@ -1,0 +1,39 @@
+# -*- mode: sh -*-
+# shellcheck shell=bash
+#
+# direnv extension functions, sourced before each .envrc.
+# (Coexists with the nix/home-manager-managed lib/*.sh files.)
+
+# use_jjvine — bootstrap jj-vine config for the current repo.
+#
+# forge/host/token are global (user config, shared by every repo); project is
+# per-repo. Idempotent: the slow gh / jj-remote calls fire only on first-time
+# init per key, so steady-state entry is a handful of local `jj config get`s.
+#
+# Add `use_jjvine` to a repo's .envrc (or .envrc.local) to enable.
+use_jjvine() {
+  command -v jj      >/dev/null 2>&1 || return 0   # jj installed?
+  command -v jj-vine >/dev/null 2>&1 || return 0   # jj-vine installed?
+  jj root            >/dev/null 2>&1 || return 0   # inside a jj repo/workspace?
+
+  # set KEY only if unset, then do it; value comes from the trailing command
+  _jjvine_ensure() {
+    local scope=$1 key=$2; shift 2
+    jj config get "$key" >/dev/null 2>&1 && return 0
+    local val; val=$("$@" 2>/dev/null) || return 0
+    [ -n "$val" ] || return 0
+    jj config set "$scope" "$key" "$val" && log_status "jjvine: set $key"
+  }
+
+  # derive owner/repo from jj's origin remote — works in a workspace (no .git / gh needed)
+  _jjvine_project() {
+    jj git remote list 2>/dev/null \
+      | awk '$1=="origin"{print $2}' \
+      | sed -E 's#\.git$##; s#^.*[:/]([^/:]+/[^/:]+)$#\1#'
+  }
+
+  _jjvine_ensure --user jj-vine.forge          printf %s github
+  _jjvine_ensure --user jj-vine.github.host    printf %s https://api.github.com
+  _jjvine_ensure --user jj-vine.github.token   gh auth token
+  _jjvine_ensure --repo jj-vine.github.project _jjvine_project
+}
