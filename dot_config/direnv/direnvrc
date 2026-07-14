@@ -6,9 +6,12 @@
 
 # use_jjvine — bootstrap jj-vine config for the current repo.
 #
-# forge/host/token are global (user config, shared by every repo); project is
-# per-repo. Idempotent: the slow gh / jj-remote calls fire only on first-time
-# init per key, so steady-state entry is a handful of local `jj config get`s.
+# forge/host/token are global (shared by every repo) and the token is SECRET —
+# so they go to ~/.config/jj/conf.d/jj-vine.toml (jj merges conf.d into user
+# config, but chezmoi does NOT manage it). They must NOT touch the managed
+# ~/.config/jj/config.toml — that would fight every `chezmoi apply` and risk
+# committing the token. project is per-repo (repo-scope → .jj/repo/config.toml).
+# Idempotent: slow gh / jj-remote calls fire only on first-time init.
 #
 # Add `use_jjvine` to a repo's .envrc (or .envrc.local) to enable.
 use_jjvine() {
@@ -16,13 +19,33 @@ use_jjvine() {
   command -v jj-vine >/dev/null 2>&1 || return 0   # jj-vine installed?
   jj root            >/dev/null 2>&1 || return 0   # inside a jj repo/workspace?
 
-  # set KEY only if unset, then do it; value comes from the trailing command
-  _jjvine_ensure() {
-    local scope=$1 key=$2; shift 2
+  # user-scope config (forge/host/token) → conf.d, NOT the managed config.toml.
+  # Guard on token presence so `gh auth token` runs only on first init. 0600.
+  _jjvine_user_conf() {
+    jj config get jj-vine.github.token >/dev/null 2>&1 && return 0
+    local tok; tok=$(gh auth token 2>/dev/null) || return 0
+    [ -n "$tok" ] || return 0
+    local f="${XDG_CONFIG_HOME:-$HOME/.config}/jj/conf.d/jj-vine.toml"
+    mkdir -p "${f%/*}"
+    ( umask 077; cat > "$f" <<EOF
+# Written by use_jjvine (direnvrc). NOT chezmoi-managed — holds a GitHub token.
+[jj-vine]
+forge = "github"
+
+[jj-vine.github]
+host = "https://api.github.com"
+token = "$tok"
+EOF
+    ) && log_status "jjvine: wrote conf.d/jj-vine.toml (token, 0600)"
+  }
+
+  # repo-scope only (lands in .jj/repo/config.toml, not the managed user file)
+  _jjvine_ensure_repo() {
+    local key=$1; shift
     jj config get "$key" >/dev/null 2>&1 && return 0
     local val; val=$("$@" 2>/dev/null) || return 0
     [ -n "$val" ] || return 0
-    jj config set "$scope" "$key" "$val" && log_status "jjvine: set $key"
+    jj config set --repo "$key" "$val" && log_status "jjvine: set $key"
   }
 
   # derive owner/repo from jj's origin remote — works in a workspace (no .git / gh needed)
@@ -32,8 +55,21 @@ use_jjvine() {
       | sed -E 's#\.git$##; s#^.*[:/]([^/:]+/[^/:]+)$#\1#'
   }
 
-  _jjvine_ensure --user jj-vine.forge          printf %s github
-  _jjvine_ensure --user jj-vine.github.host    printf %s https://api.github.com
-  _jjvine_ensure --user jj-vine.github.token   gh auth token
-  _jjvine_ensure --repo jj-vine.github.project _jjvine_project
+  # jj-vine names the PR base from a LOCAL bookmark on trunk(); warn (don't mutate) if missing
+  _jjvine_check_trunk() {
+    [ -n "$(jj log -r 'trunk()' --no-pager -T 'local_bookmarks' 2>/dev/null)" ] && return 0
+    local rb
+    rb=$(jj log -r 'trunk()' --no-pager -T 'bookmarks' 2>/dev/null | tr ' ' '\n' | grep '@' | head -1)
+    if [ -n "$rb" ]; then
+      log_error "jjvine: trunk() has no local bookmark — 'jj-vine submit' can't name the PR base. Run:"
+      log_error "          jj bookmark track $rb"
+    else
+      log_error "jjvine: trunk() has no bookmark — run 'jj bookmark track <name>@origin' before 'jj-vine submit'."
+    fi
+  }
+
+  _jjvine_user_conf
+  _jjvine_ensure_repo jj-vine.github.project _jjvine_project
+
+  _jjvine_check_trunk
 }
