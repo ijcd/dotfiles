@@ -8,6 +8,7 @@
     ./direnv.nix
     ./emacs.nix
     ./workspace.nix
+    ./local-ai.nix
   ];
 
   nix.gc = {
