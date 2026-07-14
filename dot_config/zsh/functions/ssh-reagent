@@ -5,9 +5,14 @@ function ssh-reagent () {
   local quiet=0
   [[ "$1" == "-q" ]] && quiet=1
 
-  for agent in ${TMPDIR}ssh-*/agent.*(N); do
-    # Only use sockets owned by us
-    [[ -O $agent ]] || continue
+  # Search classic agent sockets (ssh-agent -s, forwarded agents) AND macOS's
+  # launchd ssh-agent sockets. macOS exposes one per launchd session at
+  # /private/tmp/com.apple.launchd.*/Listeners, all routing to the single shared
+  # com.openssh.ssh-agent — so the first one that answers (and has our keys) wins.
+  local agent
+  for agent in ${TMPDIR}ssh-*/agent.*(N) /private/tmp/com.apple.launchd.*/Listeners(N); do
+    # Must be a socket we own
+    [[ -S $agent && -O $agent ]] || continue
     export SSH_AUTH_SOCK=$agent
     if ssh-add -l &>/dev/null; then
       if (( ! quiet )); then
@@ -17,6 +22,7 @@ function ssh-reagent () {
       return 0
     fi
   done
+  unset SSH_AUTH_SOCK
   echo 'Cannot find ssh agent - maybe you should reconnect and forward it?' >&2
   return 1
 }

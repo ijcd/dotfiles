@@ -15,9 +15,13 @@ if [[ -o interactive && -z "$SSH_CLIENT" ]]; then
   source $ZDOTDIR/functions/ssh-reagent
   case "$OSTYPE" in
     darwin*)
-      # macOS: Use Keychain integration, fall back to ssh-reagent
-      if [[ -z "$SSH_AUTH_SOCK" ]] || ! ssh-add -l &>/dev/null; then
-        ssh-add --apple-use-keychain 2>/dev/null || ssh-reagent
+      # macOS: adopt the launchd ssh-agent socket first (ssh-reagent knows the
+      # /private/tmp/com.apple.launchd.*/Listeners location), THEN load our key
+      # from the keychain if it isn't already in the agent. Order matters:
+      # `ssh-add --apple-use-keychain` needs a reachable agent to add into.
+      if ! ssh-add -l &>/dev/null; then
+        ssh-reagent -q
+        ssh-add -l &>/dev/null || ssh-add --apple-use-keychain 2>/dev/null
       fi
       ;;
     linux*)
