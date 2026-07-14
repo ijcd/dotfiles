@@ -88,6 +88,14 @@ in
       # watchman - file watcher (folly broken on x86_64-darwin, nixpkgs .align 64 asm error)
 
       # ─────────────────────────────────────────────────────────────────────────
+      # AI / local models  (see docs/superpowers/plans/2026-07-14-opencode-local-models.md)
+      # Runtime + proxy are wired as launchd agents in common/local-ai.nix.
+      # ─────────────────────────────────────────────────────────────────────────
+      ollama             # local LLM runtime (Metal accel on arm64-darwin); serve on :11434
+      litellm            # OpenAI-compatible routing proxy (local↔cloud) on :4000
+      opencode           # terminal AI coding agent; talks only to the litellm proxy
+
+      # ─────────────────────────────────────────────────────────────────────────
       # Cloud & infrastructure
       # ─────────────────────────────────────────────────────────────────────────
       awscli2            # AWS CLI v2
