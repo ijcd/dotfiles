@@ -1,0 +1,35 @@
+# LiteLLM routing hub. OpenCode talks ONLY to this proxy; policy lives here.
+# Aliases:
+#   local        pure Ollama, never leaves the machine (privacy default)
+#   local-small  small/fast Ollama, for OpenCode small_model (titles/summaries)
+#   auto         Ollama first, fall back to cloud on context-overflow OR error
+#   smart        cloud Claude (needs ANTHROPIC_API_KEY)
+# NOTE: fallbacks are attached to `auto` ONLY — `local` stays pure on purpose.
+model_list:
+  - model_name: local
+    litellm_params:
+      model: openai/qwen3-coder:30b
+      api_base: http://127.0.0.1:11434/v1
+      api_key: "none"
+  - model_name: local-small
+    litellm_params:
+      model: openai/qwen3:4b
+      api_base: http://127.0.0.1:11434/v1
+      api_key: "none"
+  - model_name: auto
+    litellm_params:
+      model: openai/qwen3-coder:30b
+      api_base: http://127.0.0.1:11434/v1
+      api_key: "none"
+  - model_name: smart
+    litellm_params:
+      model: anthropic/claude-sonnet-5
+      api_key: os.environ/ANTHROPIC_API_KEY
+
+router_settings:
+  fallbacks: [{ "auto": ["smart"] }]
+  context_window_fallbacks: [{ "auto": ["smart"] }]
+
+litellm_settings:
+  drop_params: true          # ignore params a local model doesn't understand
+  # set_verbose: false
