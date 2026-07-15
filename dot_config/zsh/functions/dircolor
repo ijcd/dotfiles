@@ -1,4 +1,4 @@
-# dircolor - per-directory terminal background colors
+# dircolor - per-directory terminal background colors, OKLab-based auto-color
 #
 # Usage:
 #   dircolor            pick a color for current directory
@@ -6,19 +6,199 @@
 #   dircolor set NAME   set current dir to NAME from palette
 #   dircolor clear      remove color for current dir
 #   dircolor show       show current dir's color
+#   dircolor mode       show or set dark/light mode override
 #   dircolor apply      apply color for current dir (called by chpwd hook)
 #
 # Colors are applied via OSC 11 escape sequences (works in kitty, iTerm2, etc.)
 # Palette:  $XDG_CONFIG_HOME/dircolor/dir-palette  (name:hex, tracked in chezmoi)
 # Mappings: $XDG_CONFIG_HOME/dircolor/dir-colors   (path:name, auto-created)
 # Delimiter is last colon — paths with spaces work fine (macOS forbids : in filenames)
+#
+# When a path has NO explicit mapping in dir-colors, dircolor auto-picks a
+# color derived from the SHA of $PWD: hue from hash (~0-359°), fixed
+# saturation/lightness chosen for dark or light mode. Adjacent paths hash
+# to unrelated hues so distinct dirs look distinct.
 
 _DIRCOLOR_DIR="${XDG_CONFIG_HOME:-$HOME/.config}/dircolor"
 _DIRCOLOR_PALETTE="$_DIRCOLOR_DIR/dir-palette"
 _DIRCOLOR_MAP="$_DIRCOLOR_DIR/dir-colors"
 
+# OKLab → sRGB math needs sin/cos/pow. mathfunc is a zsh core module.
+zmodload zsh/mathfunc 2>/dev/null
+
 _dircolor_ensure_map() {
   [[ -f $_DIRCOLOR_MAP ]] || touch "$_DIRCOLOR_MAP"
+}
+
+# ─── Dark/light mode detection ─────────────────────────────────────────────
+# The macOS AppleInterfaceStyle reflects SYSTEM UI theme, not what the
+# terminal is actually showing (kitty/ghostty/iTerm background is an
+# independent theme setting). So we ask the terminal directly via OSC 11
+# query: emit `\e]11;?\e\\` and parse the `rgb:RRRR/GGGG/BBBB` response.
+# Perceived luminance decides mode. If no response in ~200ms, default to
+# dark (the pragmatic majority-case for terminal usage).
+#
+# Override: `export DIRCOLOR_MODE=dark` (or `light`) in zshenv skips detection.
+_dircolor_detect_mode() {
+  if [[ -n $DIRCOLOR_MODE ]]; then
+    print -r -- "$DIRCOLOR_MODE"
+    return
+  fi
+
+  # Only query if we have a real controlling terminal
+  if [[ ! -t 1 ]] || [[ ! -c /dev/tty ]]; then
+    print dark; return
+  fi
+
+  local response=""
+  local old_stty
+  old_stty=$(stty -g </dev/tty 2>/dev/null) || { print dark; return }
+  stty -icanon -echo min 0 time 2 </dev/tty 2>/dev/null
+  printf '\033]11;?\033\\' > /dev/tty
+  IFS= read -k 40 -t 0.2 response </dev/tty 2>/dev/null
+  stty "$old_stty" </dev/tty 2>/dev/null
+
+  # Parse the "rgb:RRRR/GGGG/BBBB" (widths vary by terminal, typically 4 hex each)
+  if [[ $response == *rgb:*/*/* ]]; then
+    local rgb=${response#*rgb:}
+    rgb=${rgb%%$'\e'*}
+    rgb=${rgb%%$'\a'*}
+    local r16=${rgb%%/*}
+    local rest=${rgb#*/}
+    local g16=${rest%%/*}
+    local b16=${rest#*/}
+    local r=$(( 16#${r16:0:2} ))
+    local g=$(( 16#${g16:0:2} ))
+    local b=$(( 16#${b16:0:2} ))
+    # BT.601 perceived luminance: 0.299R + 0.587G + 0.114B (× 1000 for int math)
+    local Y=$(( (r*299 + g*587 + b*114) / 1000 ))
+    if (( Y < 128 )); then print dark; else print light; fi
+    return
+  fi
+
+  print dark
+}
+_DIRCOLOR_MODE=$(_dircolor_detect_mode)
+
+# ─── OKLab → sRGB ─────────────────────────────────────────────────────────
+# Björn Ottosson's OKLab (2020). Perceptually uniform: equal distances in
+# OKLab correspond to equal perceived color differences. Which fixes HSL's
+# green/cyan/blue arc feeling less distinct than red/orange/yellow.
+#
+# Input:  L (0-1 perceptual lightness), a (-0.4..0.4), b (-0.4..0.4)
+# Output: _dircolor_r/_g/_b as 0-255 integers via sRGB gamma correction.
+_dircolor_oklab_to_srgb() {
+  local L=$1 a=$2 b=$3
+
+  # Non-linear cone response (LMS')
+  local l_=$(( L + 0.3963377774 * a + 0.2158037573 * b ))
+  local m_=$(( L - 0.1055613458 * a - 0.0638541728 * b ))
+  local s_=$(( L - 0.0894841775 * a - 1.2914855480 * b ))
+
+  # Cube for LMS
+  local ll=$(( l_ * l_ * l_ ))
+  local mm=$(( m_ * m_ * m_ ))
+  local ss=$(( s_ * s_ * s_ ))
+
+  # Linear sRGB
+  local rl=$((  4.0767416621 * ll - 3.3077115913 * mm + 0.2309699292 * ss ))
+  local gl=$(( -1.2684380046 * ll + 2.6097574011 * mm - 0.3413193965 * ss ))
+  local bl=$(( -0.0041960863 * ll - 0.7034186147 * mm + 1.7076147010 * ss ))
+
+  # Clamp to sRGB gamut [0, 1]
+  (( rl < 0.0 )) && rl=0.0
+  (( rl > 1.0 )) && rl=1.0
+  (( gl < 0.0 )) && gl=0.0
+  (( gl > 1.0 )) && gl=1.0
+  (( bl < 0.0 )) && bl=0.0
+  (( bl > 1.0 )) && bl=1.0
+
+  # Gamma correction: linear → sRGB
+  local rs gs bs
+  if (( rl < 0.0031308 )); then rs=$(( 12.92 * rl ));
+                          else  rs=$(( 1.055 * (rl ** (1.0/2.4)) - 0.055 )); fi
+  if (( gl < 0.0031308 )); then gs=$(( 12.92 * gl ));
+                          else  gs=$(( 1.055 * (gl ** (1.0/2.4)) - 0.055 )); fi
+  if (( bl < 0.0031308 )); then bs=$(( 12.92 * bl ));
+                          else  bs=$(( 1.055 * (bl ** (1.0/2.4)) - 0.055 )); fi
+
+  _dircolor_r=$(( int(rs * 255 + 0.5) ))
+  _dircolor_g=$(( int(gs * 255 + 0.5) ))
+  _dircolor_b=$(( int(bs * 255 + 0.5) ))
+  (( _dircolor_r < 0 ))   && _dircolor_r=0
+  (( _dircolor_r > 255 )) && _dircolor_r=255
+  (( _dircolor_g < 0 ))   && _dircolor_g=0
+  (( _dircolor_g > 255 )) && _dircolor_g=255
+  (( _dircolor_b < 0 ))   && _dircolor_b=0
+  (( _dircolor_b > 255 )) && _dircolor_b=255
+}
+
+# ─── PWD hash → OKLab (L, C, h) ────────────────────────────────────────────
+# Uses 3 independent bytes of the SHA to spread colors across THREE axes in
+# OKLab (perceptually uniform), so equal hash steps give equal PERCEIVED
+# color differences:
+#   - hue     (first 4 chars → 0-360°) — the color wheel, uniformly perceived
+#   - lightness (next 2 chars → ±L_range) — brightness variation
+#   - chroma  (next 2 chars → ±C_range) — vividness variation
+# Two directories that hash near each other in hue still land on different L
+# and C, so they look distinct.
+
+_dircolor_auto_hue() {
+  local dir=$1
+  local hash=$(printf '%s' "$dir" | shasum | cut -c1-4)
+  print -- $(( 16#$hash % 360 ))
+}
+
+# Sets reply=(h_deg L_pct C_pct) — human-scale values for show/preview.
+# L is OKLab perceptual lightness × 100; C is OKLab chroma × 1000.
+_dircolor_auto_hsl() {
+  local dir=$1
+  local hash=$(printf '%s' "$dir" | shasum | cut -c1-8)
+  local hdeg=$(( 16#${hash:0:4} % 360 ))
+  local h_rad=$(( hdeg * 3.14159265358979 / 180.0 ))
+
+  # OKLab ranges — chosen so:
+  #   dark:  L 0.20-0.40 (visibly dark→medium), C 0.08-0.22 (muted→vivid)
+  #   light: L 0.82-0.95, C 0.05-0.15
+  local L_base L_range C_base C_range
+  case $_DIRCOLOR_MODE in
+    light)
+      L_base=0.88; L_range=0.12
+      C_base=0.10; C_range=0.10
+      ;;
+    *)
+      L_base=0.30; L_range=0.20
+      C_base=0.15; C_range=0.14
+      ;;
+  esac
+  # Two hash bytes → [-0.5, +0.5], scaled by range → offset from base
+  local ld=$(( (16#${hash:4:2} - 128) / 256.0 ))
+  local cd=$(( (16#${hash:6:2} - 128) / 256.0 ))
+  local L=$(( L_base + ld * L_range ))
+  local C=$(( C_base + cd * C_range ))
+
+  # Guard against out-of-gamut / unusable extremes.
+  (( L < 0.05 )) && L=0.05
+  (( L > 0.98 )) && L=0.98
+  (( C < 0.03 )) && C=0.03
+  (( C > 0.30 )) && C=0.30
+
+  # OKLab a/b from chroma and hue
+  local a=$(( C * cos(h_rad) ))
+  local b=$(( C * sin(h_rad) ))
+
+  _dircolor_oklab_to_srgb "$L" "$a" "$b"
+  # Human-readable reply: hue in degrees, L in %, C in 1/1000ths
+  reply=( "$hdeg" "$(( int(L * 100 + 0.5) ))" "$(( int(C * 1000 + 0.5) ))" )
+}
+
+_dircolor_auto_apply() {
+  local dir=$1
+  local reply
+  _dircolor_auto_hsl "$dir"
+  # _dircolor_auto_hsl already computed + populated _dircolor_r/_g/_b
+  printf '\033]11;rgb:%02x/%02x/%02x\033\\' \
+    "$_dircolor_r" "$_dircolor_g" "$_dircolor_b"
 }
 
 _dircolor_apply() {
@@ -39,7 +219,11 @@ _dircolor_apply() {
     done < "$_DIRCOLOR_MAP"
   fi
 
-  [[ -z $best_name ]] && best_name=default
+  # No explicit mapping? Auto-pick from PWD hash, sensitive to dark/light mode.
+  if [[ -z $best_name ]]; then
+    _dircolor_auto_apply "$dir"
+    return
+  fi
 
   # Resolve name to hex from palette
   local hex pline
@@ -55,6 +239,24 @@ _dircolor_apply() {
   # Convert #rrggbb to rr/gg/bb for OSC 11
   local r=${hex:1:2} g=${hex:3:2} b=${hex:5:2}
   printf '\033]11;rgb:%s/%s/%s\033\\' "$r" "$g" "$b"
+}
+
+# Show or override the dark/light mode.
+_dircolor_mode() {
+  case ${1:-} in
+    "") echo "$_DIRCOLOR_MODE" ;;
+    dark|light|auto)
+      if [[ $1 == auto ]]; then
+        unset DIRCOLOR_MODE
+      else
+        export DIRCOLOR_MODE=$1
+      fi
+      _DIRCOLOR_MODE=$(_dircolor_detect_mode)
+      echo "$_DIRCOLOR_MODE"
+      _dircolor_apply
+      ;;
+    *) echo "Usage: dircolor mode [dark|light|auto]" >&2; return 1 ;;
+  esac
 }
 
 _dircolor_list() {
@@ -176,7 +378,52 @@ _dircolor_show() {
       best_len=${#mpath}
     fi
   done < "$_DIRCOLOR_MAP"
-  echo "$dir -> ${best_name:-default}"
+
+  if [[ -n $best_name ]]; then
+    # Resolve to hex for display
+    local hex pline
+    while read -r pline; do
+      [[ -n $pline && $pline != \#* ]] || continue
+      [[ ${pline%:*} == $best_name ]] && { hex=${pline##*:}; break; }
+    done < "$_DIRCOLOR_PALETTE"
+    echo "$dir -> $best_name ($hex)"
+  else
+    # Auto-color: compute + describe (OKLab coordinates)
+    local reply
+    _dircolor_auto_hsl "$dir"
+    printf '%s -> auto (h=%d° L=%d%% C=%.3f, %s mode) #%02x%02x%02x\n' \
+      "$dir" "${reply[1]}" "${reply[2]}" \
+      "$(( ${reply[3]} / 1000.0 ))" "$_DIRCOLOR_MODE" \
+      "$_dircolor_r" "$_dircolor_g" "$_dircolor_b"
+  fi
+}
+
+# ─── preview: swatch every subdir of a target (or ~/work by default) ───
+_dircolor_preview() {
+  local target=${1:-$PWD}
+  target=${target/#\~/$HOME}
+  if [[ ! -d $target ]]; then
+    echo "Not a directory: $target" >&2
+    return 1
+  fi
+  local reply
+  _dircolor_auto_hsl "$target"
+  printf '  \033[48;2;%d;%d;%dm     ●     \033[0m  h=%3d° L=%d%% C=%3d  #%02x%02x%02x  %s (SELF)\n' \
+    "$_dircolor_r" "$_dircolor_g" "$_dircolor_b" \
+    "${reply[1]}" "${reply[2]}" "${reply[3]}" \
+    "$_dircolor_r" "$_dircolor_g" "$_dircolor_b" \
+    "$target"
+
+  local d
+  for d in $target/*(N/); do
+    _dircolor_auto_hsl "$d"
+    local label=${${d%/}##*/}
+    printf '  \033[48;2;%d;%d;%dm     ●     \033[0m  h=%3d° L=%d%% C=%3d  #%02x%02x%02x  %s\n' \
+      "$_dircolor_r" "$_dircolor_g" "$_dircolor_b" \
+      "${reply[1]}" "${reply[2]}" "${reply[3]}" \
+      "$_dircolor_r" "$_dircolor_g" "$_dircolor_b" \
+      "$label"
+  done
 }
 
 dircolor() {
@@ -187,6 +434,8 @@ dircolor() {
     show)  _dircolor_show ;;
     pick)  _dircolor_pick ;;
     apply) _dircolor_apply ;;
-    *)     echo "Usage: dircolor [list|set NAME|clear|show|pick]" >&2 ;;
+    mode)  _dircolor_mode "$2" ;;
+    preview) _dircolor_preview "$2" ;;
+    *)     echo "Usage: dircolor [list|set NAME|clear|show|pick|mode|preview]" >&2 ;;
   esac
 }

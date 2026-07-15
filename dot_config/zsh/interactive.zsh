@@ -76,6 +76,31 @@ add-zsh-hook chpwd _dircolor_chpwd
 dircolor apply  # apply on shell start
 
 ###########################################
+# Auto-attach tmux on incoming SSH sessions
+###########################################
+# When SSH'd in, drop straight into a tmux session with a bright red
+# status bar so it's unmistakable this is a remote session. Bonus: the
+# session persists between reconnects — dropped connection resumes.
+#
+# Modern reboot of legacy/local/login.zsh's always-screen (`exec screen -xRR`).
+# Uses a SEPARATE tmux socket (`-L ssh`) so local tmux is untouched — you
+# can `tmux ls` locally and see none of these.
+#
+# Skips when: no SSH, already in tmux, non-interactive, dumb term, no tmux.
+if [ -n "$SSH_CONNECTION" ] \
+   && [ -z "$TMUX" ] \
+   && [[ -o interactive ]] \
+   && [ "$TERM" != "screen" ] && [ "$TERM" != "screen-256color" ] \
+   && [ "$TERM" != "dumb" ] \
+   && command -v tmux >/dev/null; then
+  # `-L ssh`      : separate socket → distinct server → ssh.conf always wins
+  # `-f ssh.conf` : red-alert status/border config
+  # `-A -s remote`: attach to `remote` session or create it
+  # `exec`        : replace zsh so exiting tmux exits the SSH session cleanly
+  exec tmux -L ssh -f ~/.config/tmux/ssh.conf new-session -A -s remote
+fi
+
+###########################################
 # Auto-listing on directory change
 ###########################################
 # Show pwd + listing after every cd. Three tiers based on entry count:
