@@ -31,10 +31,19 @@ use_jjvine() {
 # Written by use_jjvine (direnvrc). NOT chezmoi-managed — holds a GitHub token.
 [jj-vine]
 forge = "github"
+# open new PRs as draft (seed as draft, flesh out the body, promote when green)
+openAsDraft = true
 
 [jj-vine.github]
 host = "https://api.github.com"
 token = "$tok"
+
+# Workflow 2: seed PR title/description once, then never overwrite — so edits made
+# on github.com stick across re-submits. (description.sync already defaults false;
+# titles default to overwriting every submit, so disable both title syncs.)
+[jj-vine.title]
+syncSingleRevision = false
+syncMultipleRevisions = false
 EOF
     ) && log_status "jjvine: wrote conf.d/jj-vine.toml (token, 0600)"
   }
