@@ -21,8 +21,29 @@ set -euo pipefail
 
 usage() { awk 'NR==1{next} !/^#/{exit} {sub(/^# ?/,"");print}' "$0"; }
 
+load_config() {
+  SOURCE_PREFIX="$(jj config get jj-mirror.source-prefix 2>/dev/null || echo 'wip/')"
+  PRIME_PREFIX="$(jj config get jj-mirror.prime-prefix  2>/dev/null || echo 'pr/')"
+
+  if [[ "$SOURCE_PREFIX" == "$PRIME_PREFIX" ]]; then
+    echo "jj-mirror: source-prefix and prime-prefix must differ" >&2
+    exit 2
+  fi
+  # neither may be a prefix of the other
+  if [[ -n "$SOURCE_PREFIX" && "$PRIME_PREFIX" == "$SOURCE_PREFIX"* ]] \
+  || [[ -n "$PRIME_PREFIX"  && "$SOURCE_PREFIX" == "$PRIME_PREFIX"*  ]]; then
+    echo "jj-mirror: source-prefix ($SOURCE_PREFIX) and prime-prefix ($PRIME_PREFIX) must not overlap" >&2
+    exit 2
+  fi
+}
+
 case "${1:-sync}" in
   --help|-h) usage; exit 0 ;;
-  sync|status|push|abandon) : ;;  # implemented in later tasks
+  _dump-config)
+    load_config
+    printf 'source-prefix=%s\nprime-prefix=%s\n' "$SOURCE_PREFIX" "$PRIME_PREFIX"
+    exit 0
+    ;;
+  sync|status|push|abandon) load_config ;;
   *) echo "jj-mirror: unknown command: $1" >&2; usage >&2; exit 2 ;;
 esac
