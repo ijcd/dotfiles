@@ -1,0 +1,28 @@
+#!/usr/bin/env bash
+# jj-mirror — maintain a "prime" bookmark chain as a derived view of a
+# "source" bookmark chain. Prime is what jj-vine pushes as PRs; source is
+# where WIP happens. Non-source bookmarks (local scaffolding) are ignored.
+#
+# Usage:
+#   jj-mirror                    alias for `sync`
+#   jj-mirror sync               update prime chain to match source chain
+#   jj-mirror status             show threads, source/prime pairs, staleness
+#   jj-mirror push               sync, then `jj vine submit --tracked`
+#   jj-mirror abandon <name>     delete both <source-prefix>name and <prime-prefix>name
+#   jj-mirror --help             print this help
+#
+# Config (jj config, [jj-mirror] section):
+#   source-prefix   default "wip/"
+#   prime-prefix    default "pr/"
+#
+# See docs/superpowers/specs/2026-07-15-jj-mirror-design.md for the design.
+
+set -euo pipefail
+
+usage() { awk 'NR==1{next} !/^#/{exit} {sub(/^# ?/,"");print}' "$0"; }
+
+case "${1:-sync}" in
+  --help|-h) usage; exit 0 ;;
+  sync|status|push|abandon) : ;;  # implemented in later tasks
+  *) echo "jj-mirror: unknown command: $1" >&2; usage >&2; exit 2 ;;
+esac
