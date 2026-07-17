@@ -158,31 +158,48 @@ sync_thread() {
   local prev
   prev=$(jj log --no-graph -r "trunk()" -T 'commit_id.short() ++ "\n"' | head -n1)
 
-  local source_name suffix prime_full existing new_cid
+  local cascade=0   # once set, everything downstream must rebuild
+  local source_name suffix prime_full existing existing_parent existing_hash source_hash new_cid
   for source_name in "${chain[@]}"; do
     suffix=$(strip_source_prefix "$source_name")
     prime_full="${PRIME_PREFIX}${suffix}"
     existing=$(find_prime_bookmark "$suffix")
 
-    if [[ -z "$existing" ]]; then
-      # Cherry-pick source commit onto prev; capture new commit id.
-      # jj 0.43.0's `duplicate` has no --template/-T flag, so parse the
-      # "Duplicated <old> as <change_id> <commit_id> <description>" stderr
-      # line. Field 5 is always the new short commit id regardless of
-      # description content (verified empirically against jj 0.43.0).
-      local out
-      out=$(jj duplicate "$source_name" --destination "$prev" 2>&1)
-      new_cid=$(printf '%s\n' "$out" | awk '/^Duplicated/ {print $5; exit}')
-      [[ -n "$new_cid" ]] || { echo "jj-mirror: duplicate produced no commit for $source_name" >&2; return 1; }
-      # sync_thread runs inside `if ! sync_thread` in sync_main, which suspends
-      # `set -e` for its whole body. Check bookmark-set's exit code explicitly
-      # so a failure propagates to the rollback path instead of silently continuing.
-      jj bookmark set "$prime_full" -r "$new_cid" >/dev/null 2>&1 \
-        || { echo "jj-mirror: bookmark set failed for $prime_full at $new_cid" >&2; return 1; }
-      prev=$new_cid
-    else
-      prev=$existing   # placeholder — later tasks handle updates
+    if [[ -n "$existing" && $cascade -eq 0 ]]; then
+      existing_parent=$(jj log --no-graph -r "$existing-" -T 'commit_id.short() ++ "\n"' | head -n1)
+      existing_hash=$(diff_hash "$existing")
+      source_hash=$(diff_hash "$source_name")
+      if [[ "$existing_parent" == "$prev" && "$existing_hash" == "$source_hash" ]]; then
+        # up-to-date — no touch
+        prev=$existing
+        continue
+      fi
     fi
+
+    # Need to (re)build. Any downstream commit must also cascade.
+    if [[ -n "$existing" ]]; then
+      jj bookmark delete "$prime_full" >/dev/null 2>&1 \
+        || { echo "jj-mirror: bookmark delete failed for $prime_full" >&2; return 1; }
+      jj abandon "$existing" >/dev/null 2>&1 \
+        || { echo "jj-mirror: abandon failed for $existing" >&2; return 1; }
+    fi
+
+    # Cherry-pick source commit onto prev; capture new commit id.
+    # jj 0.43.0's `duplicate` has no --template/-T flag, so parse the
+    # "Duplicated <old> as <change_id> <commit_id> <description>" stderr
+    # line. Field 5 is always the new short commit id regardless of
+    # description content (verified empirically against jj 0.43.0).
+    local out
+    out=$(jj duplicate "$source_name" --destination "$prev" 2>&1)
+    new_cid=$(printf '%s\n' "$out" | awk '/^Duplicated/ {print $5; exit}')
+    [[ -n "$new_cid" ]] || { echo "jj-mirror: duplicate produced no commit for $source_name" >&2; return 1; }
+    # sync_thread runs inside `if ! sync_thread` in sync_main, which suspends
+    # `set -e` for its whole body. Check bookmark-set's exit code explicitly
+    # so a failure propagates to the rollback path instead of silently continuing.
+    jj bookmark set "$prime_full" -r "$new_cid" >/dev/null 2>&1 \
+      || { echo "jj-mirror: bookmark set failed for $prime_full at $new_cid" >&2; return 1; }
+    prev=$new_cid
+    cascade=1
   done
 }
 
