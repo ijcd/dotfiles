@@ -1,0 +1,736 @@
+#!/usr/bin/env bash
+# jj-mirror — maintain a "prime" bookmark chain as a derived view of a
+# "source" (WIP) bookmark chain, so jj-vine pushes clean PRs without
+# force-push churn as the WIP side evolves.
+#
+# See docs/superpowers/specs/2026-07-15-jj-mirror-design.md for the design.
+
+set -euo pipefail
+
+# Requires bash 4+ for associative arrays (declare -A in the orphan cull) and
+# safe empty-array expansion. macOS stock /bin/bash is 3.2 — install a modern
+# bash (homebrew, nix, macports) before using this tool.
+if (( BASH_VERSINFO[0] < 4 )); then
+  echo "jj-mirror: bash ${BASH_VERSION} too old — needs bash 4+ (declare -A, safe \${arr[@]+expansion})" >&2
+  exit 1
+fi
+
+# ─── Help ─────────────────────────────────────────────────────────────────────
+# Top-level usage: overview + command index. Per-command help via
+# `jj-mirror <cmd> --help` or `jj-mirror help <cmd>`.
+
+usage() {
+  cat <<'EOF'
+jj-mirror — maintain a clean "prime" bookmark chain as a derived view of a
+messy "source" (WIP) chain, so jj-vine pushes stable PRs across resyncs.
+
+Usage:
+  jj-mirror [--help]                     show this help
+  jj-mirror help <command>               show help for one command
+  jj-mirror <command> [--help] [args]    run a command (or its own help)
+
+Commands:
+  sync       Re-derive the prime chain from the current source chain (default).
+  status     Report source→prime pair state per thread (ok/stale/missing).
+  push       Sync, then delegate to jj-vine submit --tracked.
+  abandon    Delete a matched pair of source and prime bookmarks + commits.
+
+Configuration (jj config, [jj-mirror] section):
+  source-prefix    Source-side bookmark prefix (default "wip/").
+  prime-prefix     Prime-side bookmark prefix (default "pr/").
+                   Must not overlap. Empty prefix is allowed but matches
+                   every bookmark; use with care.
+
+Model:
+  Source bookmarks (default wip/*) mark commits you want mirrored. Non-source
+  bookmarks are ignored — that's where local scaffolding lives. Prime commits
+  (default pr/*) are strict cherry-picks of each source commit's own diff,
+  stacked on trunk() and re-derived from the current graph on each sync.
+
+Example:
+  jj bookmark set wip/feature-a -r @-
+  jj-mirror sync              # creates pr/feature-a
+  jj-mirror status            # reports "ok"
+  jj-mirror push              # sync + jj-vine submits the PR
+
+See:
+  spec  docs/superpowers/specs/2026-07-15-jj-mirror-design.md
+  jj-vine  https://codeberg.org/abrenneke/jj-vine
+EOF
+}
+
+help_sync() {
+  cat <<'EOF'
+Usage:
+  jj-mirror sync [-n|--dry-run] [-t|--thread <bookmark>]
+
+Re-derive the prime chain from the current source chain. State-free: the
+whole shape is computed from the current jj graph each invocation.
+
+Options:
+  -n, --dry-run
+        Print intended actions per thread without mutating the repo. Includes
+        an orphan-cull preview and marks downstream commits as "(cascade)"
+        when their parent moves even if their own diff didn't change.
+
+  -t, --thread <bookmark>
+        Limit sync to the single thread containing <bookmark>. Match is exact
+        and must include the source prefix (e.g. "wip/foo", not "foo"). Under
+        --thread, the orphan cull is skipped entirely so other threads' prime
+        bookmarks are not deleted. A filter that matches zero threads prints
+        a warning to stderr.
+
+Behavior:
+  For each thread (a linear chain of source bookmarks descending from trunk()):
+    1. Each source bookmark's own diff is duplicated onto the previous prime
+       commit (or trunk() for the first). Non-source commits in between are
+       skipped — this is the "strict cherry-pick" invariant.
+    2. Prime bookmarks whose suffix has no matching source bookmark in ANY
+       thread are abandoned (repo-wide orphan cull; skipped under --thread).
+    3. Prime commits already matching parent + diff-hash are left in place —
+       the "no-op path". This is what keeps jj-vine PRs stable across resyncs.
+    4. Cherry-pick conflicts abort the sync via `jj op restore` — the repo
+       returns to its pre-sync state atomically.
+
+Preconditions (enforced at startup, exit 2 on violation):
+  - No two source bookmarks on the same commit (ambiguous pairing).
+  - Every trunk()..<source> range must be linear (no merges).
+
+Exit codes:
+  0    sync succeeded (or dry-run completed)
+  1    runtime error (rolled back)
+  2    conflict, ambiguous pairing, non-linear thread, or bad arg (rolled back)
+EOF
+}
+
+help_status() {
+  cat <<'EOF'
+Usage:
+  jj-mirror status
+
+Read-only report of every source→prime pair, grouped by thread.
+
+Output per line:
+  <source-name> -> <prime-name>    [state]
+
+States:
+  ok       Prime exists and its diff matches the source diff.
+  stale    Prime exists but the two diffs differ (sync would rebuild).
+  missing  No prime bookmark for this source suffix (sync would create).
+
+Preconditions (enforced at startup, exit 2 on violation):
+  - No two source bookmarks on the same commit.
+  - Every trunk()..<source> range must be linear.
+
+Exit codes:
+  0    reported successfully
+  2    validation error
+EOF
+}
+
+help_push() {
+  cat <<'EOF'
+Usage:
+  jj-mirror push
+
+Run `sync`, then delegate to jj-vine to submit the prime chain as PRs.
+jj-vine is looked up in this order:
+  1. Standalone `jj-vine` binary on PATH.
+  2. `jj vine …` subcommand plugin (via `jj vine --help`).
+
+If jj-vine is not installed, prints an install hint and exits 1 AFTER a
+successful sync.
+
+Exit codes:
+  0    sync + push both succeeded (replaced by jj-vine's own exit code via exec)
+  1    sync succeeded but jj-vine not found
+  Other  sync failure — see `jj-mirror sync --help`
+EOF
+}
+
+help_abandon() {
+  cat <<'EOF'
+Usage:
+  jj-mirror abandon <name>
+
+Delete both the source bookmark <source-prefix><name> and the prime bookmark
+<prime-prefix><name>, and abandon their underlying commits.
+
+Idempotent: missing bookmarks are OK; a second invocation is a no-op.
+Atomic: wraps in the same `capture_pre_op` + `jj op restore` envelope as
+sync, so any failure leaves the repo at its pre-abandon state.
+
+Arguments:
+  <name>    The pair suffix (no prefix). Example: for wip/feature-a and
+            pr/feature-a, run `jj-mirror abandon feature-a`.
+
+Exit codes:
+  0    completed (or nothing to do)
+  1    runtime error (rolled back)
+  2    missing <name> argument
+EOF
+}
+
+# print_help TOPIC — dispatch to a per-command help function, or the top-level
+# usage. Called from every `--help` / `help` handler so the surface is
+# uniform.
+print_help() {
+  case "${1:-}" in
+    ""|jj-mirror) usage ;;
+    sync)         help_sync ;;
+    status)       help_status ;;
+    push)         help_push ;;
+    abandon)      help_abandon ;;
+    *) echo "jj-mirror: no help for unknown command '$1'" >&2; usage >&2; return 2 ;;
+  esac
+}
+
+load_config() {
+  SOURCE_PREFIX="$(jj config get jj-mirror.source-prefix 2>/dev/null || echo 'wip/')"
+  PRIME_PREFIX="$(jj config get jj-mirror.prime-prefix  2>/dev/null || echo 'pr/')"
+
+  if [[ "$SOURCE_PREFIX" == "$PRIME_PREFIX" ]]; then
+    echo "jj-mirror: source-prefix and prime-prefix must differ" >&2
+    exit 2
+  fi
+  # neither may be a prefix of the other
+  if [[ -n "$SOURCE_PREFIX" && "$PRIME_PREFIX" == "$SOURCE_PREFIX"* ]] \
+  || [[ -n "$PRIME_PREFIX"  && "$SOURCE_PREFIX" == "$PRIME_PREFIX"*  ]]; then
+    echo "jj-mirror: source-prefix ($SOURCE_PREFIX) and prime-prefix ($PRIME_PREFIX) must not overlap" >&2
+    exit 2
+  fi
+}
+
+# list_bookmarks_with_prefix PREFIX
+# Emits: <name>\t<short-commit-id> per line, filtered by PREFIX.
+# Empty PREFIX matches every bookmark.
+list_bookmarks_with_prefix() {
+  local prefix=$1
+  # Template: name TAB short commit_id NEWLINE. normal_target is the local commit.
+  jj bookmark list -T 'name ++ "\t" ++ normal_target.commit_id().short() ++ "\n"' 2>/dev/null \
+    | while IFS=$'\t' read -r name cid; do
+        [[ -n "$name" && -n "$cid" ]] || continue
+        if [[ -z "$prefix" || "$name" == "$prefix"* ]]; then
+          printf '%s\t%s\n' "$name" "$cid"
+        fi
+      done
+}
+
+DRY_RUN=0
+THREAD_FILTER=""
+
+# parse_sync_flags — pull -n/--dry-run and -t/--thread out of "$@" as globals.
+# Rejects unknown positionals: `sync` takes no positional args, so anything
+# left over is a typo. (Previously silently discarded — a footgun.)
+parse_sync_flags() {
+  while (( $# )); do
+    case "$1" in
+      -n|--dry-run) DRY_RUN=1; shift ;;
+      -t|--thread)  THREAD_FILTER=${2:-}; shift 2 ;;
+      --thread=*)   THREAD_FILTER=${1#--thread=}; shift ;;
+      *)
+        echo "jj-mirror: sync: unknown argument '$1'" >&2
+        exit 2
+        ;;
+    esac
+  done
+}
+
+list_source_bookmarks() { list_bookmarks_with_prefix "$SOURCE_PREFIX"; }
+list_prime_bookmarks()  { list_bookmarks_with_prefix "$PRIME_PREFIX"; }
+
+strip_source_prefix() { printf '%s' "${1#"$SOURCE_PREFIX"}"; }
+strip_prime_prefix()  { printf '%s' "${1#"$PRIME_PREFIX"}";  }
+
+# diff_hash REVSET
+# Emit SHA-256 hex of the patch text of the revision's own diff.
+# Uses -T "" to strip commit metadata; -p emits the diff.
+#
+# Capture jj's output before hashing so a jj failure returns non-zero instead
+# of silently producing the SHA of empty input (the "up-to-date" comparison in
+# sync would then treat two failed hashes as equal — a nasty false-positive).
+diff_hash() {
+  local rev=$1 patch
+  patch=$(jj log --no-graph -r "$rev" -T '""' -p) || return 1
+  printf '%s' "$patch" | shasum -a 256 | awk '{print $1}'
+}
+
+# list_source_threads
+# Emits one line per thread: <leaf>\t<b1>|<b2>|...|<leaf>
+# Algorithm:
+#   1. Collect all source bookmarks with their commit ids.
+#   2. For each pair, check ancestry via revset (descendants()).
+#   3. Leaves = bookmarks with no source-bookmark descendant.
+#   4. For each leaf, walk trunk()..leaf & bookmarks() in ancestry order,
+#      picking out only source-prefixed names at each commit.
+list_source_threads() {
+  local -a names cids
+  while IFS=$'\t' read -r name cid; do
+    names+=("$name"); cids+=("$cid")
+  done < <(list_source_bookmarks)
+
+  local n=${#names[@]}
+  (( n > 0 )) || return 0
+
+  # For each candidate leaf L, ensure no other source bookmark has L as ancestor.
+  # Exclude L itself from the descendants check — otherwise two bookmarks on the
+  # same commit would each see the other as a "descendant" and neither picked as
+  # leaf (thread silently vanishes). (Same-commit collisions are already caught
+  # upstream by validate_source_bookmarks_or_die, but this stays safe if the
+  # validator is bypassed.)
+  local i j leaf other
+  for (( i=0; i<n; i++ )); do
+    leaf=${names[i]}
+    local is_leaf=1
+    for (( j=0; j<n; j++ )); do
+      (( i == j )) && continue
+      other=${names[j]}
+      # Is 'other' a descendant of 'leaf' (excluding L itself)? If so, leaf isn't a leaf.
+      if jj log --no-graph -r "(descendants(\"$leaf\") ~ \"$leaf\") & \"$other\"" \
+              -T 'commit_id.short() ++ "\n"' 2>/dev/null | grep -q .; then
+        is_leaf=0; break
+      fi
+    done
+    (( is_leaf )) || continue
+
+    # Walk the ordered chain from trunk toward leaf.
+    # jj log with a revset prints in reverse-chronological order (newest first);
+    # we want oldest first, so reverse portably via awk. (macOS `tail -r` and
+    # GNU `tac` both exist but neither is universal.)
+    # Template note: bookmarks.map(|b| b.name()).join(",") verified working
+    # against jj 0.43.0 — emits comma-joined names for multi-bookmark commits.
+    local chain
+    chain=$(
+      jj log --no-graph -r "trunk()..\"$leaf\" & bookmarks()" \
+        -T 'bookmarks.map(|b| b.name()).join(",") ++ "\n"' 2>/dev/null \
+      | awk 'NF' \
+      | awk '{a[NR]=$0} END{for(i=NR;i>=1;i--)print a[i]}'
+    )
+
+    # Each line may have multiple source-prefixed names comma-separated if a commit
+    # carries several source bookmarks. Split, filter, join with |.
+    local ordered=""
+    while IFS= read -r line; do
+      [[ -n "$line" ]] || continue
+      IFS=',' read -ra parts <<< "$line"
+      local part
+      for part in "${parts[@]}"; do
+        if [[ "$part" == "$SOURCE_PREFIX"* ]]; then
+          ordered+="${ordered:+|}$part"
+        fi
+      done
+    done <<< "$chain"
+
+    printf '%s\t%s\n' "$leaf" "$ordered"
+  done
+}
+
+# validate_source_bookmarks_or_die — enforce the spec's shape invariants for
+# source threads. Exits 2 (config-error tier) on violation.
+#
+# Rejects, per spec's "Failure modes" table:
+#   - Two source bookmarks on the same commit (ambiguous pairing).
+#   - Non-linear source thread — a merge commit anywhere in trunk()..leaf.
+#
+# This runs BEFORE sync_main or status_main mutates or reports; anything
+# downstream can trust the graph is a set of disjoint linear chains.
+validate_source_bookmarks_or_die() {
+  local -a names cids
+  while IFS=$'\t' read -r name cid; do
+    names+=("$name"); cids+=("$cid")
+  done < <(list_source_bookmarks)
+
+  local n=${#names[@]}
+  (( n > 0 )) || return 0
+
+  # 1. Same-commit ambiguity — pairwise scan on commit id.
+  local i j
+  for (( i=0; i<n; i++ )); do
+    for (( j=i+1; j<n; j++ )); do
+      if [[ "${cids[i]}" == "${cids[j]}" ]]; then
+        echo "jj-mirror: ambiguous pairing — ${names[i]} and ${names[j]} point to the same commit ${cids[i]}; one source bookmark per commit" >&2
+        exit 2
+      fi
+    done
+  done
+
+  # 2. Non-linear threads — merges() intersected with trunk()..bookmark must
+  # be empty for every source bookmark. Merges anywhere upstream of a source
+  # bookmark within the mine range mean the chain from trunk isn't a single
+  # path.
+  local nm
+  for nm in "${names[@]}"; do
+    if jj log --no-graph -r "merges() & trunk()..\"$nm\"" -T 'commit_id ++ "\n"' 2>/dev/null \
+       | grep -q .; then
+      echo "jj-mirror: non-linear source thread — merge commit found between trunk() and $nm; only linear chains are supported in v1" >&2
+      exit 2
+    fi
+  done
+}
+
+# capture_pre_op — echo the current jj op id, to feed jj op restore on failure.
+capture_pre_op() {
+  jj op log --limit 1 --no-graph -T 'id ++ "\n"' 2>/dev/null | head -n1
+}
+
+# find_prime_bookmark NAME — echo the commit id of <prime-prefix>NAME, or empty.
+find_prime_bookmark() {
+  local name=$1
+  local full="${PRIME_PREFIX}${name}"
+  jj log --no-graph -r "$full" -T 'commit_id.short() ++ "\n"' 2>/dev/null | head -n1 || true
+}
+
+# sync_thread LEAF CHAIN_STR
+# CHAIN_STR is "b1|b2|...|leaf" — pipe-separated source bookmark names in trunk-to-leaf order.
+sync_thread() {
+  local leaf=$1
+  local chain_str=$2
+  IFS='|' read -ra chain <<< "$chain_str"
+
+  local prev
+  prev=$(jj log --no-graph -r "trunk()" -T 'commit_id.short() ++ "\n"' | head -n1)
+
+  local cascade=0   # once set, everything downstream must rebuild
+  local source_name suffix prime_full existing existing_parent existing_hash source_hash new_cid
+  for source_name in "${chain[@]}"; do
+    suffix=$(strip_source_prefix "$source_name")
+    prime_full="${PRIME_PREFIX}${suffix}"
+    existing=$(find_prime_bookmark "$suffix")
+
+    if [[ -n "$existing" && $cascade -eq 0 ]]; then
+      existing_parent=$(jj log --no-graph -r "$existing-" -T 'commit_id.short() ++ "\n"' | head -n1)
+      # diff_hash returns non-zero on jj failure; check explicitly because sync_thread runs
+      # inside `if ! sync_thread` in sync_main, which suspends set -e for this body — two
+      # empty hashes would otherwise falsely compare equal and skip the rebuild.
+      existing_hash=$(diff_hash "$existing") \
+        || { echo "jj-mirror: diff_hash failed on existing prime $existing" >&2; return 1; }
+      source_hash=$(diff_hash "$source_name") \
+        || { echo "jj-mirror: diff_hash failed on source $source_name" >&2; return 1; }
+      if [[ "$existing_parent" == "$prev" && "$existing_hash" == "$source_hash" ]]; then
+        # up-to-date — no touch
+        prev=$existing
+        continue
+      fi
+    fi
+
+    # Need to (re)build. Any downstream commit must also cascade.
+    if [[ -n "$existing" ]]; then
+      jj bookmark delete "$prime_full" >/dev/null 2>&1 \
+        || { echo "jj-mirror: bookmark delete failed for $prime_full" >&2; return 1; }
+      jj abandon "$existing" >/dev/null 2>&1 \
+        || { echo "jj-mirror: abandon failed for $existing" >&2; return 1; }
+    fi
+
+    # Cherry-pick source commit onto prev; capture new commit id.
+    # jj 0.43.0's `duplicate` has no --template/-T flag, so parse the
+    # "Duplicated <old> as <change_id> <commit_id> <description>" stderr
+    # line. Field 5 is always the new short commit id regardless of
+    # description content (verified empirically against jj 0.43.0).
+    local out
+    out=$(jj duplicate "$source_name" --destination "$prev" 2>&1)
+    new_cid=$(printf '%s\n' "$out" | awk '/^Duplicated/ {print $5; exit}')
+    [[ -n "$new_cid" ]] || { echo "jj-mirror: duplicate produced no commit for $source_name" >&2; return 1; }
+    # sync_thread runs inside `if ! sync_thread` in sync_main, which suspends
+    # `set -e` for its whole body. Check bookmark-set's exit code explicitly
+    # so a failure propagates to the rollback path instead of silently continuing.
+    jj bookmark set "$prime_full" -r "$new_cid" >/dev/null 2>&1 \
+      || { echo "jj-mirror: bookmark set failed for $prime_full at $new_cid" >&2; return 1; }
+
+    # Note on ordering: we bookmark BEFORE checking for conflict. If the new
+    # commit is conflicted, `return 2` triggers `jj op restore` in sync_main
+    # which atomically unwinds both the bookmark-set and the duplicate. So
+    # the transient "bookmark on a conflicted commit" state is safe — but
+    # only under that rollback invariant. Do not reorder without preserving
+    # the atomic-rollback guarantee.
+    local cflag
+    cflag=$(jj log --no-graph -r "$new_cid" -T 'if(conflict, "y", "n") ++ "\n"' 2>/dev/null | head -n1)
+    if [[ "$cflag" == "y" ]]; then
+      echo "jj-mirror: conflict cherry-picking $source_name onto ${prev} (prime commit $new_cid)" >&2
+      return 2   # signal 'conflict, roll back' to sync_main
+    fi
+
+    prev=$new_cid
+    cascade=1
+  done
+}
+
+# dry_run_thread LEAF CHAIN_STR — print intended actions for one thread
+# without mutating anything.
+#
+# Tracks cascade the same way sync_thread does: once one commit is marked
+# create-or-rebuild, every downstream commit's parent moves, so it must
+# rebuild too — even if its own diff hasn't changed. Without this, dry-run
+# undercounts the real work sync would do.
+dry_run_thread() {
+  local leaf=$1 chain_str=$2
+  local -a parts
+  IFS='|' read -ra parts <<< "$chain_str"
+
+  printf 'thread %s (dry-run)\n' "$leaf"
+  local sname sfx existing hs hp cascade=0
+  for sname in "${parts[@]}"; do
+    sfx=$(strip_source_prefix "$sname")
+    existing=$(find_prime_bookmark "$sfx")
+    if [[ -z "$existing" ]]; then
+      printf '  would create %s%s from %s\n' "$PRIME_PREFIX" "$sfx" "$sname"
+      cascade=1
+    elif (( cascade )); then
+      printf '  would rebuild %s%s (cascade)\n' "$PRIME_PREFIX" "$sfx"
+    else
+      hs=$(diff_hash "$sname") || hs=""
+      hp=$(diff_hash "$existing") || hp=""
+      if [[ -n "$hs" && "$hs" == "$hp" ]]; then
+        printf '  would keep %s%s (up-to-date)\n' "$PRIME_PREFIX" "$sfx"
+      else
+        printf '  would rebuild %s%s (diff changed)\n' "$PRIME_PREFIX" "$sfx"
+        cascade=1
+      fi
+    fi
+  done
+}
+
+# thread_matches_filter LEAF CHAIN_STR — true if THREAD_FILTER is unset, or
+# equals the leaf, or appears anywhere in the chain.
+thread_matches_filter() {
+  local leaf=$1 chain_str=$2
+  [[ -n "$THREAD_FILTER" ]] || return 0
+  [[ "$leaf" == "$THREAD_FILTER" ]] && return 0
+  [[ "|$chain_str|" == *"|$THREAD_FILTER|"* ]]
+}
+
+sync_main() {
+  validate_source_bookmarks_or_die
+
+  local pre_op rc=0
+  pre_op=$(capture_pre_op)
+  [[ -n "$pre_op" ]] || { echo "jj-mirror: could not capture pre-sync op id" >&2; exit 1; }
+
+  # Collect all threads up front — used both for the orphan cull (needs the
+  # full repo-wide "wanted" set, not just one thread's) and the per-thread walk.
+  local -a all_leaves=() all_chains=() leaves=() chains=()
+  local leaf chain
+  while IFS=$'\t' read -r leaf chain; do
+    [[ -n "$leaf" && -n "$chain" ]] || continue
+    all_leaves+=("$leaf"); all_chains+=("$chain")
+    if thread_matches_filter "$leaf" "$chain"; then
+      leaves+=("$leaf"); chains+=("$chain")
+    fi
+  done < <(list_source_threads)
+
+  # --thread scoping that matches zero threads is almost always a typo. Warn
+  # rather than silently claim success — the user thought sync was running.
+  if [[ -n "$THREAD_FILTER" && ${#leaves[@]} -eq 0 ]]; then
+    echo "jj-mirror: warning — --thread '$THREAD_FILTER' matched 0 of ${#all_leaves[@]} thread(s); nothing to do" >&2
+  fi
+
+  if [[ $DRY_RUN -eq 1 ]]; then
+    # Preview orphan cull first, under the same repo-wide `wanted` union that
+    # the real sync uses. Skipped under --thread (matches real behavior).
+    if [[ -z "$THREAD_FILTER" ]]; then
+      local -A dry_wanted=()
+      local source_name t
+      for t in "${all_chains[@]}"; do
+        IFS='|' read -ra t_chain <<< "$t"
+        for source_name in "${t_chain[@]}"; do
+          dry_wanted["$(strip_source_prefix "$source_name")"]=1
+        done
+      done
+      local pname pcid psuffix
+      while IFS=$'\t' read -r pname pcid; do
+        psuffix=$(strip_prime_prefix "$pname")
+        if [[ -z "${dry_wanted[$psuffix]:-}" ]]; then
+          printf 'would cull orphan %s\n' "$pname"
+        fi
+      done < <(list_prime_bookmarks)
+    fi
+
+    local i
+    for (( i=0; i<${#leaves[@]}; i++ )); do
+      dry_run_thread "${leaves[i]}" "${chains[i]}"
+    done
+    printf 'jj-mirror: dry-run — no changes made\n'
+    return 0
+  fi
+
+  # Orphan cull: any prime bookmark whose suffix has no corresponding source
+  # bookmark in ANY current thread's chain. Computed repo-wide (not per-thread)
+  # so culling one thread's leftovers doesn't clobber another thread's live
+  # prime bookmarks. Skipped when --thread scopes the sync to a subset, since
+  # threads outside the filter must not lose their prime bookmarks.
+  if [[ -z "$THREAD_FILTER" ]]; then
+    local -A wanted=()
+    local source_name t
+    for t in "${all_chains[@]}"; do
+      IFS='|' read -ra t_chain <<< "$t"
+      for source_name in "${t_chain[@]}"; do
+        wanted["$(strip_source_prefix "$source_name")"]=1
+      done
+    done
+
+    local pname pcid psuffix
+    while IFS=$'\t' read -r pname pcid; do
+      psuffix=$(strip_prime_prefix "$pname")
+      if [[ -z "${wanted[$psuffix]:-}" ]]; then
+        jj bookmark delete "$pname" >/dev/null 2>&1 \
+          || { echo "jj-mirror: orphan cull bookmark delete failed for $pname; rolling back to op $pre_op" >&2; jj op restore "$pre_op" >/dev/null 2>&1 || true; exit 1; }
+        jj abandon "$pcid" >/dev/null 2>&1 \
+          || { echo "jj-mirror: orphan cull abandon failed for $pcid; rolling back to op $pre_op" >&2; jj op restore "$pre_op" >/dev/null 2>&1 || true; exit 1; }
+      fi
+    done < <(list_prime_bookmarks)
+  fi
+
+  local synced=0 i
+  for (( i=0; i<${#leaves[@]}; i++ )); do
+    rc=0
+    sync_thread "${leaves[i]}" "${chains[i]}" || rc=$?
+    if [[ $rc -ne 0 ]]; then
+      echo "jj-mirror: thread ${leaves[i]} failed; rolling back to op $pre_op" >&2
+      jj op restore "$pre_op" >/dev/null 2>&1 || true
+      exit "$rc"
+    fi
+    synced=$((synced + 1))
+  done
+
+  if [[ -n "$THREAD_FILTER" ]]; then
+    printf 'jj-mirror: synced %d thread(s) (scoped to %s)\n' "$synced" "$THREAD_FILTER"
+  else
+    printf 'jj-mirror: synced %d thread(s)\n' "$synced"
+  fi
+}
+
+status_main() {
+  validate_source_bookmarks_or_die
+
+  local leaf chain source_name suffix existing state hs hp
+  local -a parts
+  while IFS=$'\t' read -r leaf chain; do
+    [[ -n "$leaf" && -n "$chain" ]] || continue
+    printf 'thread %s\n' "$leaf"
+    parts=()
+    IFS='|' read -ra parts <<< "$chain"
+    for source_name in "${parts[@]}"; do
+      suffix=$(strip_source_prefix "$source_name")
+      existing=$(find_prime_bookmark "$suffix")
+      if [[ -z "$existing" ]]; then
+        state="missing"
+      else
+        hs=$(diff_hash "$source_name") || hs=""
+        hp=$(diff_hash "$existing") || hp=""
+        if [[ "$hs" == "$hp" && -n "$hs" ]]; then state="ok"; else state="stale"; fi
+      fi
+      printf '  %s -> %s%s    [%s]\n' "$source_name" "$PRIME_PREFIX" "$suffix" "$state"
+    done
+  done < <(list_source_threads)
+}
+
+abandon_main() {
+  local name=${1:-}
+  [[ -n "$name" ]] || { echo "usage: jj-mirror abandon <name>" >&2; exit 2; }
+
+  # Wrap the paired delete+abandon in the same atomicity envelope as sync:
+  # capture the pre-op id, roll back on any failure. Prevents half-torn state
+  # where source is removed but prime lingers (or vice-versa).
+  local pre_op
+  pre_op=$(capture_pre_op)
+  [[ -n "$pre_op" ]] || { echo "jj-mirror: could not capture pre-abandon op id" >&2; exit 1; }
+
+  local full cid
+  for full in "${SOURCE_PREFIX}${name}" "${PRIME_PREFIX}${name}"; do
+    cid=$(jj log --no-graph -r "$full" -T 'commit_id.short() ++ "\n"' 2>/dev/null | head -n1 || true)
+    if [[ -n "$cid" ]]; then
+      if ! jj bookmark delete "$full" >/dev/null 2>&1; then
+        echo "jj-mirror: bookmark delete failed for $full; rolling back to op $pre_op" >&2
+        jj op restore "$pre_op" >/dev/null 2>&1 || true
+        exit 1
+      fi
+      if ! jj abandon "$cid" >/dev/null 2>&1; then
+        echo "jj-mirror: abandon failed for $cid; rolling back to op $pre_op" >&2
+        jj op restore "$pre_op" >/dev/null 2>&1 || true
+        exit 1
+      fi
+    fi
+  done
+}
+
+push_main() {
+  sync_main
+
+  if command -v jj-vine >/dev/null 2>&1; then
+    exec jj-vine submit --tracked
+  fi
+  # Try `jj vine ...` as a jj subcommand plugin
+  if jj vine --help >/dev/null 2>&1; then
+    exec jj vine submit --tracked
+  fi
+
+  cat >&2 <<'EOF'
+jj-mirror: jj-vine not found. Install from https://codeberg.org/abrenneke/jj-vine
+Sync succeeded; skipping push.
+EOF
+  exit 1
+}
+
+# wants_help ARG — true when the arg is --help or -h. Used at the top of every
+# subcommand's arm so `jj-mirror <cmd> --help` short-circuits without loading
+# config or side-effects.
+wants_help() { [[ "$1" == "--help" || "$1" == "-h" ]]; }
+
+case "${1:-sync}" in
+  --help|-h) usage; exit 0 ;;
+  help)      print_help "${2:-}"; exit $? ;;
+  _dump-config)
+    load_config
+    printf 'source-prefix=%s\nprime-prefix=%s\n' "$SOURCE_PREFIX" "$PRIME_PREFIX"
+    exit 0
+    ;;
+  _dump-bookmarks)
+    load_config
+    case "${2:-}" in
+      source) list_source_bookmarks ;;
+      prime)  list_prime_bookmarks ;;
+      *) echo "usage: jj-mirror _dump-bookmarks source|prime" >&2; exit 2 ;;
+    esac
+    exit 0
+    ;;
+  _dump-threads)
+    load_config
+    list_source_threads
+    exit 0
+    ;;
+  _diff-hash)
+    load_config
+    [[ -n "${2:-}" ]] || { echo "usage: jj-mirror _diff-hash <revset>" >&2; exit 2; }
+    diff_hash "$2"
+    exit 0
+    ;;
+  sync)
+    (( $# > 0 )) && shift
+    if (( $# > 0 )) && wants_help "$1"; then help_sync; exit 0; fi
+    load_config
+    parse_sync_flags "$@"
+    sync_main
+    exit 0
+    ;;
+  status)
+    (( $# > 0 )) && shift
+    if (( $# > 0 )) && wants_help "$1"; then help_status; exit 0; fi
+    load_config
+    status_main
+    exit 0
+    ;;
+  abandon)
+    (( $# > 0 )) && shift
+    if (( $# > 0 )) && wants_help "$1"; then help_abandon; exit 0; fi
+    load_config
+    abandon_main "${1:-}"
+    exit 0
+    ;;
+  push)
+    (( $# > 0 )) && shift
+    if (( $# > 0 )) && wants_help "$1"; then help_push; exit 0; fi
+    load_config
+    push_main
+    exit 0
+    ;;
+  *) echo "jj-mirror: unknown command: $1" >&2; usage >&2; exit 2 ;;
+esac

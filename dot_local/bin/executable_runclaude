@@ -21,6 +21,12 @@ if [ -n "${KITTY_LISTEN_ON:-}" ]; then
     kitty @ set-tab-title "cc:${name}" 2>/dev/null || true
 fi
 
+# tmux window name — disable automatic-rename so it sticks past claude startup.
+if [ -n "${TMUX:-}" ]; then
+    tmux set-window-option automatic-rename off 2>/dev/null || true
+    tmux rename-window "cc:${name}" 2>/dev/null || true
+fi
+
 # Claude Code's session storage: ~/.claude/projects/<encoded-cwd>/*.jsonl
 # where encoded-cwd is $PWD with '/', '.', and '_' replaced by '-'.
 # e.g. /Users/foo/.bar/baz_qux → -Users-foo--bar-baz-qux
