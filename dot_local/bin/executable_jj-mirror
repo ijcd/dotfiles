@@ -61,9 +61,14 @@ strip_prime_prefix()  { printf '%s' "${1#"$PRIME_PREFIX"}";  }
 # diff_hash REVSET
 # Emit SHA-256 hex of the patch text of the revision's own diff.
 # Uses -T "" to strip commit metadata; -p emits the diff.
+#
+# Capture jj's output before hashing so a jj failure returns non-zero instead
+# of silently producing the SHA of empty input (the "up-to-date" comparison in
+# sync would then treat two failed hashes as equal — a nasty false-positive).
 diff_hash() {
-  local rev=$1
-  jj log --no-graph -r "$rev" -T '""' -p 2>/dev/null | shasum -a 256 | awk '{print $1}'
+  local rev=$1 patch
+  patch=$(jj log --no-graph -r "$rev" -T '""' -p) || return 1
+  printf '%s' "$patch" | shasum -a 256 | awk '{print $1}'
 }
 
 # list_source_threads
