@@ -66,25 +66,21 @@ list_bookmarks_with_prefix() {
 DRY_RUN=0
 THREAD_FILTER=""
 
-# parse_sync_flags — pull -n/--dry-run and -t/--thread out of "$@", leave the rest.
-# Sets DRY_RUN and THREAD_FILTER as side effects. Echoes the remaining args
-# for the caller to consume via `read -ra`.
+# parse_sync_flags — pull -n/--dry-run and -t/--thread out of "$@" as globals.
+# Rejects unknown positionals: `sync` takes no positional args, so anything
+# left over is a typo. (Previously silently discarded — a footgun.)
 parse_sync_flags() {
-  local -a remaining=()
   while (( $# )); do
     case "$1" in
       -n|--dry-run) DRY_RUN=1; shift ;;
       -t|--thread)  THREAD_FILTER=${2:-}; shift 2 ;;
       --thread=*)   THREAD_FILTER=${1#--thread=}; shift ;;
-      *) remaining+=("$1"); shift ;;
+      *)
+        echo "jj-mirror: sync: unknown argument '$1'" >&2
+        exit 2
+        ;;
     esac
   done
-  # ${remaining[@]} on an empty array errors under `set -u` on older bash
-  # (fixed in bash 4.4+, but be defensive since #!/usr/bin/env bash can
-  # resolve to whatever's first on PATH).
-  if (( ${#remaining[@]} > 0 )); then
-    printf '%s\n' "${remaining[@]}"
-  fi
 }
 
 list_source_bookmarks() { list_bookmarks_with_prefix "$SOURCE_PREFIX"; }
@@ -138,7 +134,7 @@ list_source_threads() {
       other=${names[j]}
       # Is 'other' a descendant of 'leaf' (excluding L itself)? If so, leaf isn't a leaf.
       if jj log --no-graph -r "(descendants(\"$leaf\") ~ \"$leaf\") & \"$other\"" \
-              -T 'commit_id ++ "\n"' 2>/dev/null | grep -q .; then
+              -T 'commit_id.short() ++ "\n"' 2>/dev/null | grep -q .; then
         is_leaf=0; break
       fi
     done
@@ -287,7 +283,12 @@ sync_thread() {
     jj bookmark set "$prime_full" -r "$new_cid" >/dev/null 2>&1 \
       || { echo "jj-mirror: bookmark set failed for $prime_full at $new_cid" >&2; return 1; }
 
-    # Conflict check
+    # Note on ordering: we bookmark BEFORE checking for conflict. If the new
+    # commit is conflicted, `return 2` triggers `jj op restore` in sync_main
+    # which atomically unwinds both the bookmark-set and the duplicate. So
+    # the transient "bookmark on a conflicted commit" state is safe — but
+    # only under that rollback invariant. Do not reorder without preserving
+    # the atomic-rollback guarantee.
     local cflag
     cflag=$(jj log --no-graph -r "$new_cid" -T 'if(conflict, "y", "n") ++ "\n"' 2>/dev/null | head -n1)
     if [[ "$cflag" == "y" ]]; then
@@ -546,8 +547,7 @@ case "${1:-sync}" in
   sync)
     load_config
     (( $# > 0 )) && shift
-    # Consume flags into globals, ignore remaining positionals for now
-    parse_sync_flags "$@" >/dev/null
+    parse_sync_flags "$@"
     sync_main
     exit 0
     ;;
