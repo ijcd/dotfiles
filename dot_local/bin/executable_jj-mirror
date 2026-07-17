@@ -167,8 +167,13 @@ sync_thread() {
 
     if [[ -n "$existing" && $cascade -eq 0 ]]; then
       existing_parent=$(jj log --no-graph -r "$existing-" -T 'commit_id.short() ++ "\n"' | head -n1)
-      existing_hash=$(diff_hash "$existing")
-      source_hash=$(diff_hash "$source_name")
+      # diff_hash returns non-zero on jj failure; check explicitly because sync_thread runs
+      # inside `if ! sync_thread` in sync_main, which suspends set -e for this body — two
+      # empty hashes would otherwise falsely compare equal and skip the rebuild.
+      existing_hash=$(diff_hash "$existing") \
+        || { echo "jj-mirror: diff_hash failed on existing prime $existing" >&2; return 1; }
+      source_hash=$(diff_hash "$source_name") \
+        || { echo "jj-mirror: diff_hash failed on source $source_name" >&2; return 1; }
       if [[ "$existing_parent" == "$prev" && "$existing_hash" == "$source_hash" ]]; then
         # up-to-date — no touch
         prev=$existing
