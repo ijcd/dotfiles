@@ -307,6 +307,24 @@ abandon_main() {
   done
 }
 
+push_main() {
+  sync_main
+
+  if command -v jj-vine >/dev/null 2>&1; then
+    exec jj-vine submit --tracked
+  fi
+  # Try `jj vine ...` as a jj subcommand plugin
+  if jj vine --help >/dev/null 2>&1; then
+    exec jj vine submit --tracked
+  fi
+
+  cat >&2 <<'EOF'
+jj-mirror: jj-vine not found. Install from https://codeberg.org/abrenneke/jj-vine
+Sync succeeded; skipping push.
+EOF
+  exit 1
+}
+
 case "${1:-sync}" in
   --help|-h) usage; exit 0 ;;
   _dump-config)
@@ -349,6 +367,10 @@ case "${1:-sync}" in
     abandon_main "${2:-}"
     exit 0
     ;;
-  push) load_config ;;
+  push)
+    load_config
+    push_main
+    exit 0
+    ;;
   *) echo "jj-mirror: unknown command: $1" >&2; usage >&2; exit 2 ;;
 esac
