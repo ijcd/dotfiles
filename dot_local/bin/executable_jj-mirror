@@ -22,6 +22,14 @@
 
 set -euo pipefail
 
+# Requires bash 4+ for associative arrays (declare -A in the orphan cull) and
+# safe empty-array expansion. macOS stock /bin/bash is 3.2 — install a modern
+# bash (homebrew, nix, macports) before using this tool.
+if (( BASH_VERSINFO[0] < 4 )); then
+  echo "jj-mirror: bash ${BASH_VERSION} too old — needs bash 4+ (declare -A, safe \${arr[@]+expansion})" >&2
+  exit 1
+fi
+
 usage() { awk 'NR==1{next} !/^#/{exit} {sub(/^# ?/,"");print}' "$0"; }
 
 load_config() {

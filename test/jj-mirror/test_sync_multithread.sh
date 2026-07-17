@@ -36,5 +36,18 @@ after_b=$(jj log --no-graph -r "pr/b1" -T 'commit_id.short() ++ "\n"')
 assert_eq "$before_a" "$after_a" "pr/a1 re-sync should be no-op"
 assert_eq "$before_b" "$after_b" "pr/b1 re-sync should be no-op"
 
+# Cross-thread orphan cull: delete one thread's source bookmark, sync.
+# The other thread's prime bookmark MUST survive. This is the exact regression
+# the sync_main-scoped `wanted` union guards against — a per-thread cull would
+# delete pr/b1 while processing thread a (or vice-versa).
+jj bookmark delete wip/a1 >/dev/null 2>&1
+"$SCRIPT" sync
+
+if jj log --no-graph -r "pr/a1" -T '""' >/dev/null 2>&1; then
+  fail "pr/a1 should have been orphan-culled after wip/a1 deletion"
+fi
+jj log --no-graph -r "pr/b1" -T '""' >/dev/null 2>&1 \
+  || fail "pr/b1 was clobbered by pr/a1's orphan cull (cross-thread contamination)"
+
 cd / && rm -rf "$repo"
 echo "ok: sync_multithread"
