@@ -1,22 +1,7 @@
 #!/usr/bin/env bash
 # jj-mirror — maintain a "prime" bookmark chain as a derived view of a
-# "source" bookmark chain. Prime is what jj-vine pushes as PRs; source is
-# where WIP happens. Non-source bookmarks (local scaffolding) are ignored.
-#
-# Usage:
-#   jj-mirror                    alias for `sync`
-#   jj-mirror sync               update prime chain to match source chain
-#   jj-mirror sync -n|--dry-run  print intended actions per thread without mutating
-#   jj-mirror sync -t|--thread <root>
-#                                 limit sync to the thread containing bookmark <root>
-#   jj-mirror status             show threads, source/prime pairs, staleness
-#   jj-mirror push               sync, then `jj vine submit --tracked`
-#   jj-mirror abandon <name>     delete both <source-prefix>name and <prime-prefix>name
-#   jj-mirror --help             print this help
-#
-# Config (jj config, [jj-mirror] section):
-#   source-prefix   default "wip/"
-#   prime-prefix    default "pr/"
+# "source" (WIP) bookmark chain, so jj-vine pushes clean PRs without
+# force-push churn as the WIP side evolves.
 #
 # See docs/superpowers/specs/2026-07-15-jj-mirror-design.md for the design.
 
@@ -30,7 +15,175 @@ if (( BASH_VERSINFO[0] < 4 )); then
   exit 1
 fi
 
-usage() { awk 'NR==1{next} !/^#/{exit} {sub(/^# ?/,"");print}' "$0"; }
+# ─── Help ─────────────────────────────────────────────────────────────────────
+# Top-level usage: overview + command index. Per-command help via
+# `jj-mirror <cmd> --help` or `jj-mirror help <cmd>`.
+
+usage() {
+  cat <<'EOF'
+jj-mirror — maintain a clean "prime" bookmark chain as a derived view of a
+messy "source" (WIP) chain, so jj-vine pushes stable PRs across resyncs.
+
+Usage:
+  jj-mirror [--help]                     show this help
+  jj-mirror help <command>               show help for one command
+  jj-mirror <command> [--help] [args]    run a command (or its own help)
+
+Commands:
+  sync       Re-derive the prime chain from the current source chain (default).
+  status     Report source→prime pair state per thread (ok/stale/missing).
+  push       Sync, then delegate to jj-vine submit --tracked.
+  abandon    Delete a matched pair of source and prime bookmarks + commits.
+
+Configuration (jj config, [jj-mirror] section):
+  source-prefix    Source-side bookmark prefix (default "wip/").
+  prime-prefix     Prime-side bookmark prefix (default "pr/").
+                   Must not overlap. Empty prefix is allowed but matches
+                   every bookmark; use with care.
+
+Model:
+  Source bookmarks (default wip/*) mark commits you want mirrored. Non-source
+  bookmarks are ignored — that's where local scaffolding lives. Prime commits
+  (default pr/*) are strict cherry-picks of each source commit's own diff,
+  stacked on trunk() and re-derived from the current graph on each sync.
+
+Example:
+  jj bookmark set wip/feature-a -r @-
+  jj-mirror sync              # creates pr/feature-a
+  jj-mirror status            # reports "ok"
+  jj-mirror push              # sync + jj-vine submits the PR
+
+See:
+  spec  docs/superpowers/specs/2026-07-15-jj-mirror-design.md
+  jj-vine  https://codeberg.org/abrenneke/jj-vine
+EOF
+}
+
+help_sync() {
+  cat <<'EOF'
+Usage:
+  jj-mirror sync [-n|--dry-run] [-t|--thread <bookmark>]
+
+Re-derive the prime chain from the current source chain. State-free: the
+whole shape is computed from the current jj graph each invocation.
+
+Options:
+  -n, --dry-run
+        Print intended actions per thread without mutating the repo. Includes
+        an orphan-cull preview and marks downstream commits as "(cascade)"
+        when their parent moves even if their own diff didn't change.
+
+  -t, --thread <bookmark>
+        Limit sync to the single thread containing <bookmark>. Match is exact
+        and must include the source prefix (e.g. "wip/foo", not "foo"). Under
+        --thread, the orphan cull is skipped entirely so other threads' prime
+        bookmarks are not deleted. A filter that matches zero threads prints
+        a warning to stderr.
+
+Behavior:
+  For each thread (a linear chain of source bookmarks descending from trunk()):
+    1. Each source bookmark's own diff is duplicated onto the previous prime
+       commit (or trunk() for the first). Non-source commits in between are
+       skipped — this is the "strict cherry-pick" invariant.
+    2. Prime bookmarks whose suffix has no matching source bookmark in ANY
+       thread are abandoned (repo-wide orphan cull; skipped under --thread).
+    3. Prime commits already matching parent + diff-hash are left in place —
+       the "no-op path". This is what keeps jj-vine PRs stable across resyncs.
+    4. Cherry-pick conflicts abort the sync via `jj op restore` — the repo
+       returns to its pre-sync state atomically.
+
+Preconditions (enforced at startup, exit 2 on violation):
+  - No two source bookmarks on the same commit (ambiguous pairing).
+  - Every trunk()..<source> range must be linear (no merges).
+
+Exit codes:
+  0    sync succeeded (or dry-run completed)
+  1    runtime error (rolled back)
+  2    conflict, ambiguous pairing, non-linear thread, or bad arg (rolled back)
+EOF
+}
+
+help_status() {
+  cat <<'EOF'
+Usage:
+  jj-mirror status
+
+Read-only report of every source→prime pair, grouped by thread.
+
+Output per line:
+  <source-name> -> <prime-name>    [state]
+
+States:
+  ok       Prime exists and its diff matches the source diff.
+  stale    Prime exists but the two diffs differ (sync would rebuild).
+  missing  No prime bookmark for this source suffix (sync would create).
+
+Preconditions (enforced at startup, exit 2 on violation):
+  - No two source bookmarks on the same commit.
+  - Every trunk()..<source> range must be linear.
+
+Exit codes:
+  0    reported successfully
+  2    validation error
+EOF
+}
+
+help_push() {
+  cat <<'EOF'
+Usage:
+  jj-mirror push
+
+Run `sync`, then delegate to jj-vine to submit the prime chain as PRs.
+jj-vine is looked up in this order:
+  1. Standalone `jj-vine` binary on PATH.
+  2. `jj vine …` subcommand plugin (via `jj vine --help`).
+
+If jj-vine is not installed, prints an install hint and exits 1 AFTER a
+successful sync.
+
+Exit codes:
+  0    sync + push both succeeded (replaced by jj-vine's own exit code via exec)
+  1    sync succeeded but jj-vine not found
+  Other  sync failure — see `jj-mirror sync --help`
+EOF
+}
+
+help_abandon() {
+  cat <<'EOF'
+Usage:
+  jj-mirror abandon <name>
+
+Delete both the source bookmark <source-prefix><name> and the prime bookmark
+<prime-prefix><name>, and abandon their underlying commits.
+
+Idempotent: missing bookmarks are OK; a second invocation is a no-op.
+Atomic: wraps in the same `capture_pre_op` + `jj op restore` envelope as
+sync, so any failure leaves the repo at its pre-abandon state.
+
+Arguments:
+  <name>    The pair suffix (no prefix). Example: for wip/feature-a and
+            pr/feature-a, run `jj-mirror abandon feature-a`.
+
+Exit codes:
+  0    completed (or nothing to do)
+  1    runtime error (rolled back)
+  2    missing <name> argument
+EOF
+}
+
+# print_help TOPIC — dispatch to a per-command help function, or the top-level
+# usage. Called from every `--help` / `help` handler so the surface is
+# uniform.
+print_help() {
+  case "${1:-}" in
+    ""|jj-mirror) usage ;;
+    sync)         help_sync ;;
+    status)       help_status ;;
+    push)         help_push ;;
+    abandon)      help_abandon ;;
+    *) echo "jj-mirror: no help for unknown command '$1'" >&2; usage >&2; return 2 ;;
+  esac
+}
 
 load_config() {
   SOURCE_PREFIX="$(jj config get jj-mirror.source-prefix 2>/dev/null || echo 'wip/')"
@@ -517,8 +670,14 @@ EOF
   exit 1
 }
 
+# wants_help ARG — true when the arg is --help or -h. Used at the top of every
+# subcommand's arm so `jj-mirror <cmd> --help` short-circuits without loading
+# config or side-effects.
+wants_help() { [[ "$1" == "--help" || "$1" == "-h" ]]; }
+
 case "${1:-sync}" in
   --help|-h) usage; exit 0 ;;
+  help)      print_help "${2:-}"; exit $? ;;
   _dump-config)
     load_config
     printf 'source-prefix=%s\nprime-prefix=%s\n' "$SOURCE_PREFIX" "$PRIME_PREFIX"
@@ -545,23 +704,30 @@ case "${1:-sync}" in
     exit 0
     ;;
   sync)
-    load_config
     (( $# > 0 )) && shift
+    if (( $# > 0 )) && wants_help "$1"; then help_sync; exit 0; fi
+    load_config
     parse_sync_flags "$@"
     sync_main
     exit 0
     ;;
   status)
+    (( $# > 0 )) && shift
+    if (( $# > 0 )) && wants_help "$1"; then help_status; exit 0; fi
     load_config
     status_main
     exit 0
     ;;
   abandon)
+    (( $# > 0 )) && shift
+    if (( $# > 0 )) && wants_help "$1"; then help_abandon; exit 0; fi
     load_config
-    abandon_main "${2:-}"
+    abandon_main "${1:-}"
     exit 0
     ;;
   push)
+    (( $# > 0 )) && shift
+    if (( $# > 0 )) && wants_help "$1"; then help_push; exit 0; fi
     load_config
     push_main
     exit 0
