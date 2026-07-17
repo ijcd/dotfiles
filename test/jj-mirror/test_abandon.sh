@@ -18,6 +18,16 @@ if jj bookmark list -T 'name ++ "\n"' | grep -qE '^(wip|pr)/a2$'; then
   fail "wip/a2 or pr/a2 still exists after abandon"
 fi
 
+# Commits should be dropped from the visible DAG. `jj log -r <cid>` in jj still
+# resolves abandoned commits by hash (they linger in the store), so we can't use
+# that as the check — instead, verify the commit id is not reachable from @.
+if jj log --no-graph -r "ancestors(@) & $wip_a2_cid" -T 'commit_id.short() ++ "\n"' 2>/dev/null | grep -q .; then
+  fail "wip/a2 commit $wip_a2_cid still an ancestor of @ after abandon"
+fi
+if jj log --no-graph -r "ancestors(@) & $pr_a2_cid" -T 'commit_id.short() ++ "\n"' 2>/dev/null | grep -q .; then
+  fail "pr/a2 commit $pr_a2_cid still an ancestor of @ after abandon"
+fi
+
 # Idempotent — second call is no-op, exit 0
 "$SCRIPT" abandon a2 >/dev/null 2>&1 || fail "second abandon should be idempotent"
 
