@@ -438,12 +438,27 @@ abandon_main() {
   local name=${1:-}
   [[ -n "$name" ]] || { echo "usage: jj-mirror abandon <name>" >&2; exit 2; }
 
+  # Wrap the paired delete+abandon in the same atomicity envelope as sync:
+  # capture the pre-op id, roll back on any failure. Prevents half-torn state
+  # where source is removed but prime lingers (or vice-versa).
+  local pre_op
+  pre_op=$(capture_pre_op)
+  [[ -n "$pre_op" ]] || { echo "jj-mirror: could not capture pre-abandon op id" >&2; exit 1; }
+
   local full cid
   for full in "${SOURCE_PREFIX}${name}" "${PRIME_PREFIX}${name}"; do
     cid=$(jj log --no-graph -r "$full" -T 'commit_id.short() ++ "\n"' 2>/dev/null | head -n1 || true)
     if [[ -n "$cid" ]]; then
-      jj bookmark delete "$full" >/dev/null 2>&1 || true
-      jj abandon "$cid"          >/dev/null 2>&1 || true
+      if ! jj bookmark delete "$full" >/dev/null 2>&1; then
+        echo "jj-mirror: bookmark delete failed for $full; rolling back to op $pre_op" >&2
+        jj op restore "$pre_op" >/dev/null 2>&1 || true
+        exit 1
+      fi
+      if ! jj abandon "$cid" >/dev/null 2>&1; then
+        echo "jj-mirror: abandon failed for $cid; rolling back to op $pre_op" >&2
+        jj op restore "$pre_op" >/dev/null 2>&1 || true
+        exit 1
+      fi
     fi
   done
 }
