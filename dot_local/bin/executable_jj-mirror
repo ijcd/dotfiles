@@ -30,22 +30,27 @@ Usage:
   jj-mirror <command> [--help] [args]    run a command (or its own help)
 
 Commands:
-  sync       Re-derive the prime chain from the current source chain (default).
-  status     Report source→prime pair state per thread (ok/stale/missing).
+  sync       Re-derive the prime chain from the current source chain.
+  status     Report source→prime pair state per thread (ok/stale/missing). [default]
   push       Sync, then delegate to jj-vine submit --tracked.
   abandon    Delete a matched pair of source and prime bookmarks + commits.
+  config     Print the detected configuration (prefixes + roots, resolved).
 
 Configuration (jj config, [jj-mirror] section):
   source-prefix    Source-side bookmark prefix (default "wip/").
   prime-prefix     Prime-side bookmark prefix (default "pr/").
                    Must not overlap. Empty prefix is allowed but matches
                    every bookmark; use with care.
+  source-root      Base the source bookmarks sit on (default local/main,
+                   falling back to trunk() where local/main is absent).
+  prime-root       Base the prime chain is re-based onto (default trunk()=master).
 
 Model:
   Source bookmarks (default wip/*) mark commits you want mirrored. Non-source
   bookmarks are ignored — that's where local scaffolding lives. Prime commits
   (default pr/*) are strict cherry-picks of each source commit's own diff,
-  stacked on trunk() and re-derived from the current graph on each sync.
+  re-based from the source root (default local/main) onto the prime root
+  (default trunk() = master), and re-derived from the current graph on each sync.
 
 Example:
   jj bookmark set wip/feature-a -r @-
@@ -171,6 +176,28 @@ Exit codes:
 EOF
 }
 
+help_config() {
+  cat <<'EOF'
+Usage:
+  jj-mirror config
+
+Print the detected configuration — the source/prime bookmark prefixes and the
+source/prime roots, each with the commit its revset resolves to. Read-only.
+EOF
+}
+
+# config_main — print the detected config (prefixes + roots + what they resolve to).
+config_main() {
+  local sr pr
+  sr=$(jj log --no-graph -r "$SOURCE_ROOT" -T 'commit_id.short() ++ if(bookmarks, " " ++ bookmarks, "")' 2>/dev/null | head -n1)
+  pr=$(jj log --no-graph -r "$PRIME_ROOT"  -T 'commit_id.short() ++ if(bookmarks, " " ++ bookmarks, "")' 2>/dev/null | head -n1)
+  printf 'jj-mirror config (detected):\n'
+  printf '  source-prefix   %s\n' "$SOURCE_PREFIX"
+  printf '  prime-prefix    %s\n' "$PRIME_PREFIX"
+  printf '  source-root     %s  ->  %s\n' "$SOURCE_ROOT" "${sr:-<unresolved>}"
+  printf '  prime-root      %s  ->  %s\n' "$PRIME_ROOT" "${pr:-<unresolved>}"
+}
+
 # print_help TOPIC — dispatch to a per-command help function, or the top-level
 # usage. Called from every `--help` / `help` handler so the surface is
 # uniform.
@@ -181,6 +208,7 @@ print_help() {
     status)       help_status ;;
     push)         help_push ;;
     abandon)      help_abandon ;;
+    config)       help_config ;;
     *) echo "jj-mirror: no help for unknown command '$1'" >&2; usage >&2; return 2 ;;
   esac
 }
@@ -188,6 +216,14 @@ print_help() {
 load_config() {
   SOURCE_PREFIX="$(jj config get jj-mirror.source-prefix 2>/dev/null || echo 'wip/')"
   PRIME_PREFIX="$(jj config get jj-mirror.prime-prefix  2>/dev/null || echo 'pr/')"
+
+  # Bases. Source bookmarks sit on SOURCE_ROOT (default local/main = master + your
+  # local-only base); the prime chain is re-based onto PRIME_ROOT (default trunk() =
+  # master). Stripping SOURCE_ROOT's extra base is the whole point — it makes the
+  # prime chain PR-ready. source-root's default falls back to trunk() where
+  # local/main is absent, so generic repos (and the tests) still work.
+  SOURCE_ROOT="$(jj config get jj-mirror.source-root 2>/dev/null || echo 'coalesce(present(local/main), trunk())')"
+  PRIME_ROOT="$(jj config get jj-mirror.prime-root  2>/dev/null || echo 'trunk()')"
 
   if [[ "$SOURCE_PREFIX" == "$PRIME_PREFIX" ]]; then
     echo "jj-mirror: source-prefix and prime-prefix must differ" >&2
@@ -301,7 +337,7 @@ list_source_threads() {
     # against jj 0.43.0 — emits comma-joined names for multi-bookmark commits.
     local chain
     chain=$(
-      jj log --no-graph -r "trunk()..\"$leaf\" & bookmarks()" \
+      jj log --no-graph -r "$SOURCE_ROOT..\"$leaf\" & bookmarks()" \
         -T 'bookmarks.map(|b| b.name()).join(",") ++ "\n"' 2>/dev/null \
       | awk 'NF' \
       | awk '{a[NR]=$0} END{for(i=NR;i>=1;i--)print a[i]}'
@@ -360,9 +396,9 @@ validate_source_bookmarks_or_die() {
   # path.
   local nm
   for nm in "${names[@]}"; do
-    if jj log --no-graph -r "merges() & trunk()..\"$nm\"" -T 'commit_id ++ "\n"' 2>/dev/null \
+    if jj log --no-graph -r "merges() & $SOURCE_ROOT..\"$nm\"" -T 'commit_id ++ "\n"' 2>/dev/null \
        | grep -q .; then
-      echo "jj-mirror: non-linear source thread — merge commit found between trunk() and $nm; only linear chains are supported in v1" >&2
+      echo "jj-mirror: non-linear source thread — merge commit found between the source root and $nm; only linear chains are supported in v1" >&2
       exit 2
     fi
   done
@@ -388,7 +424,7 @@ sync_thread() {
   IFS='|' read -ra chain <<< "$chain_str"
 
   local prev
-  prev=$(jj log --no-graph -r "trunk()" -T 'commit_id.short() ++ "\n"' | head -n1)
+  prev=$(jj log --no-graph -r "$PRIME_ROOT" -T 'commit_id.short() ++ "\n"' | head -n1)
 
   local cascade=0   # once set, everything downstream must rebuild
   local source_name suffix prime_full existing existing_parent existing_hash source_hash new_cid
@@ -675,12 +711,13 @@ EOF
 # config or side-effects.
 wants_help() { [[ "$1" == "--help" || "$1" == "-h" ]]; }
 
-case "${1:-sync}" in
+case "${1:-status}" in
   --help|-h) usage; exit 0 ;;
   help)      print_help "${2:-}"; exit $? ;;
   _dump-config)
     load_config
-    printf 'source-prefix=%s\nprime-prefix=%s\n' "$SOURCE_PREFIX" "$PRIME_PREFIX"
+    printf 'source-prefix=%s\nprime-prefix=%s\nsource-root=%s\nprime-root=%s\n' \
+      "$SOURCE_PREFIX" "$PRIME_PREFIX" "$SOURCE_ROOT" "$PRIME_ROOT"
     exit 0
     ;;
   _dump-bookmarks)
@@ -716,6 +753,13 @@ case "${1:-sync}" in
     if (( $# > 0 )) && wants_help "$1"; then help_status; exit 0; fi
     load_config
     status_main
+    exit 0
+    ;;
+  config)
+    (( $# > 0 )) && shift
+    if (( $# > 0 )) && wants_help "$1"; then help_config; exit 0; fi
+    load_config
+    config_main
     exit 0
     ;;
   abandon)
