@@ -1,27 +1,35 @@
 # Find a usable SSH agent
 # Usage: ssh-reagent [-q]
 #   -q  Quiet: don't show agent info when found
-function ssh-reagent () {
+#
+# Portable across zsh and bash. Enumerates candidates via `find` instead of
+# zsh's (N) glob qualifier so bash sessions (e.g. Claude Code tool calls) can
+# `source` this file and use it too.
+ssh-reagent() {
   local quiet=0
   [[ "$1" == "-q" ]] && quiet=1
 
   # Search classic agent sockets (ssh-agent -s, forwarded agents) AND macOS's
   # launchd ssh-agent sockets. macOS exposes one per launchd session at
   # /private/tmp/com.apple.launchd.*/Listeners, all routing to the single shared
-  # com.openssh.ssh-agent — so the first one that answers (and has our keys) wins.
+  # com.openssh.ssh-agent — the first one that answers (and has our keys) wins.
   local agent
-  for agent in ${TMPDIR}ssh-*/agent.*(N) /private/tmp/com.apple.launchd.*/Listeners(N); do
-    # Must be a socket we own
-    [[ -S $agent && -O $agent ]] || continue
-    export SSH_AUTH_SOCK=$agent
-    if ssh-add -l &>/dev/null; then
+  while IFS= read -r agent; do
+    # Must be a socket we own.
+    [[ -S "$agent" && -O "$agent" ]] || continue
+    export SSH_AUTH_SOCK="$agent"
+    if ssh-add -l >/dev/null 2>&1; then
       if (( ! quiet )); then
         echo "Found working SSH Agent:"
         ssh-add -l
       fi
       return 0
     fi
-  done
+  done < <(
+    find "${TMPDIR:-/tmp}" /private/tmp -maxdepth 2 -type s \
+      \( -path '*/ssh-*/agent.*' -o -path '*/com.apple.launchd.*/Listeners' \) \
+      2>/dev/null
+  )
   unset SSH_AUTH_SOCK
   echo 'Cannot find ssh agent - maybe you should reconnect and forward it?' >&2
   return 1
