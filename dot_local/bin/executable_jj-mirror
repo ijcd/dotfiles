@@ -293,6 +293,20 @@ status_main() {
   done < <(list_source_threads)
 }
 
+abandon_main() {
+  local name=${1:-}
+  [[ -n "$name" ]] || { echo "usage: jj-mirror abandon <name>" >&2; exit 2; }
+
+  local full cid
+  for full in "${SOURCE_PREFIX}${name}" "${PRIME_PREFIX}${name}"; do
+    cid=$(jj log --no-graph -r "$full" -T 'commit_id.short() ++ "\n"' 2>/dev/null | head -n1 || true)
+    if [[ -n "$cid" ]]; then
+      jj bookmark delete "$full" >/dev/null 2>&1 || true
+      jj abandon "$cid"          >/dev/null 2>&1 || true
+    fi
+  done
+}
+
 case "${1:-sync}" in
   --help|-h) usage; exit 0 ;;
   _dump-config)
@@ -330,6 +344,11 @@ case "${1:-sync}" in
     status_main
     exit 0
     ;;
-  push|abandon) load_config ;;
+  abandon)
+    load_config
+    abandon_main "${2:-}"
+    exit 0
+    ;;
+  push) load_config ;;
   *) echo "jj-mirror: unknown command: $1" >&2; usage >&2; exit 2 ;;
 esac
