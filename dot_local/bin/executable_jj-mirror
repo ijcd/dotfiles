@@ -145,7 +145,7 @@ capture_pre_op() {
 find_prime_bookmark() {
   local name=$1
   local full="${PRIME_PREFIX}${name}"
-  jj log --no-graph -r "$full" -T 'commit_id.short() ++ "\n"' 2>/dev/null | head -n1
+  jj log --no-graph -r "$full" -T 'commit_id.short() ++ "\n"' 2>/dev/null | head -n1 || true
 }
 
 # sync_thread LEAF CHAIN_STR
@@ -270,6 +270,29 @@ sync_main() {
   printf 'jj-mirror: synced %d thread(s)\n' "$synced"
 }
 
+status_main() {
+  local leaf chain source_name suffix existing state hs hp
+  local -a parts
+  while IFS=$'\t' read -r leaf chain; do
+    [[ -n "$leaf" && -n "$chain" ]] || continue
+    printf 'thread %s\n' "$leaf"
+    parts=()
+    IFS='|' read -ra parts <<< "$chain"
+    for source_name in "${parts[@]}"; do
+      suffix=$(strip_source_prefix "$source_name")
+      existing=$(find_prime_bookmark "$suffix")
+      if [[ -z "$existing" ]]; then
+        state="missing"
+      else
+        hs=$(diff_hash "$source_name") || hs=""
+        hp=$(diff_hash "$existing") || hp=""
+        if [[ "$hs" == "$hp" && -n "$hs" ]]; then state="ok"; else state="stale"; fi
+      fi
+      printf '  %s -> %s%s    [%s]\n' "$source_name" "$PRIME_PREFIX" "$suffix" "$state"
+    done
+  done < <(list_source_threads)
+}
+
 case "${1:-sync}" in
   --help|-h) usage; exit 0 ;;
   _dump-config)
@@ -302,6 +325,11 @@ case "${1:-sync}" in
     sync_main
     exit 0
     ;;
-  status|push|abandon) load_config ;;
+  status)
+    load_config
+    status_main
+    exit 0
+    ;;
+  push|abandon) load_config ;;
   *) echo "jj-mirror: unknown command: $1" >&2; usage >&2; exit 2 ;;
 esac
