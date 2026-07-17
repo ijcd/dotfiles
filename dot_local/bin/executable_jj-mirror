@@ -203,13 +203,22 @@ sync_thread() {
     # so a failure propagates to the rollback path instead of silently continuing.
     jj bookmark set "$prime_full" -r "$new_cid" >/dev/null 2>&1 \
       || { echo "jj-mirror: bookmark set failed for $prime_full at $new_cid" >&2; return 1; }
+
+    # Conflict check
+    local cflag
+    cflag=$(jj log --no-graph -r "$new_cid" -T 'if(conflict, "y", "n") ++ "\n"' 2>/dev/null | head -n1)
+    if [[ "$cflag" == "y" ]]; then
+      echo "jj-mirror: conflict cherry-picking $source_name onto ${prev} (prime commit $new_cid)" >&2
+      return 2   # signal 'conflict, roll back' to sync_main
+    fi
+
     prev=$new_cid
     cascade=1
   done
 }
 
 sync_main() {
-  local pre_op
+  local pre_op rc=0
   pre_op=$(capture_pre_op)
   [[ -n "$pre_op" ]] || { echo "jj-mirror: could not capture pre-sync op id" >&2; exit 1; }
 
@@ -248,10 +257,12 @@ sync_main() {
 
   local synced=0 i
   for (( i=0; i<${#leaves[@]}; i++ )); do
-    if ! sync_thread "${leaves[i]}" "${chains[i]}"; then
+    rc=0
+    sync_thread "${leaves[i]}" "${chains[i]}" || rc=$?
+    if [[ $rc -ne 0 ]]; then
       echo "jj-mirror: thread ${leaves[i]} failed; rolling back to op $pre_op" >&2
       jj op restore "$pre_op" >/dev/null 2>&1 || true
-      exit 1
+      exit "$rc"
     fi
     synced=$((synced + 1))
   done
