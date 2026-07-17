@@ -58,6 +58,14 @@ list_prime_bookmarks()  { list_bookmarks_with_prefix "$PRIME_PREFIX"; }
 strip_source_prefix() { printf '%s' "${1#"$SOURCE_PREFIX"}"; }
 strip_prime_prefix()  { printf '%s' "${1#"$PRIME_PREFIX"}";  }
 
+# diff_hash REVSET
+# Emit SHA-256 hex of the patch text of the revision's own diff.
+# Uses -T "" to strip commit metadata; -p emits the diff.
+diff_hash() {
+  local rev=$1
+  jj log --no-graph -r "$rev" -T '""' -p 2>/dev/null | shasum -a 256 | awk '{print $1}'
+}
+
 # list_source_threads
 # Emits one line per thread: <leaf>\t<b1>|<b2>|...|<leaf>
 # Algorithm:
@@ -142,6 +150,12 @@ case "${1:-sync}" in
   _dump-threads)
     load_config
     list_source_threads
+    exit 0
+    ;;
+  _diff-hash)
+    load_config
+    [[ -n "${2:-}" ]] || { echo "usage: jj-mirror _diff-hash <revset>" >&2; exit 2; }
+    diff_hash "$2"
     exit 0
     ;;
   sync|status|push|abandon) load_config ;;
