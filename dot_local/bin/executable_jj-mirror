@@ -37,11 +37,41 @@ load_config() {
   fi
 }
 
+# list_bookmarks_with_prefix PREFIX
+# Emits: <name>\t<short-commit-id> per line, filtered by PREFIX.
+# Empty PREFIX matches every bookmark.
+list_bookmarks_with_prefix() {
+  local prefix=$1
+  # Template: name TAB short commit_id NEWLINE. normal_target is the local commit.
+  jj bookmark list -T 'name ++ "\t" ++ normal_target.commit_id().short() ++ "\n"' 2>/dev/null \
+    | while IFS=$'\t' read -r name cid; do
+        [[ -n "$name" && -n "$cid" ]] || continue
+        if [[ -z "$prefix" || "$name" == "$prefix"* ]]; then
+          printf '%s\t%s\n' "$name" "$cid"
+        fi
+      done
+}
+
+list_source_bookmarks() { list_bookmarks_with_prefix "$SOURCE_PREFIX"; }
+list_prime_bookmarks()  { list_bookmarks_with_prefix "$PRIME_PREFIX"; }
+
+strip_source_prefix() { printf '%s' "${1#"$SOURCE_PREFIX"}"; }
+strip_prime_prefix()  { printf '%s' "${1#"$PRIME_PREFIX"}";  }
+
 case "${1:-sync}" in
   --help|-h) usage; exit 0 ;;
   _dump-config)
     load_config
     printf 'source-prefix=%s\nprime-prefix=%s\n' "$SOURCE_PREFIX" "$PRIME_PREFIX"
+    exit 0
+    ;;
+  _dump-bookmarks)
+    load_config
+    case "${2:-}" in
+      source) list_source_bookmarks ;;
+      prime)  list_prime_bookmarks ;;
+      *) echo "usage: jj-mirror _dump-bookmarks source|prime" >&2; exit 2 ;;
+    esac
     exit 0
     ;;
   sync|status|push|abandon) load_config ;;
