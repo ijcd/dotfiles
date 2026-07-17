@@ -124,6 +124,11 @@ list_source_threads() {
   (( n > 0 )) || return 0
 
   # For each candidate leaf L, ensure no other source bookmark has L as ancestor.
+  # Exclude L itself from the descendants check — otherwise two bookmarks on the
+  # same commit would each see the other as a "descendant" and neither picked as
+  # leaf (thread silently vanishes). (Same-commit collisions are already caught
+  # upstream by validate_source_bookmarks_or_die, but this stays safe if the
+  # validator is bypassed.)
   local i j leaf other
   for (( i=0; i<n; i++ )); do
     leaf=${names[i]}
@@ -131,9 +136,9 @@ list_source_threads() {
     for (( j=0; j<n; j++ )); do
       (( i == j )) && continue
       other=${names[j]}
-      # Is 'other' a descendant of 'leaf'? If so, leaf isn't a leaf.
-      if jj log --no-graph -r "descendants(\"$leaf\") & \"$other\"" -T 'commit_id ++ "\n"' 2>/dev/null \
-         | grep -q .; then
+      # Is 'other' a descendant of 'leaf' (excluding L itself)? If so, leaf isn't a leaf.
+      if jj log --no-graph -r "(descendants(\"$leaf\") ~ \"$leaf\") & \"$other\"" \
+              -T 'commit_id ++ "\n"' 2>/dev/null | grep -q .; then
         is_leaf=0; break
       fi
     done
@@ -168,6 +173,49 @@ list_source_threads() {
     done <<< "$chain"
 
     printf '%s\t%s\n' "$leaf" "$ordered"
+  done
+}
+
+# validate_source_bookmarks_or_die — enforce the spec's shape invariants for
+# source threads. Exits 2 (config-error tier) on violation.
+#
+# Rejects, per spec's "Failure modes" table:
+#   - Two source bookmarks on the same commit (ambiguous pairing).
+#   - Non-linear source thread — a merge commit anywhere in trunk()..leaf.
+#
+# This runs BEFORE sync_main or status_main mutates or reports; anything
+# downstream can trust the graph is a set of disjoint linear chains.
+validate_source_bookmarks_or_die() {
+  local -a names cids
+  while IFS=$'\t' read -r name cid; do
+    names+=("$name"); cids+=("$cid")
+  done < <(list_source_bookmarks)
+
+  local n=${#names[@]}
+  (( n > 0 )) || return 0
+
+  # 1. Same-commit ambiguity — pairwise scan on commit id.
+  local i j
+  for (( i=0; i<n; i++ )); do
+    for (( j=i+1; j<n; j++ )); do
+      if [[ "${cids[i]}" == "${cids[j]}" ]]; then
+        echo "jj-mirror: ambiguous pairing — ${names[i]} and ${names[j]} point to the same commit ${cids[i]}; one source bookmark per commit" >&2
+        exit 2
+      fi
+    done
+  done
+
+  # 2. Non-linear threads — merges() intersected with trunk()..bookmark must
+  # be empty for every source bookmark. Merges anywhere upstream of a source
+  # bookmark within the mine range mean the chain from trunk isn't a single
+  # path.
+  local nm
+  for nm in "${names[@]}"; do
+    if jj log --no-graph -r "merges() & trunk()..\"$nm\"" -T 'commit_id ++ "\n"' 2>/dev/null \
+       | grep -q .; then
+      echo "jj-mirror: non-linear source thread — merge commit found between trunk() and $nm; only linear chains are supported in v1" >&2
+      exit 2
+    fi
   done
 }
 
@@ -288,6 +336,8 @@ thread_matches_filter() {
 }
 
 sync_main() {
+  validate_source_bookmarks_or_die
+
   local pre_op rc=0
   pre_op=$(capture_pre_op)
   [[ -n "$pre_op" ]] || { echo "jj-mirror: could not capture pre-sync op id" >&2; exit 1; }
@@ -360,6 +410,8 @@ sync_main() {
 }
 
 status_main() {
+  validate_source_bookmarks_or_die
+
   local leaf chain source_name suffix existing state hs hp
   local -a parts
   while IFS=$'\t' read -r leaf chain; do
