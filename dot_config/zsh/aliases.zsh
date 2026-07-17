@@ -213,3 +213,13 @@ alias acs="apt-cache search"
 alias acsh="apt-cache show"
 alias acp="apt-cache policy"
 alias agi="apt-get install"
+
+###############################
+# Terminal
+###############################
+# fixterm: undo the terminal modes a fullscreen TUI (e.g. a Ctrl-Z'd Claude
+# Code) leaves behind — alt-screen, mouse tracking, focus reporting — that make
+# the wheel and PageUp/Down scroll command history instead of the scrollback.
+# \e[<u pops the kitty keyboard protocol (CSI-u) a fullscreen TUI leaves on,
+# which otherwise makes Ctrl-A/E/F/B send escape sequences zsh prints as junk.
+alias fixterm='printf "\e[?1049l\e[?1000l\e[?1002l\e[?1003l\e[?1006l\e[?1004l\e[<u"'

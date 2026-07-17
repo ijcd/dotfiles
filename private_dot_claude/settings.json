@@ -75,5 +75,5 @@
   "inputNeededNotifEnabled": true,
   "agentPushNotifEnabled": true,
   "remoteControlAtStartup": true,
-  "tui": "fullscreen"
+  "tui": "default"
 }
