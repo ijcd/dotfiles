@@ -302,18 +302,26 @@ sync_thread() {
 
 # dry_run_thread LEAF CHAIN_STR — print intended actions for one thread
 # without mutating anything.
+#
+# Tracks cascade the same way sync_thread does: once one commit is marked
+# create-or-rebuild, every downstream commit's parent moves, so it must
+# rebuild too — even if its own diff hasn't changed. Without this, dry-run
+# undercounts the real work sync would do.
 dry_run_thread() {
   local leaf=$1 chain_str=$2
   local -a parts
   IFS='|' read -ra parts <<< "$chain_str"
 
   printf 'thread %s (dry-run)\n' "$leaf"
-  local sname sfx existing hs hp
+  local sname sfx existing hs hp cascade=0
   for sname in "${parts[@]}"; do
     sfx=$(strip_source_prefix "$sname")
     existing=$(find_prime_bookmark "$sfx")
     if [[ -z "$existing" ]]; then
       printf '  would create %s%s from %s\n' "$PRIME_PREFIX" "$sfx" "$sname"
+      cascade=1
+    elif (( cascade )); then
+      printf '  would rebuild %s%s (cascade)\n' "$PRIME_PREFIX" "$sfx"
     else
       hs=$(diff_hash "$sname") || hs=""
       hp=$(diff_hash "$existing") || hp=""
@@ -321,6 +329,7 @@ dry_run_thread() {
         printf '  would keep %s%s (up-to-date)\n' "$PRIME_PREFIX" "$sfx"
       else
         printf '  would rebuild %s%s (diff changed)\n' "$PRIME_PREFIX" "$sfx"
+        cascade=1
       fi
     fi
   done
@@ -354,7 +363,33 @@ sync_main() {
     fi
   done < <(list_source_threads)
 
+  # --thread scoping that matches zero threads is almost always a typo. Warn
+  # rather than silently claim success — the user thought sync was running.
+  if [[ -n "$THREAD_FILTER" && ${#leaves[@]} -eq 0 ]]; then
+    echo "jj-mirror: warning — --thread '$THREAD_FILTER' matched 0 of ${#all_leaves[@]} thread(s); nothing to do" >&2
+  fi
+
   if [[ $DRY_RUN -eq 1 ]]; then
+    # Preview orphan cull first, under the same repo-wide `wanted` union that
+    # the real sync uses. Skipped under --thread (matches real behavior).
+    if [[ -z "$THREAD_FILTER" ]]; then
+      local -A dry_wanted=()
+      local source_name t
+      for t in "${all_chains[@]}"; do
+        IFS='|' read -ra t_chain <<< "$t"
+        for source_name in "${t_chain[@]}"; do
+          dry_wanted["$(strip_source_prefix "$source_name")"]=1
+        done
+      done
+      local pname pcid psuffix
+      while IFS=$'\t' read -r pname pcid; do
+        psuffix=$(strip_prime_prefix "$pname")
+        if [[ -z "${dry_wanted[$psuffix]:-}" ]]; then
+          printf 'would cull orphan %s\n' "$pname"
+        fi
+      done < <(list_prime_bookmarks)
+    fi
+
     local i
     for (( i=0; i<${#leaves[@]}; i++ )); do
       dry_run_thread "${leaves[i]}" "${chains[i]}"
