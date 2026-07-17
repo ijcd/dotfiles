@@ -174,7 +174,11 @@ sync_thread() {
       out=$(jj duplicate "$source_name" --destination "$prev" 2>&1)
       new_cid=$(printf '%s\n' "$out" | awk '/^Duplicated/ {print $5; exit}')
       [[ -n "$new_cid" ]] || { echo "jj-mirror: duplicate produced no commit for $source_name" >&2; return 1; }
-      jj bookmark set "$prime_full" -r "$new_cid" >/dev/null 2>&1
+      # sync_thread runs inside `if ! sync_thread` in sync_main, which suspends
+      # `set -e` for its whole body. Check bookmark-set's exit code explicitly
+      # so a failure propagates to the rollback path instead of silently continuing.
+      jj bookmark set "$prime_full" -r "$new_cid" >/dev/null 2>&1 \
+        || { echo "jj-mirror: bookmark set failed for $prime_full at $new_cid" >&2; return 1; }
       prev=$new_cid
     else
       prev=$existing   # placeholder — later tasks handle updates
