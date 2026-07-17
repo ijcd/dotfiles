@@ -64,6 +64,8 @@ tug = ["bookmark", "move", "--from", "closest_bookmark(@-)", "--to", "@-"]
 # rp/lp: patch logs. rp = work since local main with --stat; lp = plain -p.
 rp = ["log", "--no-graph", "-r", "sincemain", "--stat", "-p"]
 lp = ["log", "--no-graph", "-p"]
+# vine: run jj-vine (stacked-PR submit helper) as `jj vine …`.
+vine = ["util", "exec", "--", "jj-vine"]
 
 [ui]
 diff-formatter = ":git" # jj's own git-style diff
