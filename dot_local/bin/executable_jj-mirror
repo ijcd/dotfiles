@@ -6,6 +6,9 @@
 # Usage:
 #   jj-mirror                    alias for `sync`
 #   jj-mirror sync               update prime chain to match source chain
+#   jj-mirror sync -n|--dry-run  print intended actions per thread without mutating
+#   jj-mirror sync -t|--thread <root>
+#                                 limit sync to the thread containing bookmark <root>
 #   jj-mirror status             show threads, source/prime pairs, staleness
 #   jj-mirror push               sync, then `jj vine submit --tracked`
 #   jj-mirror abandon <name>     delete both <source-prefix>name and <prime-prefix>name
@@ -50,6 +53,30 @@ list_bookmarks_with_prefix() {
           printf '%s\t%s\n' "$name" "$cid"
         fi
       done
+}
+
+DRY_RUN=0
+THREAD_FILTER=""
+
+# parse_sync_flags — pull -n/--dry-run and -t/--thread out of "$@", leave the rest.
+# Sets DRY_RUN and THREAD_FILTER as side effects. Echoes the remaining args
+# for the caller to consume via `read -ra`.
+parse_sync_flags() {
+  local -a remaining=()
+  while (( $# )); do
+    case "$1" in
+      -n|--dry-run) DRY_RUN=1; shift ;;
+      -t|--thread)  THREAD_FILTER=${2:-}; shift 2 ;;
+      --thread=*)   THREAD_FILTER=${1#--thread=}; shift ;;
+      *) remaining+=("$1"); shift ;;
+    esac
+  done
+  # ${remaining[@]} on an empty array errors under `set -u` on older bash
+  # (fixed in bash 4.4+, but be defensive since #!/usr/bin/env bash can
+  # resolve to whatever's first on PATH).
+  if (( ${#remaining[@]} > 0 )); then
+    printf '%s\n' "${remaining[@]}"
+  fi
 }
 
 list_source_bookmarks() { list_bookmarks_with_prefix "$SOURCE_PREFIX"; }
@@ -217,6 +244,41 @@ sync_thread() {
   done
 }
 
+# dry_run_thread LEAF CHAIN_STR — print intended actions for one thread
+# without mutating anything.
+dry_run_thread() {
+  local leaf=$1 chain_str=$2
+  local -a parts
+  IFS='|' read -ra parts <<< "$chain_str"
+
+  printf 'thread %s (dry-run)\n' "$leaf"
+  local sname sfx existing hs hp
+  for sname in "${parts[@]}"; do
+    sfx=$(strip_source_prefix "$sname")
+    existing=$(find_prime_bookmark "$sfx")
+    if [[ -z "$existing" ]]; then
+      printf '  would create %s%s from %s\n' "$PRIME_PREFIX" "$sfx" "$sname"
+    else
+      hs=$(diff_hash "$sname") || hs=""
+      hp=$(diff_hash "$existing") || hp=""
+      if [[ -n "$hs" && "$hs" == "$hp" ]]; then
+        printf '  would keep %s%s (up-to-date)\n' "$PRIME_PREFIX" "$sfx"
+      else
+        printf '  would rebuild %s%s (diff changed)\n' "$PRIME_PREFIX" "$sfx"
+      fi
+    fi
+  done
+}
+
+# thread_matches_filter LEAF CHAIN_STR — true if THREAD_FILTER is unset, or
+# equals the leaf, or appears anywhere in the chain.
+thread_matches_filter() {
+  local leaf=$1 chain_str=$2
+  [[ -n "$THREAD_FILTER" ]] || return 0
+  [[ "$leaf" == "$THREAD_FILTER" ]] && return 0
+  [[ "|$chain_str|" == *"|$THREAD_FILTER|"* ]]
+}
+
 sync_main() {
   local pre_op rc=0
   pre_op=$(capture_pre_op)
@@ -224,36 +286,51 @@ sync_main() {
 
   # Collect all threads up front — used both for the orphan cull (needs the
   # full repo-wide "wanted" set, not just one thread's) and the per-thread walk.
-  local -a leaves=() chains=()
+  local -a all_leaves=() all_chains=() leaves=() chains=()
   local leaf chain
   while IFS=$'\t' read -r leaf chain; do
     [[ -n "$leaf" && -n "$chain" ]] || continue
-    leaves+=("$leaf"); chains+=("$chain")
+    all_leaves+=("$leaf"); all_chains+=("$chain")
+    if thread_matches_filter "$leaf" "$chain"; then
+      leaves+=("$leaf"); chains+=("$chain")
+    fi
   done < <(list_source_threads)
+
+  if [[ $DRY_RUN -eq 1 ]]; then
+    local i
+    for (( i=0; i<${#leaves[@]}; i++ )); do
+      dry_run_thread "${leaves[i]}" "${chains[i]}"
+    done
+    printf 'jj-mirror: dry-run — no changes made\n'
+    return 0
+  fi
 
   # Orphan cull: any prime bookmark whose suffix has no corresponding source
   # bookmark in ANY current thread's chain. Computed repo-wide (not per-thread)
   # so culling one thread's leftovers doesn't clobber another thread's live
-  # prime bookmarks.
-  local -A wanted=()
-  local source_name t
-  for t in "${chains[@]}"; do
-    IFS='|' read -ra t_chain <<< "$t"
-    for source_name in "${t_chain[@]}"; do
-      wanted["$(strip_source_prefix "$source_name")"]=1
+  # prime bookmarks. Skipped when --thread scopes the sync to a subset, since
+  # threads outside the filter must not lose their prime bookmarks.
+  if [[ -z "$THREAD_FILTER" ]]; then
+    local -A wanted=()
+    local source_name t
+    for t in "${all_chains[@]}"; do
+      IFS='|' read -ra t_chain <<< "$t"
+      for source_name in "${t_chain[@]}"; do
+        wanted["$(strip_source_prefix "$source_name")"]=1
+      done
     done
-  done
 
-  local pname pcid psuffix
-  while IFS=$'\t' read -r pname pcid; do
-    psuffix=$(strip_prime_prefix "$pname")
-    if [[ -z "${wanted[$psuffix]:-}" ]]; then
-      jj bookmark delete "$pname" >/dev/null 2>&1 \
-        || { echo "jj-mirror: orphan cull bookmark delete failed for $pname; rolling back to op $pre_op" >&2; jj op restore "$pre_op" >/dev/null 2>&1 || true; exit 1; }
-      jj abandon "$pcid" >/dev/null 2>&1 \
-        || { echo "jj-mirror: orphan cull abandon failed for $pcid; rolling back to op $pre_op" >&2; jj op restore "$pre_op" >/dev/null 2>&1 || true; exit 1; }
-    fi
-  done < <(list_prime_bookmarks)
+    local pname pcid psuffix
+    while IFS=$'\t' read -r pname pcid; do
+      psuffix=$(strip_prime_prefix "$pname")
+      if [[ -z "${wanted[$psuffix]:-}" ]]; then
+        jj bookmark delete "$pname" >/dev/null 2>&1 \
+          || { echo "jj-mirror: orphan cull bookmark delete failed for $pname; rolling back to op $pre_op" >&2; jj op restore "$pre_op" >/dev/null 2>&1 || true; exit 1; }
+        jj abandon "$pcid" >/dev/null 2>&1 \
+          || { echo "jj-mirror: orphan cull abandon failed for $pcid; rolling back to op $pre_op" >&2; jj op restore "$pre_op" >/dev/null 2>&1 || true; exit 1; }
+      fi
+    done < <(list_prime_bookmarks)
+  fi
 
   local synced=0 i
   for (( i=0; i<${#leaves[@]}; i++ )); do
@@ -267,7 +344,11 @@ sync_main() {
     synced=$((synced + 1))
   done
 
-  printf 'jj-mirror: synced %d thread(s)\n' "$synced"
+  if [[ -n "$THREAD_FILTER" ]]; then
+    printf 'jj-mirror: synced %d thread(s) (scoped to %s)\n' "$synced" "$THREAD_FILTER"
+  else
+    printf 'jj-mirror: synced %d thread(s)\n' "$synced"
+  fi
 }
 
 status_main() {
@@ -354,6 +435,9 @@ case "${1:-sync}" in
     ;;
   sync)
     load_config
+    (( $# > 0 )) && shift
+    # Consume flags into globals, ignore remaining positionals for now
+    parse_sync_flags "$@" >/dev/null
     sync_main
     exit 0
     ;;
