@@ -136,6 +136,71 @@ list_source_threads() {
   done
 }
 
+# capture_pre_op — echo the current jj op id, to feed jj op restore on failure.
+capture_pre_op() {
+  jj op log --limit 1 --no-graph -T 'id ++ "\n"' 2>/dev/null | head -n1
+}
+
+# find_prime_bookmark NAME — echo the commit id of <prime-prefix>NAME, or empty.
+find_prime_bookmark() {
+  local name=$1
+  local full="${PRIME_PREFIX}${name}"
+  jj log --no-graph -r "$full" -T 'commit_id.short() ++ "\n"' 2>/dev/null | head -n1
+}
+
+# sync_thread LEAF CHAIN_STR
+# CHAIN_STR is "b1|b2|...|leaf" — pipe-separated source bookmark names in trunk-to-leaf order.
+sync_thread() {
+  local leaf=$1
+  local chain_str=$2
+  IFS='|' read -ra chain <<< "$chain_str"
+
+  local prev
+  prev=$(jj log --no-graph -r "trunk()" -T 'commit_id.short() ++ "\n"' | head -n1)
+
+  local source_name suffix prime_full existing new_cid
+  for source_name in "${chain[@]}"; do
+    suffix=$(strip_source_prefix "$source_name")
+    prime_full="${PRIME_PREFIX}${suffix}"
+    existing=$(find_prime_bookmark "$suffix")
+
+    if [[ -z "$existing" ]]; then
+      # Cherry-pick source commit onto prev; capture new commit id.
+      # jj 0.43.0's `duplicate` has no --template/-T flag, so parse the
+      # "Duplicated <old> as <change_id> <commit_id> <description>" stderr
+      # line. Field 5 is always the new short commit id regardless of
+      # description content (verified empirically against jj 0.43.0).
+      local out
+      out=$(jj duplicate "$source_name" --destination "$prev" 2>&1)
+      new_cid=$(printf '%s\n' "$out" | awk '/^Duplicated/ {print $5; exit}')
+      [[ -n "$new_cid" ]] || { echo "jj-mirror: duplicate produced no commit for $source_name" >&2; return 1; }
+      jj bookmark set "$prime_full" -r "$new_cid" >/dev/null 2>&1
+      prev=$new_cid
+    else
+      prev=$existing   # placeholder — later tasks handle updates
+    fi
+  done
+}
+
+sync_main() {
+  local pre_op
+  pre_op=$(capture_pre_op)
+  [[ -n "$pre_op" ]] || { echo "jj-mirror: could not capture pre-sync op id" >&2; exit 1; }
+
+  local synced=0 line leaf chain
+  while IFS=$'\t' read -r leaf chain; do
+    [[ -n "$leaf" && -n "$chain" ]] || continue
+    if ! sync_thread "$leaf" "$chain"; then
+      echo "jj-mirror: thread $leaf failed; rolling back to op $pre_op" >&2
+      jj op restore "$pre_op" >/dev/null 2>&1 || true
+      exit 1
+    fi
+    synced=$((synced + 1))
+  done < <(list_source_threads)
+
+  printf 'jj-mirror: synced %d thread(s)\n' "$synced"
+}
+
 case "${1:-sync}" in
   --help|-h) usage; exit 0 ;;
   _dump-config)
@@ -163,6 +228,11 @@ case "${1:-sync}" in
     diff_hash "$2"
     exit 0
     ;;
-  sync|status|push|abandon) load_config ;;
+  sync)
+    load_config
+    sync_main
+    exit 0
+    ;;
+  status|push|abandon) load_config ;;
   *) echo "jj-mirror: unknown command: $1" >&2; usage >&2; exit 2 ;;
 esac
