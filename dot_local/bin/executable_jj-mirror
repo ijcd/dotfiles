@@ -58,6 +58,71 @@ list_prime_bookmarks()  { list_bookmarks_with_prefix "$PRIME_PREFIX"; }
 strip_source_prefix() { printf '%s' "${1#"$SOURCE_PREFIX"}"; }
 strip_prime_prefix()  { printf '%s' "${1#"$PRIME_PREFIX"}";  }
 
+# list_source_threads
+# Emits one line per thread: <leaf>\t<b1>|<b2>|...|<leaf>
+# Algorithm:
+#   1. Collect all source bookmarks with their commit ids.
+#   2. For each pair, check ancestry via revset (descendants()).
+#   3. Leaves = bookmarks with no source-bookmark descendant.
+#   4. For each leaf, walk trunk()..leaf & bookmarks() in ancestry order,
+#      picking out only source-prefixed names at each commit.
+list_source_threads() {
+  local -a names cids
+  while IFS=$'\t' read -r name cid; do
+    names+=("$name"); cids+=("$cid")
+  done < <(list_source_bookmarks)
+
+  local n=${#names[@]}
+  (( n > 0 )) || return 0
+
+  # For each candidate leaf L, ensure no other source bookmark has L as ancestor.
+  local i j leaf other
+  for (( i=0; i<n; i++ )); do
+    leaf=${names[i]}
+    local is_leaf=1
+    for (( j=0; j<n; j++ )); do
+      (( i == j )) && continue
+      other=${names[j]}
+      # Is 'other' a descendant of 'leaf'? If so, leaf isn't a leaf.
+      if jj log --no-graph -r "descendants(\"$leaf\") & \"$other\"" -T 'commit_id ++ "\n"' 2>/dev/null \
+         | grep -q .; then
+        is_leaf=0; break
+      fi
+    done
+    (( is_leaf )) || continue
+
+    # Walk the ordered chain from trunk toward leaf.
+    # jj log with a revset prints in reverse-chronological order (newest first);
+    # we want oldest first, so reverse portably via awk. (macOS `tail -r` and
+    # GNU `tac` both exist but neither is universal.)
+    # Template note: bookmarks.map(|b| b.name()).join(",") verified working
+    # against jj 0.43.0 — emits comma-joined names for multi-bookmark commits.
+    local chain
+    chain=$(
+      jj log --no-graph -r "trunk()..\"$leaf\" & bookmarks()" \
+        -T 'bookmarks.map(|b| b.name()).join(",") ++ "\n"' 2>/dev/null \
+      | awk 'NF' \
+      | awk '{a[NR]=$0} END{for(i=NR;i>=1;i--)print a[i]}'
+    )
+
+    # Each line may have multiple source-prefixed names comma-separated if a commit
+    # carries several source bookmarks. Split, filter, join with |.
+    local ordered=""
+    while IFS= read -r line; do
+      [[ -n "$line" ]] || continue
+      IFS=',' read -ra parts <<< "$line"
+      local part
+      for part in "${parts[@]}"; do
+        if [[ "$part" == "$SOURCE_PREFIX"* ]]; then
+          ordered+="${ordered:+|}$part"
+        fi
+      done
+    done <<< "$chain"
+
+    printf '%s\t%s\n' "$leaf" "$ordered"
+  done
+}
+
 case "${1:-sync}" in
   --help|-h) usage; exit 0 ;;
   _dump-config)
@@ -72,6 +137,11 @@ case "${1:-sync}" in
       prime)  list_prime_bookmarks ;;
       *) echo "usage: jj-mirror _dump-bookmarks source|prime" >&2; exit 2 ;;
     esac
+    exit 0
+    ;;
+  _dump-threads)
+    load_config
+    list_source_threads
     exit 0
     ;;
   sync|status|push|abandon) load_config ;;
