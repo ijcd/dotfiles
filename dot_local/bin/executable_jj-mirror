@@ -213,16 +213,48 @@ sync_main() {
   pre_op=$(capture_pre_op)
   [[ -n "$pre_op" ]] || { echo "jj-mirror: could not capture pre-sync op id" >&2; exit 1; }
 
-  local synced=0 line leaf chain
+  # Collect all threads up front — used both for the orphan cull (needs the
+  # full repo-wide "wanted" set, not just one thread's) and the per-thread walk.
+  local -a leaves=() chains=()
+  local leaf chain
   while IFS=$'\t' read -r leaf chain; do
     [[ -n "$leaf" && -n "$chain" ]] || continue
-    if ! sync_thread "$leaf" "$chain"; then
-      echo "jj-mirror: thread $leaf failed; rolling back to op $pre_op" >&2
+    leaves+=("$leaf"); chains+=("$chain")
+  done < <(list_source_threads)
+
+  # Orphan cull: any prime bookmark whose suffix has no corresponding source
+  # bookmark in ANY current thread's chain. Computed repo-wide (not per-thread)
+  # so culling one thread's leftovers doesn't clobber another thread's live
+  # prime bookmarks.
+  local -A wanted=()
+  local source_name t
+  for t in "${chains[@]}"; do
+    IFS='|' read -ra t_chain <<< "$t"
+    for source_name in "${t_chain[@]}"; do
+      wanted["$(strip_source_prefix "$source_name")"]=1
+    done
+  done
+
+  local pname pcid psuffix
+  while IFS=$'\t' read -r pname pcid; do
+    psuffix=$(strip_prime_prefix "$pname")
+    if [[ -z "${wanted[$psuffix]:-}" ]]; then
+      jj bookmark delete "$pname" >/dev/null 2>&1 \
+        || { echo "jj-mirror: orphan cull bookmark delete failed for $pname; rolling back to op $pre_op" >&2; jj op restore "$pre_op" >/dev/null 2>&1 || true; exit 1; }
+      jj abandon "$pcid" >/dev/null 2>&1 \
+        || { echo "jj-mirror: orphan cull abandon failed for $pcid; rolling back to op $pre_op" >&2; jj op restore "$pre_op" >/dev/null 2>&1 || true; exit 1; }
+    fi
+  done < <(list_prime_bookmarks)
+
+  local synced=0 i
+  for (( i=0; i<${#leaves[@]}; i++ )); do
+    if ! sync_thread "${leaves[i]}" "${chains[i]}"; then
+      echo "jj-mirror: thread ${leaves[i]} failed; rolling back to op $pre_op" >&2
       jj op restore "$pre_op" >/dev/null 2>&1 || true
       exit 1
     fi
     synced=$((synced + 1))
-  done < <(list_source_threads)
+  done
 
   printf 'jj-mirror: synced %d thread(s)\n' "$synced"
 }
