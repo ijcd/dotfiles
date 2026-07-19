@@ -94,17 +94,21 @@ Behavior:
        thread are abandoned (repo-wide orphan cull; skipped under --thread).
     3. Prime commits already matching parent + diff-hash are left in place —
        the "no-op path". This is what keeps jj-vine PRs stable across resyncs.
-    4. Cherry-pick conflicts abort the sync via `jj op restore` — the repo
-       returns to its pre-sync state atomically.
+    4. A thread whose cherry-pick conflicts is rolled back to its own
+       pre-thread savepoint and skipped (reported to stderr); the clean
+       threads still sync. jj refuses to `git push` a conflicted commit, so a
+       conflicted prime could never become a PR — fix the source thread's base
+       instead. Sync exits non-zero if any thread was skipped.
 
 Preconditions (enforced at startup, exit 2 on violation):
   - No two source bookmarks on the same commit (ambiguous pairing).
   - Every trunk()..<source> range must be linear (no merges).
 
 Exit codes:
-  0    sync succeeded (or dry-run completed)
-  1    runtime error (rolled back)
-  2    conflict, ambiguous pairing, non-linear thread, or bad arg (rolled back)
+  0    all threads mirrored (or dry-run completed)
+  1    a thread hit a runtime error — that thread rolled back, others synced
+  2    a thread conflicted (rolled back, others synced), OR a precondition
+       failed before any sync (ambiguous pairing, non-linear thread, bad arg)
 EOF
 }
 
@@ -242,8 +246,11 @@ load_config() {
 # Empty PREFIX matches every bookmark.
 list_bookmarks_with_prefix() {
   local prefix=$1
-  # Template: name TAB short commit_id NEWLINE. normal_target is the local commit.
-  jj bookmark list -T 'name ++ "\t" ++ normal_target.commit_id().short() ++ "\n"' 2>/dev/null \
+  # Template: name TAB short commit_id NEWLINE, LOCAL bookmarks only. A colocated
+  # git repo surfaces a diverged `name@git` remote-tracking row next to the local
+  # one (same name, different target); if(remote, ...) drops those so a bookmark
+  # isn't listed — and mirrored — twice. normal_target is the local commit.
+  jj bookmark list -T 'if(remote, "", name ++ "\t" ++ normal_target.commit_id().short() ++ "\n")' 2>/dev/null \
     | while IFS=$'\t' read -r name cid; do
         [[ -n "$name" && -n "$cid" ]] || continue
         if [[ -z "$prefix" || "$name" == "$prefix"* ]]; then
@@ -615,14 +622,26 @@ sync_main() {
     done < <(list_prime_bookmarks)
   fi
 
-  local synced=0 i
+  # Per-thread rollback (option 1): each thread gets its own savepoint. A thread
+  # whose cherry-pick conflicts is unwound to just before it ran and skipped;
+  # clean threads keep their primes. A conflicted commit is never left as a prime
+  # — jj refuses to `git push` conflicts, so a conflicted prime could never reach
+  # a PR; the fix must land on the source (wip) thread's base. The repo-wide
+  # orphan cull above still uses the whole-sync pre_op (atomic with itself, and it
+  # runs before any thread).
+  local synced=0 failed=0 worst_rc=0 i thread_op
+  local -a failed_threads=()
   for (( i=0; i<${#leaves[@]}; i++ )); do
+    thread_op=$(capture_pre_op)
     rc=0
     sync_thread "${leaves[i]}" "${chains[i]}" || rc=$?
     if [[ $rc -ne 0 ]]; then
-      echo "jj-mirror: thread ${leaves[i]} failed; rolling back to op $pre_op" >&2
-      jj op restore "$pre_op" >/dev/null 2>&1 || true
-      exit "$rc"
+      echo "jj-mirror: thread ${leaves[i]} failed (rc=$rc); rolling back this thread to op $thread_op (other threads unaffected)" >&2
+      jj op restore "$thread_op" >/dev/null 2>&1 || true
+      failed=$((failed + 1))
+      failed_threads+=("${leaves[i]}")
+      (( rc > worst_rc )) && worst_rc=$rc
+      continue
     fi
     synced=$((synced + 1))
   done
@@ -631,6 +650,11 @@ sync_main() {
     printf 'jj-mirror: synced %d thread(s) (scoped to %s)\n' "$synced" "$THREAD_FILTER"
   else
     printf 'jj-mirror: synced %d thread(s)\n' "$synced"
+  fi
+  if (( failed > 0 )); then
+    printf 'jj-mirror: %d thread(s) NOT mirrored (rolled back): %s\n' "$failed" "${failed_threads[*]}" >&2
+    printf 'jj-mirror: fix each so its diff applies cleanly onto %s (the prime root), then re-sync.\n' "$PRIME_ROOT" >&2
+    exit "$worst_rc"
   fi
 }
 
