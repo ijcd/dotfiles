@@ -44,6 +44,11 @@ Configuration (jj config, [jj-mirror] section):
   source-root      Base the source bookmarks sit on (default local/main,
                    falling back to trunk() where local/main is absent).
   prime-root       Base the prime chain is re-based onto (default trunk()=master).
+  roots.<pair>.source / roots.<pair>.prime
+                   Per-pair root override, keyed by the thread's leaf (tip)
+                   bookmark suffix; falls back to source-root / prime-root.
+                   So different pairs can sit on and target different bases, e.g.
+                     jj config set --repo jj-mirror.roots.feat-a.prime "release/1.2"
 
 Model:
   Source bookmarks (default wip/*) mark commits you want mirrored. Non-source
@@ -51,6 +56,19 @@ Model:
   (default pr/*) are strict cherry-picks of each source commit's own diff,
   re-based from the source root (default local/main) onto the prime root
   (default trunk() = master), and re-derived from the current graph on each sync.
+
+      SOURCE  (wip/*)                      PRIME  (pr/*)
+      sits on local/main                   re-based onto master
+                          ══ mirror ══▶
+        ● wip/feat-c ┐                     ┌ ● pr/feat-c
+        │            │   each commit's     │ │
+        ● wip/feat-b ┤   own diff,         ┤ ● pr/feat-b
+        │            │   strict            │ │
+        ● wip/feat-a ┘   cherry-pick       └ ● pr/feat-a
+        │                                    │
+        ● local/main   ✂ extra base          │
+        │                 stripped           │
+        ● master ────────────────────────────● master  (trunk)
 
 Example:
   jj bookmark set wip/feature-a -r @-
@@ -115,9 +133,12 @@ EOF
 help_status() {
   cat <<'EOF'
 Usage:
-  jj-mirror status
+  jj-mirror status [-g|--graph]
 
-Read-only report of every source→prime pair, grouped by thread.
+Read-only report of every source→prime pair, grouped by thread. With
+-g/--graph, render a graph grouped by source root then prime root, so threads
+sharing a base coalesce under one edge (a root is marked * when it differs from
+the default).
 
 Output per line:
   <source-name> -> <prime-name>    [state]
@@ -200,6 +221,14 @@ config_main() {
   printf '  prime-prefix    %s\n' "$PRIME_PREFIX"
   printf '  source-root     %s  ->  %s\n' "$SOURCE_ROOT" "${sr:-<unresolved>}"
   printf '  prime-root      %s  ->  %s\n' "$PRIME_ROOT" "${pr:-<unresolved>}"
+
+  # Per-pair overrides (jj-mirror.roots.<pair>.{source,prime}), if any.
+  local overrides
+  overrides=$(jj config list jj-mirror.roots 2>/dev/null || true)
+  if [[ -n "$overrides" ]]; then
+    printf '  per-pair overrides:\n'
+    printf '%s\n' "$overrides" | sed 's/^jj-mirror\.roots\./    /'
+  fi
 }
 
 # print_help TOPIC — dispatch to a per-command help function, or the top-level
@@ -285,6 +314,29 @@ list_prime_bookmarks()  { list_bookmarks_with_prefix "$PRIME_PREFIX"; }
 strip_source_prefix() { printf '%s' "${1#"$SOURCE_PREFIX"}"; }
 strip_prime_prefix()  { printf '%s' "${1#"$PRIME_PREFIX"}";  }
 
+# resolve_source_root NAME / resolve_prime_root NAME — the base for the thread
+# whose leaf (tip) bookmark suffix is NAME. A per-pair override
+# (jj-mirror.roots.<NAME>.{source,prime}) wins; otherwise the global default
+# (SOURCE_ROOT / PRIME_ROOT from load_config). This lets different mirror pairs
+# sit on — and target — different bases. NAME is the leaf's suffix, stripped of
+# the source prefix (e.g. leaf wip/feat-a -> NAME feat-a).
+resolve_source_root() {
+  jj config get "jj-mirror.roots.${1}.source" 2>/dev/null || printf '%s' "$SOURCE_ROOT"
+}
+resolve_prime_root() {
+  jj config get "jj-mirror.roots.${1}.prime" 2>/dev/null || printf '%s' "$PRIME_ROOT"
+}
+
+# render_root REVSET — a friendly one-token label for a root: the local bookmark
+# name on the commit it resolves to, else the revset as written. So a base reads
+# as `local/main` rather than the raw `coalesce(...)` default, while `trunk()`
+# (no local bookmark) stays `trunk()`.
+render_root() {
+  local bm
+  bm=$(jj log --no-graph -r "$1" -T 'bookmarks.map(|b| b.name()).join(",")' 2>/dev/null | head -n1)
+  if [[ -n "$bm" ]]; then printf '%s' "$bm"; else printf '%s' "$1"; fi
+}
+
 # diff_hash REVSET
 # Emit SHA-256 hex of the patch text of the revision's own diff.
 # Uses -T "" to strip commit metadata; -p emits the diff.
@@ -342,9 +394,10 @@ list_source_threads() {
     # GNU `tac` both exist but neither is universal.)
     # Template note: bookmarks.map(|b| b.name()).join(",") verified working
     # against jj 0.43.0 — emits comma-joined names for multi-bookmark commits.
-    local chain
+    local sroot chain
+    sroot=$(resolve_source_root "$(strip_source_prefix "$leaf")")
     chain=$(
-      jj log --no-graph -r "$SOURCE_ROOT..\"$leaf\" & bookmarks()" \
+      jj log --no-graph -r "$sroot..\"$leaf\" & bookmarks()" \
         -T 'bookmarks.map(|b| b.name()).join(",") ++ "\n"' 2>/dev/null \
       | awk 'NF' \
       | awk '{a[NR]=$0} END{for(i=NR;i>=1;i--)print a[i]}'
@@ -401,9 +454,10 @@ validate_source_bookmarks_or_die() {
   # be empty for every source bookmark. Merges anywhere upstream of a source
   # bookmark within the mine range mean the chain from trunk isn't a single
   # path.
-  local nm
+  local nm nmroot
   for nm in "${names[@]}"; do
-    if jj log --no-graph -r "merges() & $SOURCE_ROOT..\"$nm\"" -T 'commit_id ++ "\n"' 2>/dev/null \
+    nmroot=$(resolve_source_root "$(strip_source_prefix "$nm")")
+    if jj log --no-graph -r "merges() & $nmroot..\"$nm\"" -T 'commit_id ++ "\n"' 2>/dev/null \
        | grep -q .; then
       echo "jj-mirror: non-linear source thread — merge commit found between the source root and $nm; only linear chains are supported in v1" >&2
       exit 2
@@ -428,10 +482,11 @@ find_prime_bookmark() {
 sync_thread() {
   local leaf=$1
   local chain_str=$2
+  local prime_root=${3:-$PRIME_ROOT}
   IFS='|' read -ra chain <<< "$chain_str"
 
   local prev
-  prev=$(jj log --no-graph -r "$PRIME_ROOT" -T 'commit_id.short() ++ "\n"' | head -n1)
+  prev=$(jj log --no-graph -r "$prime_root" -T 'commit_id.short() ++ "\n"' | head -n1)
 
   local cascade=0   # once set, everything downstream must rebuild
   local source_name suffix prime_full existing existing_parent existing_hash source_hash new_cid
@@ -629,12 +684,13 @@ sync_main() {
   # a PR; the fix must land on the source (wip) thread's base. The repo-wide
   # orphan cull above still uses the whole-sync pre_op (atomic with itself, and it
   # runs before any thread).
-  local synced=0 failed=0 worst_rc=0 i thread_op
+  local synced=0 failed=0 worst_rc=0 i thread_op proot
   local -a failed_threads=()
   for (( i=0; i<${#leaves[@]}; i++ )); do
     thread_op=$(capture_pre_op)
     rc=0
-    sync_thread "${leaves[i]}" "${chains[i]}" || rc=$?
+    proot=$(resolve_prime_root "$(strip_source_prefix "${leaves[i]}")")
+    sync_thread "${leaves[i]}" "${chains[i]}" "$proot" || rc=$?
     if [[ $rc -ne 0 ]]; then
       echo "jj-mirror: thread ${leaves[i]} failed (rc=$rc); rolling back this thread to op $thread_op (other threads unaffected)" >&2
       jj op restore "$thread_op" >/dev/null 2>&1 || true
@@ -653,7 +709,7 @@ sync_main() {
   fi
   if (( failed > 0 )); then
     printf 'jj-mirror: %d thread(s) NOT mirrored (rolled back): %s\n' "$failed" "${failed_threads[*]}" >&2
-    printf 'jj-mirror: fix each so its diff applies cleanly onto %s (the prime root), then re-sync.\n' "$PRIME_ROOT" >&2
+    printf 'jj-mirror: fix each so its diff applies cleanly onto its prime root, then re-sync.\n' >&2
     exit "$worst_rc"
   fi
 }
@@ -681,6 +737,81 @@ status_main() {
       printf '  %s -> %s%s    [%s]\n' "$source_name" "$PRIME_PREFIX" "$suffix" "$state"
     done
   done < <(list_source_threads)
+}
+
+# status_graph — mirror graph grouped so shared roots coalesce: outer group by
+# source root, inner by prime root, then the threads on that (source ──▶ prime)
+# edge. A root is marked * when it differs from the global default. Symmetric
+# dedup of a shared DEST across different sources would need a bipartite layout;
+# the source→prime tree covers the common cases (one shared pair + occasional
+# per-pair override). Tip prints on top, base below. Read-only.
+status_graph() {
+  validate_source_bookmarks_or_die
+
+  local def_src def_dst
+  def_src=$(render_root "$SOURCE_ROOT")
+  def_dst=$(render_root "$PRIME_ROOT")
+
+  printf 'jj-mirror   ● ok   ◐ stale   ○ missing   ·   * = differs from default root\n'
+  printf 'defaults:   %s   ──▶   %s\n\n' "$def_src" "$def_dst"
+
+  # Gather per-thread records into parallel arrays (body = pre-rendered rows).
+  local -a t_src=() t_dst=() t_body=() src_order=()
+  local -A src_seen=()
+  local leaf chain lname slabel plabel body sname suffix existing hs hp glyph k row
+  local -a parts
+  while IFS=$'\t' read -r leaf chain; do
+    [[ -n "$leaf" && -n "$chain" ]] || continue
+    lname=$(strip_source_prefix "$leaf")
+    slabel=$(render_root "$(resolve_source_root "$lname")")
+    plabel=$(render_root "$(resolve_prime_root "$lname")")
+
+    body=""
+    IFS='|' read -ra parts <<< "$chain"
+    for (( k=${#parts[@]}-1; k>=0; k-- )); do
+      sname=${parts[k]}
+      suffix=$(strip_source_prefix "$sname")
+      existing=$(find_prime_bookmark "$suffix")
+      if [[ -z "$existing" ]]; then
+        glyph="○"
+      else
+        hs=$(diff_hash "$sname") || hs=""
+        hp=$(diff_hash "$existing") || hp=""
+        if [[ "$hs" == "$hp" && -n "$hs" ]]; then glyph="●"; else glyph="◐"; fi
+      fi
+      printf -v row '        ● %-34s ──▶  %s %s%s' "$sname" "$glyph" "$PRIME_PREFIX" "$suffix"
+      body+="$row"$'\n'
+    done
+
+    t_src+=("$slabel"); t_dst+=("$plabel"); t_body+=("$body")
+    if [[ -z "${src_seen[$slabel]:-}" ]]; then src_seen[$slabel]=1; src_order+=("$slabel"); fi
+  done < <(list_source_threads)
+
+  (( ${#t_src[@]} )) || { printf '(no source threads)\n'; return 0; }
+
+  # Render: source (outer) → prime (inner) → threads on that edge.
+  local s d i smark dmark
+  local -a dst_order
+  local -A dst_seen
+  for s in "${src_order[@]}"; do
+    smark=""; [[ "$s" != "$def_src" ]] && smark=" *"
+    printf '%s%s\n' "$s" "$smark"
+    dst_order=(); dst_seen=()
+    for (( i=0; i<${#t_src[@]}; i++ )); do
+      [[ "${t_src[i]}" == "$s" ]] || continue
+      d=${t_dst[i]}
+      [[ -z "${dst_seen[$d]:-}" ]] && { dst_seen[$d]=1; dst_order+=("$d"); }
+    done
+    for d in "${dst_order[@]}"; do
+      dmark=""; [[ "$d" != "$def_dst" ]] && dmark=" *"
+      printf '  └─▶ %s%s\n' "$d" "$dmark"
+      for (( i=0; i<${#t_src[@]}; i++ )); do
+        [[ "${t_src[i]}" == "$s" && "${t_dst[i]}" == "$d" ]] || continue
+        printf '%s' "${t_body[i]}"
+      done
+    done
+    printf '\n'
+  done
 }
 
 abandon_main() {
@@ -776,7 +907,11 @@ case "${1:-status}" in
     (( $# > 0 )) && shift
     if (( $# > 0 )) && wants_help "$1"; then help_status; exit 0; fi
     load_config
-    status_main
+    case "${1:-}" in
+      -g|--graph) status_graph ;;
+      "")         status_main ;;
+      *) echo "jj-mirror: status: unknown argument '$1'" >&2; exit 2 ;;
+    esac
     exit 0
     ;;
   config)
