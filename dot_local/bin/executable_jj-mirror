@@ -30,11 +30,14 @@ Usage:
   jj-mirror <command> [--help] [args]    run a command (or its own help)
 
 Commands:
+  add        Register a mirror rule (source -> dest [, --squash]).
+  rm         Unregister a rule / carve out a bookmark from a glob.
+  list       Print the mirror rules.
   sync       Re-derive the prime chain from the current source chain.
   status     Report source→prime pair state per thread (ok/stale/missing). [default]
   push       Sync, then delegate to jj-vine submit --tracked.
   abandon    Delete a matched pair of source and prime bookmarks + commits.
-  config     Print the detected configuration (prefixes + roots, resolved).
+  config     Print the detected configuration (prefixes + roots + rules).
 
 Configuration (jj config, [jj-mirror] section):
   source-prefix    Source-side bookmark prefix (default "wip/").
@@ -51,11 +54,13 @@ Configuration (jj config, [jj-mirror] section):
                      jj config set --repo jj-mirror.roots.feat-a.prime "release/1.2"
 
 Model:
-  Source bookmarks (default wip/*) mark commits you want mirrored. Non-source
-  bookmarks are ignored — that's where local scaffolding lives. Prime commits
-  (default pr/*) are strict cherry-picks of each source commit's own diff,
-  re-based from the source root (default local/main) onto the prime root
-  (default trunk() = master), and re-derived from the current graph on each sync.
+  Rules (jj-mirror add) opt bookmarks in; the most-specific matching rule wins.
+  For each included source bookmark's thread, the WHOLE branch source-root..tip
+  is replayed commit-for-commit onto the prime root (re-based, base stripped),
+  and dest bookmarks land on the mirrored commits — so a stacked source mirrors
+  to a stacked dest, and a tip-only bookmark mirrors its whole branch. A --squash
+  rule collapses a branch to one cumulative dest commit instead. Re-derived from
+  the current graph each sync; unchanged prefixes stay put (PR stability).
 
       SOURCE  (wip/*)                      PRIME  (pr/*)
       sits on local/main                   re-based onto master
@@ -105,9 +110,9 @@ Options:
 
 Behavior:
   For each thread (a linear chain of source bookmarks descending from trunk()):
-    1. Each source bookmark's own diff is duplicated onto the previous prime
-       commit (or trunk() for the first). Non-source commits in between are
-       skipped — this is the "strict cherry-pick" invariant.
+    1. The whole branch source-root..tip is replayed commit-for-commit onto the
+       prime root — every commit, not just bookmarked ones — and dest bookmarks
+       land on the mirrored commits. A --squash rule collapses it to one commit.
     2. Prime bookmarks whose suffix has no matching source bookmark in ANY
        thread are abandoned (repo-wide orphan cull; skipped under --thread).
     3. Prime commits already matching parent + diff-hash are left in place —
@@ -206,8 +211,48 @@ help_config() {
 Usage:
   jj-mirror config
 
-Print the detected configuration — the source/prime bookmark prefixes and the
-source/prime roots, each with the commit its revset resolves to. Read-only.
+Print the detected configuration — bookmark prefixes, source/prime roots (each
+with the commit it resolves to), and the mirror rules. Read-only.
+EOF
+}
+
+help_add() {
+  cat <<'EOF'
+Usage:
+  jj-mirror add <source> [<dest>] [--squash]
+
+Register a mirror rule. <source> and <dest> are bookmark patterns; a trailing
+'*' is a prefix glob (any depth). Only bookmarks matched by a rule are mirrored
+(explicit opt-in). The MOST-SPECIFIC matching rule wins (exact > longer-prefix
+glob), so a rename or --squash on one branch rides on top of a family glob.
+
+  jj-mirror add 'wip/*' 'ijcd/*'             # family: wip/X -> ijcd/X (live)
+  jj-mirror add 'wip/foo' 'ijcd/foo-mirror'  # rename
+  jj-mirror add 'wip/bar'                     # dest from <prime-prefix>
+  jj-mirror add 'wip/baz' --squash            # collapse the branch to one commit
+
+--squash mirrors the branch as a single cumulative commit; the default mirrors
+it commit-for-commit (stacked source -> stacked dest). See also `jj-mirror rm`.
+EOF
+}
+
+help_rm() {
+  cat <<'EOF'
+Usage:
+  jj-mirror rm <source>
+
+Guarantee <source> will not mirror. Deletes an exact rule if one names it; if a
+broader glob still covers a concrete bookmark, writes an exclusion carve-out
+(more specific than the glob, so it wins). `add <source>` reverses it.
+EOF
+}
+
+help_list() {
+  cat <<'EOF'
+Usage:
+  jj-mirror list
+
+Print the mirror rules (name, source -> dest, flags). Read-only.
 EOF
 }
 
@@ -229,6 +274,17 @@ config_main() {
     printf '  per-pair overrides:\n'
     printf '%s\n' "$overrides" | sed 's/^jj-mirror\.roots\./    /'
   fi
+
+  # Mirror rules (seeded default shown when none configured).
+  ensure_rules
+  printf '  rules (most-specific wins):\n'
+  local i rflags
+  for (( i=0; i<${#R_SRC[@]}; i++ )); do
+    rflags=""
+    [[ "${R_MIRROR[i]}" == "false" ]] && rflags+=" EXCLUDE"
+    [[ "${R_SQUASH[i]}" == "true"  ]] && rflags+=" squash"
+    printf '    %-14s %-14s -> %s%s\n' "${R_NAME[i]}" "${R_SRC[i]}" "${R_DEST[i]:-<default>}" "$rflags"
+  done
 }
 
 # print_help TOPIC — dispatch to a per-command help function, or the top-level
@@ -242,6 +298,9 @@ print_help() {
     push)         help_push ;;
     abandon)      help_abandon ;;
     config)       help_config ;;
+    add)          help_add ;;
+    rm)           help_rm ;;
+    list)         help_list ;;
     *) echo "jj-mirror: no help for unknown command '$1'" >&2; usage >&2; return 2 ;;
   esac
 }
@@ -268,6 +327,11 @@ load_config() {
     echo "jj-mirror: source-prefix ($SOURCE_PREFIX) and prime-prefix ($PRIME_PREFIX) must not overlap" >&2
     exit 2
   fi
+
+  # Load the rule registry in THIS (main) process so R_* arrays persist for
+  # functions called via $() / process-substitution subshells (which inherit but
+  # cannot export them back).
+  load_rules
 }
 
 # list_bookmarks_with_prefix PREFIX
@@ -275,11 +339,14 @@ load_config() {
 # Empty PREFIX matches every bookmark.
 list_bookmarks_with_prefix() {
   local prefix=$1
-  # Template: name TAB short commit_id NEWLINE, LOCAL bookmarks only. A colocated
-  # git repo surfaces a diverged `name@git` remote-tracking row next to the local
-  # one (same name, different target); if(remote, ...) drops those so a bookmark
-  # isn't listed — and mirrored — twice. normal_target is the local commit.
-  jj bookmark list -T 'if(remote, "", name ++ "\t" ++ normal_target.commit_id().short() ++ "\n")' 2>/dev/null \
+  # Template: name TAB short commit_id NEWLINE, for LOCAL bookmarks with a single
+  # target only. if(remote, ...) drops the diverged `name@git` remote-tracking
+  # rows a colocated git repo surfaces (same name, different target) so a bookmark
+  # isn't listed — and mirrored — twice. if(normal_target, ...) drops rows with no
+  # single local commit — a bookmark deleted-locally-but-present-on-remote, or a
+  # conflicted/divergent one — whose commit_id() would otherwise render an error
+  # string and crash a downstream `jj abandon` (orphan cull).
+  jj bookmark list -T 'if(remote, "", if(normal_target, name ++ "\t" ++ normal_target.commit_id().short() ++ "\n", ""))' 2>/dev/null \
     | while IFS=$'\t' read -r name cid; do
         [[ -n "$name" && -n "$cid" ]] || continue
         if [[ -z "$prefix" || "$name" == "$prefix"* ]]; then
@@ -308,23 +375,166 @@ parse_sync_flags() {
   done
 }
 
-list_source_bookmarks() { list_bookmarks_with_prefix "$SOURCE_PREFIX"; }
-list_prime_bookmarks()  { list_bookmarks_with_prefix "$PRIME_PREFIX"; }
+list_all_bookmarks() { list_bookmarks_with_prefix ""; }
+
+# list_source_bookmarks — local single-target bookmarks that an include rule
+# opts in (mirror != false). Replaces the old prefix filter; the seeded default
+# rule (<source-prefix>*) reproduces it.
+list_source_bookmarks() {
+  ensure_rules
+  local name cid
+  while IFS=$'\t' read -r name cid; do
+    is_included "$name" && printf '%s\t%s\n' "$name" "$cid"
+  done < <(list_all_bookmarks)
+  return 0
+}
+
+# list_prime_bookmarks — the mirror-MANAGED set: bookmarks matching any include
+# rule's dest pattern (dest omitted ⇒ <prime-prefix>*). These are the outputs the
+# orphan cull is allowed to remove.
+list_prime_bookmarks() {
+  ensure_rules
+  local name cid i destpat matched
+  while IFS=$'\t' read -r name cid; do
+    matched=0
+    for (( i=0; i<${#R_DEST[@]}; i++ )); do
+      [[ "${R_MIRROR[i]}" != "false" ]] || continue
+      destpat=${R_DEST[i]}; [[ -n "$destpat" ]] || destpat="${PRIME_PREFIX}*"
+      if pattern_match "$destpat" "$name"; then matched=1; break; fi
+    done
+    (( matched )) && printf '%s\t%s\n' "$name" "$cid"
+  done < <(list_all_bookmarks)
+  return 0
+}
 
 strip_source_prefix() { printf '%s' "${1#"$SOURCE_PREFIX"}"; }
 strip_prime_prefix()  { printf '%s' "${1#"$PRIME_PREFIX"}";  }
 
-# resolve_source_root NAME / resolve_prime_root NAME — the base for the thread
-# whose leaf (tip) bookmark suffix is NAME. A per-pair override
-# (jj-mirror.roots.<NAME>.{source,prime}) wins; otherwise the global default
-# (SOURCE_ROOT / PRIME_ROOT from load_config). This lets different mirror pairs
-# sit on — and target — different bases. NAME is the leaf's suffix, stripped of
-# the source prefix (e.g. leaf wip/feat-a -> NAME feat-a).
+# ─── Rule registry ─────────────────────────────────────────────────────────
+# Mirror rules opt bookmarks in explicitly (jj config [jj-mirror.rules.<name>]):
+#   source (pattern, required)   dest (pattern; omitted ⇒ <prime-prefix>+suffix)
+#   squash (bool)   mirror (bool; false = exclusion)   source-root / prime-root
+# A bookmark's behaviour is set by the MOST-SPECIFIC matching rule
+# (exact > longer-prefix glob). With no rules configured, an in-memory default
+# (<source-prefix>* -> <prime-prefix>*) is seeded so prefix-only setups keep
+# working with zero `add`s. '*' is a prefix glob (matches any depth).
+RULES_LOADED=0
+declare -a R_NAME R_SRC R_DEST R_SQUASH R_MIRROR R_SROOT R_PROOT
+
+# rule_names — configured rule names (empty if none).
+rule_names() {
+  jj config list jj-mirror.rules 2>/dev/null \
+    | sed -n 's/^jj-mirror\.rules\.\([^.]*\)\..*/\1/p' | awk '!seen[$0]++'
+}
+
+load_rules() {
+  R_NAME=(); R_SRC=(); R_DEST=(); R_SQUASH=(); R_MIRROR=(); R_SROOT=(); R_PROOT=()
+  local names name
+  names=$(rule_names)
+  if [[ -z "$names" ]]; then
+    R_NAME+=("default"); R_SRC+=("${SOURCE_PREFIX}*"); R_DEST+=("${PRIME_PREFIX}*")
+    R_SQUASH+=("false"); R_MIRROR+=("true"); R_SROOT+=(""); R_PROOT+=("")
+    RULES_LOADED=1; return 0
+  fi
+  while IFS= read -r name; do
+    [[ -n "$name" ]] || continue
+    R_NAME+=("$name")
+    R_SRC+=("$(jj config get "jj-mirror.rules.$name.source" 2>/dev/null || echo '')")
+    R_DEST+=("$(jj config get "jj-mirror.rules.$name.dest" 2>/dev/null || echo '')")
+    R_SQUASH+=("$(jj config get "jj-mirror.rules.$name.squash" 2>/dev/null || echo 'false')")
+    R_MIRROR+=("$(jj config get "jj-mirror.rules.$name.mirror" 2>/dev/null || echo 'true')")
+    R_SROOT+=("$(jj config get "jj-mirror.rules.$name.source-root" 2>/dev/null || echo '')")
+    R_PROOT+=("$(jj config get "jj-mirror.rules.$name.prime-root" 2>/dev/null || echo '')")
+  done <<< "$names"
+  RULES_LOADED=1
+}
+ensure_rules() { (( RULES_LOADED )) || load_rules; }
+
+# pattern_match PATTERN NAME — exact, or trailing-'*' prefix glob.
+pattern_match() {
+  local pat=$1 name=$2
+  if [[ "$pat" == *'*' ]]; then local pre=${pat%\*}; [[ "$name" == "$pre"* ]]
+  else [[ "$name" == "$pat" ]]; fi
+}
+# pattern_spec PATTERN — higher = more specific. exact ≫ glob; longer prefix wins.
+pattern_spec() {
+  local pat=$1
+  if [[ "$pat" == *'*' ]]; then local pre=${pat%\*}; printf '%s' "${#pre}"
+  else printf '%s' "$(( 100000 + ${#pat} ))"; fi
+}
+# resolve_rule_idx BM — index of the most-specific matching rule, or -1.
+resolve_rule_idx() {
+  ensure_rules
+  local bm=$1 best=-1 bestspec=-1 i spec
+  for (( i=0; i<${#R_SRC[@]}; i++ )); do
+    [[ -n "${R_SRC[i]}" ]] || continue
+    pattern_match "${R_SRC[i]}" "$bm" || continue
+    spec=$(pattern_spec "${R_SRC[i]}")
+    (( spec > bestspec )) && { bestspec=$spec; best=$i; }
+  done
+  printf '%s' "$best"
+}
+# is_included BM — true if the winning rule mirrors it (not an exclusion).
+is_included() {
+  local idx; idx=$(resolve_rule_idx "$1"); (( idx >= 0 )) || return 1
+  [[ "${R_MIRROR[idx]}" != "false" ]]
+}
+# dest_for BM — the mirror bookmark name for BM under its winning rule.
+dest_for() {
+  ensure_rules
+  local bm=$1 i spec best=-1 bestspec=-1 db=-1 dbspec=-1
+  for (( i=0; i<${#R_SRC[@]}; i++ )); do
+    [[ -n "${R_SRC[i]}" ]] || continue
+    pattern_match "${R_SRC[i]}" "$bm" || continue
+    spec=$(pattern_spec "${R_SRC[i]}")
+    (( spec > bestspec )) && { bestspec=$spec; best=$i; }
+    if [[ -n "${R_DEST[i]}" ]] && (( spec > dbspec )); then dbspec=$spec; db=$i; fi
+  done
+  (( best >= 0 )) || { printf ''; return; }
+  # A more-specific rule that omits `dest` INHERITS the dest mapping of the
+  # most-specific matching rule that sets one — so `add wip/hotfix --squash` on top
+  # of a `wip/* -> ijcd/*` family yields ijcd/hotfix, not the global-prefix default.
+  if (( db >= 0 )); then
+    local src=${R_SRC[db]} dest=${R_DEST[db]}
+    if [[ "$dest" == *'*' && "$src" == *'*' ]]; then
+      local spre=${src%\*} dpre=${dest%\*}; printf '%s' "${dpre}${bm#"$spre"}"
+    else printf '%s' "$dest"; fi
+    return
+  fi
+  # No matching rule sets a dest → global prime-prefix + the bookmark's source
+  # suffix. Use strip_source_prefix, NOT `${pattern%\*}`: an exact rule's pattern
+  # has no trailing '*', so stripping it would drop the whole name and yield a bare
+  # "$PRIME_PREFIX" (colliding across rules). e.g. `add wip/bar` → pr/bar.
+  printf '%s' "${PRIME_PREFIX}$(strip_source_prefix "$bm")"
+}
+# rule_squash_for BM — "true" if the winning rule squashes.
+rule_squash_for() {
+  local idx; idx=$(resolve_rule_idx "$1"); (( idx >= 0 )) || { printf 'false'; return; }
+  [[ "${R_SQUASH[idx]}" == "true" ]] && printf 'true' || printf 'false'
+}
+
+# resolve_source_root / resolve_prime_root LEAF (full bookmark name) — the base
+# for LEAF's thread: the winning rule's root override, else the legacy per-pair
+# override (jj-mirror.roots.<suffix>.{source,prime}), else the global default.
 resolve_source_root() {
-  jj config get "jj-mirror.roots.${1}.source" 2>/dev/null || printf '%s' "$SOURCE_ROOT"
+  local bm=$1 idx sfx; idx=$(resolve_rule_idx "$bm")
+  if (( idx >= 0 )) && [[ -n "${R_SROOT[idx]}" ]]; then printf '%s' "${R_SROOT[idx]}"; return; fi
+  sfx=$(strip_source_prefix "$bm")
+  jj config get "jj-mirror.roots.${sfx}.source" 2>/dev/null || printf '%s' "$SOURCE_ROOT"
 }
 resolve_prime_root() {
-  jj config get "jj-mirror.roots.${1}.prime" 2>/dev/null || printf '%s' "$PRIME_ROOT"
+  local bm=$1 idx sfx; idx=$(resolve_rule_idx "$bm")
+  if (( idx >= 0 )) && [[ -n "${R_PROOT[idx]}" ]]; then printf '%s' "${R_PROOT[idx]}"; return; fi
+  sfx=$(strip_source_prefix "$bm")
+  jj config get "jj-mirror.roots.${sfx}.prime" 2>/dev/null || printf '%s' "$PRIME_ROOT"
+}
+
+# range_diff_hash FROM TO — SHA-256 of the cumulative git diff FROM..TO (used by
+# squash no-op detection).
+range_diff_hash() {
+  local from=$1 to=$2 patch
+  patch=$(jj diff --from "$from" --to "$to" --git) || return 1
+  printf '%s' "$patch" | shasum -a 256 | awk '{print $1}'
 }
 
 # render_root REVSET — a friendly one-token label for a root: the local bookmark
@@ -333,7 +543,7 @@ resolve_prime_root() {
 # (no local bookmark) stays `trunk()`.
 render_root() {
   local bm
-  bm=$(jj log --no-graph -r "$1" -T 'bookmarks.map(|b| b.name()).join(",")' 2>/dev/null | head -n1)
+  bm=$(jj log --no-graph -r "$1" -T 'local_bookmarks.map(|b| b.name()).join(",")' 2>/dev/null | head -n1)
   if [[ -n "$bm" ]]; then printf '%s' "$bm"; else printf '%s' "$1"; fi
 }
 
@@ -346,7 +556,11 @@ render_root() {
 # sync would then treat two failed hashes as equal — a nasty false-positive).
 diff_hash() {
   local rev=$1 patch
-  patch=$(jj log --no-graph -r "$rev" -T '""' -p) || return 1
+  # --git: force git-unified format regardless of the user's ui.diff-formatter.
+  # range_diff_hash also forces --git; the two are compared against each other in
+  # the squash no-op check and squash status, so both MUST use the same format or
+  # a machine without a `:git` default silently rebuilds every squash thread.
+  patch=$(jj log --no-graph -r "$rev" -T '""' -p --git) || return 1
   printf '%s' "$patch" | shasum -a 256 | awk '{print $1}'
 }
 
@@ -392,13 +606,13 @@ list_source_threads() {
     # jj log with a revset prints in reverse-chronological order (newest first);
     # we want oldest first, so reverse portably via awk. (macOS `tail -r` and
     # GNU `tac` both exist but neither is universal.)
-    # Template note: bookmarks.map(|b| b.name()).join(",") verified working
+    # Template note: local_bookmarks.map(|b| b.name()).join(",") verified working
     # against jj 0.43.0 — emits comma-joined names for multi-bookmark commits.
     local sroot chain
-    sroot=$(resolve_source_root "$(strip_source_prefix "$leaf")")
+    sroot=$(resolve_source_root "$leaf")
     chain=$(
       jj log --no-graph -r "$sroot..\"$leaf\" & bookmarks()" \
-        -T 'bookmarks.map(|b| b.name()).join(",") ++ "\n"' 2>/dev/null \
+        -T 'local_bookmarks.map(|b| b.name()).join(",") ++ "\n"' 2>/dev/null \
       | awk 'NF' \
       | awk '{a[NR]=$0} END{for(i=NR;i>=1;i--)print a[i]}'
     )
@@ -411,7 +625,7 @@ list_source_threads() {
       IFS=',' read -ra parts <<< "$line"
       local part
       for part in "${parts[@]}"; do
-        if [[ "$part" == "$SOURCE_PREFIX"* ]]; then
+        if is_included "$part"; then
           ordered+="${ordered:+|}$part"
         fi
       done
@@ -456,7 +670,7 @@ validate_source_bookmarks_or_die() {
   # path.
   local nm nmroot
   for nm in "${names[@]}"; do
-    nmroot=$(resolve_source_root "$(strip_source_prefix "$nm")")
+    nmroot=$(resolve_source_root "$nm")
     if jj log --no-graph -r "merges() & $nmroot..\"$nm\"" -T 'commit_id ++ "\n"' 2>/dev/null \
        | grep -q .; then
       echo "jj-mirror: non-linear source thread — merge commit found between the source root and $nm; only linear chains are supported in v1" >&2
@@ -477,79 +691,163 @@ find_prime_bookmark() {
   jj log --no-graph -r "$full" -T 'commit_id.short() ++ "\n"' 2>/dev/null | head -n1 || true
 }
 
-# sync_thread LEAF CHAIN_STR
-# CHAIN_STR is "b1|b2|...|leaf" — pipe-separated source bookmark names in trunk-to-leaf order.
+# range_commits SROOT LEAF — emit "<short_cid>\t<comma-joined-bookmarks>" for
+# every commit in SROOT..LEAF, oldest-first. This is the FULL branch (bookmarked
+# or not), the unit the mirror replays.
+range_commits() {
+  local sroot=$1 leaf=$2
+  jj log --no-graph -r "$sroot..\"$leaf\"" \
+    -T 'commit_id.short() ++ "\t" ++ local_bookmarks.map(|b| b.name()).join(",") ++ "\n"' 2>/dev/null \
+    | awk 'NF' | awk '{a[NR]=$0} END{for(i=NR;i>=1;i--)print a[i]}'
+}
+
+# set_dest_bookmarks CID BMS — for each INCLUDED source bookmark in BMS (comma
+# list), set its resolved dest bookmark on CID. Idempotent.
+set_dest_bookmarks() {
+  local cid=$1 bms=$2 bm dname
+  [[ -n "$bms" ]] || return 0
+  local -a _arr
+  IFS=',' read -ra _arr <<< "$bms"
+  for bm in "${_arr[@]}"; do
+    is_included "$bm" || continue
+    dname=$(dest_for "$bm")
+    [[ -n "$dname" ]] || continue
+    # --allow-backwards: a rebuilt/re-based prime commit is a sideways move of the
+    # dest bookmark, which jj refuses by default.
+    jj bookmark set --allow-backwards "$dname" -r "$cid" >/dev/null 2>&1 \
+      || { echo "jj-mirror: bookmark set failed for $dname at $cid" >&2; return 1; }
+  done
+}
+
+# sync_thread LEAF _CHAIN PRIME_ROOT
+# Mirror the FULL branch SOURCE_ROOT..LEAF commit-for-commit onto PRIME_ROOT:
+# every commit is replayed (a strict cherry-pick of its own diff), and where a
+# commit carries an INCLUDED source bookmark its resolved dest bookmark is placed
+# on the mirrored commit — so a tip-only bookmark mirrors its whole branch and a
+# source stack mirrors to a dest stack. Positional no-op reuse keeps unchanged
+# prefixes stable (jj-vine PR stability). Squash mode collapses to one commit.
 sync_thread() {
   local leaf=$1
-  local chain_str=$2
   local prime_root=${3:-$PRIME_ROOT}
-  IFS='|' read -ra chain <<< "$chain_str"
+  local sroot dleaf squash
+  sroot=$(resolve_source_root "$leaf")
+  dleaf=$(dest_for "$leaf")
+  squash=$(rule_squash_for "$leaf")
+
+  if [[ "$squash" == "true" ]]; then
+    squash_thread "$leaf" "$sroot" "$prime_root" "$dleaf"
+    return $?
+  fi
+
+  # Full branch, oldest-first.
+  local -a c_cid=() c_bm=()
+  local _cid _bms
+  while IFS=$'\t' read -r _cid _bms; do
+    [[ -n "$_cid" ]] || continue
+    c_cid+=("$_cid"); c_bm+=("$_bms")
+  done < <(range_commits "$sroot" "$leaf")
+  local n=${#c_cid[@]}
+  (( n > 0 )) || return 0
+
+  # Existing prime chain (oldest-first) for positional no-op reuse.
+  local -a e_cid=()
+  local dleaf_cid ecid
+  dleaf_cid=$(jj log --no-graph -r "$dleaf" -T 'commit_id.short() ++ "\n"' 2>/dev/null | head -n1 || true)
+  if [[ -n "$dleaf_cid" ]]; then
+    while IFS= read -r ecid; do
+      [[ -n "$ecid" ]] && e_cid+=("$ecid")
+    done < <(jj log --no-graph -r "$prime_root..$dleaf_cid" -T 'commit_id.short() ++ "\n"' 2>/dev/null \
+             | awk 'NF' | awk '{a[NR]=$0} END{for(i=NR;i>=1;i--)print a[i]}')
+  fi
 
   local prev
   prev=$(jj log --no-graph -r "$prime_root" -T 'commit_id.short() ++ "\n"' | head -n1)
 
-  local cascade=0   # once set, everything downstream must rebuild
-  local source_name suffix prime_full existing existing_parent existing_hash source_hash new_cid
-  for source_name in "${chain[@]}"; do
-    suffix=$(strip_source_prefix "$source_name")
-    prime_full="${PRIME_PREFIX}${suffix}"
-    existing=$(find_prime_bookmark "$suffix")
+  local cascade=0 i scid bms existing e_parent e_hash s_hash new_cid out cflag
+  for (( i=0; i<n; i++ )); do
+    scid=${c_cid[i]}; bms=${c_bm[i]}
+    existing=""
+    (( i < ${#e_cid[@]} )) && existing=${e_cid[i]}
 
-    if [[ -n "$existing" && $cascade -eq 0 ]]; then
-      existing_parent=$(jj log --no-graph -r "$existing-" -T 'commit_id.short() ++ "\n"' | head -n1)
-      # diff_hash returns non-zero on jj failure; check explicitly because sync_thread runs
-      # inside `if ! sync_thread` in sync_main, which suspends set -e for this body — two
-      # empty hashes would otherwise falsely compare equal and skip the rebuild.
-      existing_hash=$(diff_hash "$existing") \
+    if [[ $cascade -eq 0 && -n "$existing" ]]; then
+      e_parent=$(jj log --no-graph -r "$existing-" -T 'commit_id.short() ++ "\n"' | head -n1)
+      e_hash=$(diff_hash "$existing") \
         || { echo "jj-mirror: diff_hash failed on existing prime $existing" >&2; return 1; }
-      source_hash=$(diff_hash "$source_name") \
-        || { echo "jj-mirror: diff_hash failed on source $source_name" >&2; return 1; }
-      if [[ "$existing_parent" == "$prev" && "$existing_hash" == "$source_hash" ]]; then
-        # up-to-date — no touch
+      s_hash=$(diff_hash "$scid") \
+        || { echo "jj-mirror: diff_hash failed on source $scid" >&2; return 1; }
+      if [[ "$e_parent" == "$prev" && "$e_hash" == "$s_hash" ]]; then
+        # up-to-date — keep the existing prime commit, just ensure bookmarks.
+        set_dest_bookmarks "$existing" "$bms" || return 1
         prev=$existing
         continue
       fi
     fi
 
-    # Need to (re)build. Any downstream commit must also cascade.
-    if [[ -n "$existing" ]]; then
-      jj bookmark delete "$prime_full" >/dev/null 2>&1 \
-        || { echo "jj-mirror: bookmark delete failed for $prime_full" >&2; return 1; }
-      jj abandon "$existing" >/dev/null 2>&1 \
-        || { echo "jj-mirror: abandon failed for $existing" >&2; return 1; }
-    fi
-
-    # Cherry-pick source commit onto prev; capture new commit id.
-    # jj 0.43.0's `duplicate` has no --template/-T flag, so parse the
-    # "Duplicated <old> as <change_id> <commit_id> <description>" stderr
-    # line. Field 5 is always the new short commit id regardless of
-    # description content (verified empirically against jj 0.43.0).
-    local out
-    out=$(jj duplicate "$source_name" --destination "$prev" 2>&1)
+    # (Re)build: strict cherry-pick of this commit's own diff onto prev.
+    # jj 0.43.0's `duplicate` has no -T flag; parse "Duplicated <old> as
+    # <change> <commit_id> <desc>" — field 5 is the new short commit id.
+    out=$(jj duplicate "$scid" --destination "$prev" 2>&1)
     new_cid=$(printf '%s\n' "$out" | awk '/^Duplicated/ {print $5; exit}')
-    [[ -n "$new_cid" ]] || { echo "jj-mirror: duplicate produced no commit for $source_name" >&2; return 1; }
-    # sync_thread runs inside `if ! sync_thread` in sync_main, which suspends
-    # `set -e` for its whole body. Check bookmark-set's exit code explicitly
-    # so a failure propagates to the rollback path instead of silently continuing.
-    jj bookmark set "$prime_full" -r "$new_cid" >/dev/null 2>&1 \
-      || { echo "jj-mirror: bookmark set failed for $prime_full at $new_cid" >&2; return 1; }
+    [[ -n "$new_cid" ]] || { echo "jj-mirror: duplicate produced no commit for $scid" >&2; return 1; }
+    set_dest_bookmarks "$new_cid" "$bms" || return 1
 
-    # Note on ordering: we bookmark BEFORE checking for conflict. If the new
-    # commit is conflicted, `return 2` triggers `jj op restore` in sync_main
-    # which atomically unwinds both the bookmark-set and the duplicate. So
-    # the transient "bookmark on a conflicted commit" state is safe — but
-    # only under that rollback invariant. Do not reorder without preserving
-    # the atomic-rollback guarantee.
-    local cflag
+    # Bookmark BEFORE the conflict check; a conflicted commit triggers `return 2`
+    # → sync_main's per-thread `jj op restore` atomically unwinds it.
     cflag=$(jj log --no-graph -r "$new_cid" -T 'if(conflict, "y", "n") ++ "\n"' 2>/dev/null | head -n1)
     if [[ "$cflag" == "y" ]]; then
-      echo "jj-mirror: conflict cherry-picking $source_name onto ${prev} (prime commit $new_cid)" >&2
-      return 2   # signal 'conflict, roll back' to sync_main
+      echo "jj-mirror: conflict cherry-picking $scid onto ${prev} (prime commit $new_cid)" >&2
+      return 2
     fi
 
     prev=$new_cid
     cascade=1
   done
+}
+
+# squash_thread LEAF SROOT PRIME_ROOT DLEAF — collapse the whole branch
+# SROOT..LEAF into ONE dest commit = the cumulative diff, re-based onto
+# PRIME_ROOT, bookmarked DLEAF. No-op when the existing dest already carries that
+# cumulative diff on PRIME_ROOT.
+squash_thread() {
+  local leaf=$1 sroot=$2 prime_root=$3 dleaf=$4
+  local cum existing existing_parent existing_hash proot_cid
+  cum=$(range_diff_hash "$sroot" "$leaf") \
+    || { echo "jj-mirror: range diff_hash failed for $leaf" >&2; return 1; }
+  proot_cid=$(jj log --no-graph -r "$prime_root" -T 'commit_id.short() ++ "\n"' | head -n1)
+
+  existing=$(jj log --no-graph -r "$dleaf" -T 'commit_id.short() ++ "\n"' 2>/dev/null | head -n1 || true)
+  if [[ -n "$existing" ]]; then
+    existing_parent=$(jj log --no-graph -r "$existing-" -T 'commit_id.short() ++ "\n"' | head -n1)
+    existing_hash=$(diff_hash "$existing") || existing_hash=""
+    if [[ "$existing_parent" == "$proot_cid" && "$existing_hash" == "$cum" ]]; then
+      return 0   # already the squashed cumulative diff on prime_root
+    fi
+  fi
+
+  # Duplicate the whole range onto prime_root, then fold into one commit. Track
+  # the fold target by CHANGE id (field 4 of "Duplicated <old> as <change>
+  # <commit> <desc>") — squash rewrites its commit id, but the change id of the
+  # --into commit survives, so it resolves to the folded result.
+  local out root_cid tip_cid root_change one
+  out=$(jj duplicate "$sroot..\"$leaf\"" --destination "$prime_root" 2>&1)
+  root_change=$(printf '%s\n' "$out" | awk '/^Duplicated/ {print $4; exit}')
+  root_cid=$(printf '%s\n' "$out" | awk '/^Duplicated/ {print $5; exit}')
+  tip_cid=$(printf '%s\n' "$out" | awk '/^Duplicated/ {c=$5} END{print c}')
+  [[ -n "$root_change" && -n "$root_cid" && -n "$tip_cid" ]] || { echo "jj-mirror: squash duplicate produced no commits for $leaf" >&2; return 1; }
+  if [[ "$root_cid" != "$tip_cid" ]]; then
+    jj squash --from "${root_cid}..${tip_cid}" --into "$root_cid" -u >/dev/null 2>&1 \
+      || { echo "jj-mirror: squash fold failed for $leaf" >&2; return 1; }
+  fi
+  one=$(jj log --no-graph -r "$root_change" -T 'commit_id.short() ++ "\n"' 2>/dev/null | head -n1)
+  [[ -n "$one" ]] || one=$root_cid
+  jj bookmark set --allow-backwards "$dleaf" -r "$one" >/dev/null 2>&1 \
+    || { echo "jj-mirror: bookmark set failed for $dleaf at $one" >&2; return 1; }
+  local cflag
+  cflag=$(jj log --no-graph -r "$one" -T 'if(conflict, "y", "n") ++ "\n"' 2>/dev/null | head -n1)
+  if [[ "$cflag" == "y" ]]; then
+    echo "jj-mirror: conflict squashing $leaf onto $prime_root (prime commit $one)" >&2
+    return 2
+  fi
 }
 
 # dry_run_thread LEAF CHAIN_STR — print intended actions for one thread
@@ -560,30 +858,72 @@ sync_thread() {
 # rebuild too — even if its own diff hasn't changed. Without this, dry-run
 # undercounts the real work sync would do.
 dry_run_thread() {
-  local leaf=$1 chain_str=$2
-  local -a parts
-  IFS='|' read -ra parts <<< "$chain_str"
-
+  local leaf=$1
+  local sroot proot dleaf squash
+  sroot=$(resolve_source_root "$leaf")
+  proot=$(resolve_prime_root "$leaf")
+  dleaf=$(dest_for "$leaf")
+  squash=$(rule_squash_for "$leaf")
   printf 'thread %s (dry-run)\n' "$leaf"
-  local sname sfx existing hs hp cascade=0
-  for sname in "${parts[@]}"; do
-    sfx=$(strip_source_prefix "$sname")
-    existing=$(find_prime_bookmark "$sfx")
-    if [[ -z "$existing" ]]; then
-      printf '  would create %s%s from %s\n' "$PRIME_PREFIX" "$sfx" "$sname"
-      cascade=1
-    elif (( cascade )); then
-      printf '  would rebuild %s%s (cascade)\n' "$PRIME_PREFIX" "$sfx"
+
+  if [[ "$squash" == "true" ]]; then
+    if jj log --no-graph -r "$dleaf" -T '""' >/dev/null 2>&1; then
+      printf '  would rebuild %s (squash)\n' "$dleaf"
     else
-      hs=$(diff_hash "$sname") || hs=""
-      hp=$(diff_hash "$existing") || hp=""
-      if [[ -n "$hs" && "$hs" == "$hp" ]]; then
-        printf '  would keep %s%s (up-to-date)\n' "$PRIME_PREFIX" "$sfx"
+      printf '  would create %s (squash) from %s\n' "$dleaf" "$leaf"
+    fi
+    return 0
+  fi
+
+  local -a c_cid=() c_bm=()
+  local _cid _bms
+  while IFS=$'\t' read -r _cid _bms; do
+    [[ -n "$_cid" ]] || continue
+    c_cid+=("$_cid"); c_bm+=("$_bms")
+  done < <(range_commits "$sroot" "$leaf")
+  local n=${#c_cid[@]}
+
+  local -a e_cid=()
+  local dleaf_cid ecid
+  dleaf_cid=$(jj log --no-graph -r "$dleaf" -T 'commit_id.short() ++ "\n"' 2>/dev/null | head -n1 || true)
+  if [[ -n "$dleaf_cid" ]]; then
+    while IFS= read -r ecid; do [[ -n "$ecid" ]] && e_cid+=("$ecid"); done < <(
+      jj log --no-graph -r "$proot..$dleaf_cid" -T 'commit_id.short() ++ "\n"' 2>/dev/null \
+      | awk 'NF' | awk '{a[NR]=$0} END{for(i=NR;i>=1;i--)print a[i]}')
+  fi
+
+  local prev cascade=0 i scid bms existing e_parent e_hash s_hash bm dname action
+  local -a _bmarr
+  prev=$(jj log --no-graph -r "$proot" -T 'commit_id.short() ++ "\n"' | head -n1)
+  for (( i=0; i<n; i++ )); do
+    scid=${c_cid[i]}; bms=${c_bm[i]}
+    existing=""; (( i < ${#e_cid[@]} )) && existing=${e_cid[i]}
+    if (( cascade )); then
+      action="cascade"
+    elif [[ -z "$existing" ]]; then
+      action="create"; cascade=1
+    else
+      e_parent=$(jj log --no-graph -r "$existing-" -T 'commit_id.short() ++ "\n"' | head -n1)
+      e_hash=$(diff_hash "$existing") || e_hash=""
+      s_hash=$(diff_hash "$scid") || s_hash=""
+      if [[ "$e_parent" == "$prev" && -n "$s_hash" && "$e_hash" == "$s_hash" ]]; then
+        action="keep"; prev=$existing
       else
-        printf '  would rebuild %s%s (diff changed)\n' "$PRIME_PREFIX" "$sfx"
-        cascade=1
+        action="diff"; cascade=1
       fi
     fi
+    [[ -n "$bms" ]] || continue
+    IFS=',' read -ra _bmarr <<< "$bms"
+    for bm in "${_bmarr[@]}"; do
+      is_included "$bm" || continue
+      dname=$(dest_for "$bm")
+      case "$action" in
+        create)  printf '  would create %s from %s\n' "$dname" "$bm" ;;
+        cascade) printf '  would rebuild %s (cascade)\n' "$dname" ;;
+        diff)    printf '  would rebuild %s (diff changed)\n' "$dname" ;;
+        keep)    printf '  would keep %s (up-to-date)\n' "$dname" ;;
+      esac
+    done
   done
 }
 
@@ -630,13 +970,12 @@ sync_main() {
       for t in "${all_chains[@]}"; do
         IFS='|' read -ra t_chain <<< "$t"
         for source_name in "${t_chain[@]}"; do
-          dry_wanted["$(strip_source_prefix "$source_name")"]=1
+          dry_wanted["$(dest_for "$source_name")"]=1
         done
       done
-      local pname pcid psuffix
+      local pname pcid
       while IFS=$'\t' read -r pname pcid; do
-        psuffix=$(strip_prime_prefix "$pname")
-        if [[ -z "${dry_wanted[$psuffix]:-}" ]]; then
+        if [[ -z "${dry_wanted[$pname]:-}" ]]; then
           printf 'would cull orphan %s\n' "$pname"
         fi
       done < <(list_prime_bookmarks)
@@ -661,14 +1000,13 @@ sync_main() {
     for t in "${all_chains[@]}"; do
       IFS='|' read -ra t_chain <<< "$t"
       for source_name in "${t_chain[@]}"; do
-        wanted["$(strip_source_prefix "$source_name")"]=1
+        wanted["$(dest_for "$source_name")"]=1
       done
     done
 
-    local pname pcid psuffix
+    local pname pcid
     while IFS=$'\t' read -r pname pcid; do
-      psuffix=$(strip_prime_prefix "$pname")
-      if [[ -z "${wanted[$psuffix]:-}" ]]; then
+      if [[ -z "${wanted[$pname]:-}" ]]; then
         jj bookmark delete "$pname" >/dev/null 2>&1 \
           || { echo "jj-mirror: orphan cull bookmark delete failed for $pname; rolling back to op $pre_op" >&2; jj op restore "$pre_op" >/dev/null 2>&1 || true; exit 1; }
         jj abandon "$pcid" >/dev/null 2>&1 \
@@ -689,7 +1027,7 @@ sync_main() {
   for (( i=0; i<${#leaves[@]}; i++ )); do
     thread_op=$(capture_pre_op)
     rc=0
-    proot=$(resolve_prime_root "$(strip_source_prefix "${leaves[i]}")")
+    proot=$(resolve_prime_root "${leaves[i]}")
     sync_thread "${leaves[i]}" "${chains[i]}" "$proot" || rc=$?
     if [[ $rc -ne 0 ]]; then
       echo "jj-mirror: thread ${leaves[i]} failed (rc=$rc); rolling back this thread to op $thread_op (other threads unaffected)" >&2
@@ -717,24 +1055,43 @@ sync_main() {
 status_main() {
   validate_source_bookmarks_or_die
 
-  local leaf chain source_name suffix existing state hs hp
+  local leaf chain source_name existing state hs hp dname sroot proot sc pc
   local -a parts
   while IFS=$'\t' read -r leaf chain; do
     [[ -n "$leaf" && -n "$chain" ]] || continue
     printf 'thread %s\n' "$leaf"
-    parts=()
-    IFS='|' read -ra parts <<< "$chain"
-    for source_name in "${parts[@]}"; do
-      suffix=$(strip_source_prefix "$source_name")
-      existing=$(find_prime_bookmark "$suffix")
-      if [[ -z "$existing" ]]; then
-        state="missing"
+    if [[ "$(rule_squash_for "$leaf")" == "true" ]]; then
+      dname=$(dest_for "$leaf"); sroot=$(resolve_source_root "$leaf")
+      existing=$(jj log --no-graph -r "$dname" -T 'commit_id.short() ++ "\n"' 2>/dev/null | head -n1 || true)
+      if [[ -z "$existing" ]]; then state="missing"
       else
-        hs=$(diff_hash "$source_name") || hs=""
+        hs=$(range_diff_hash "$sroot" "$leaf") || hs=""
         hp=$(diff_hash "$existing") || hp=""
         if [[ "$hs" == "$hp" && -n "$hs" ]]; then state="ok"; else state="stale"; fi
       fi
-      printf '  %s -> %s%s    [%s]\n' "$source_name" "$PRIME_PREFIX" "$suffix" "$state"
+      printf '  %s -> %s (squash)    [%s]\n' "$leaf" "$dname" "$state"
+      continue
+    fi
+    parts=()
+    IFS='|' read -ra parts <<< "$chain"
+    sroot=$(resolve_source_root "$leaf")
+    proot=$(resolve_prime_root "$leaf")
+    for source_name in "${parts[@]}"; do
+      dname=$(dest_for "$source_name")
+      existing=$(jj log --no-graph -r "$dname" -T 'commit_id.short() ++ "\n"' 2>/dev/null | head -n1 || true)
+      if [[ -z "$existing" ]]; then
+        state="missing"
+      else
+        # Full-branch faithfulness: compare the CUMULATIVE diff AND commit count of
+        # the whole sub-branch (sroot..source) against the prime chain (proot..dest),
+        # not just the tip's own diff — else a tip-only / incomplete prime reads "ok".
+        hs=$(range_diff_hash "$sroot" "$source_name") || hs=""
+        hp=$(range_diff_hash "$proot" "$dname") || hp=""
+        sc=$(jj log --no-graph -r "$sroot..\"$source_name\"" -T '"x\n"' 2>/dev/null | awk 'END{print NR}')
+        pc=$(jj log --no-graph -r "$proot..\"$dname\"" -T '"x\n"' 2>/dev/null | awk 'END{print NR}')
+        if [[ -n "$hs" && "$hs" == "$hp" && "$sc" == "$pc" ]]; then state="ok"; else state="stale"; fi
+      fi
+      printf '  %s -> %s    [%s]\n' "$source_name" "$dname" "$state"
     done
   done < <(list_source_threads)
 }
@@ -758,30 +1115,46 @@ status_graph() {
   # Gather per-thread records into parallel arrays (body = pre-rendered rows).
   local -a t_src=() t_dst=() t_body=() src_order=()
   local -A src_seen=()
-  local leaf chain lname slabel plabel body sname suffix existing hs hp glyph k row
+  local leaf chain lname slabel plabel body sname dname existing hs hp glyph k row
+  local sroot_rev proot_rev sc pc
   local -a parts
   while IFS=$'\t' read -r leaf chain; do
     [[ -n "$leaf" && -n "$chain" ]] || continue
     lname=$(strip_source_prefix "$leaf")
-    slabel=$(render_root "$(resolve_source_root "$lname")")
-    plabel=$(render_root "$(resolve_prime_root "$lname")")
+    sroot_rev=$(resolve_source_root "$leaf"); slabel=$(render_root "$sroot_rev")
+    proot_rev=$(resolve_prime_root "$leaf"); plabel=$(render_root "$proot_rev")
 
     body=""
+    if [[ "$(rule_squash_for "$leaf")" == "true" ]]; then
+      local sq_dest sq_exist sq_h sq_g
+      sq_dest=$(dest_for "$leaf")
+      sq_exist=$(jj log --no-graph -r "$sq_dest" -T 'commit_id.short() ++ "\n"' 2>/dev/null | head -n1 || true)
+      if [[ -z "$sq_exist" ]]; then sq_g="○"; else
+        sq_h=$(range_diff_hash "$(resolve_source_root "$leaf")" "$leaf") || sq_h=""
+        hp=$(diff_hash "$sq_exist") || hp=""
+        if [[ "$sq_h" == "$hp" && -n "$sq_h" ]]; then sq_g="●"; else sq_g="◐"; fi
+      fi
+      printf -v row '        ● %-34s ══▶  %s %s (squash)' "$leaf" "$sq_g" "$sq_dest"
+      body="$row"$'\n'
+    else
     IFS='|' read -ra parts <<< "$chain"
     for (( k=${#parts[@]}-1; k>=0; k-- )); do
       sname=${parts[k]}
-      suffix=$(strip_source_prefix "$sname")
-      existing=$(find_prime_bookmark "$suffix")
+      dname=$(dest_for "$sname")
+      existing=$(jj log --no-graph -r "$dname" -T 'commit_id.short() ++ "\n"' 2>/dev/null | head -n1 || true)
       if [[ -z "$existing" ]]; then
         glyph="○"
       else
-        hs=$(diff_hash "$sname") || hs=""
-        hp=$(diff_hash "$existing") || hp=""
-        if [[ "$hs" == "$hp" && -n "$hs" ]]; then glyph="●"; else glyph="◐"; fi
+        hs=$(range_diff_hash "$sroot_rev" "$sname") || hs=""
+        hp=$(range_diff_hash "$proot_rev" "$dname") || hp=""
+        sc=$(jj log --no-graph -r "$sroot_rev..\"$sname\"" -T '"x\n"' 2>/dev/null | awk 'END{print NR}')
+        pc=$(jj log --no-graph -r "$proot_rev..\"$dname\"" -T '"x\n"' 2>/dev/null | awk 'END{print NR}')
+        if [[ -n "$hs" && "$hs" == "$hp" && "$sc" == "$pc" ]]; then glyph="●"; else glyph="◐"; fi
       fi
-      printf -v row '        ● %-34s ──▶  %s %s%s' "$sname" "$glyph" "$PRIME_PREFIX" "$suffix"
+      printf -v row '        ● %-34s ──▶  %s %s' "$sname" "$glyph" "$dname"
       body+="$row"$'\n'
     done
+    fi
 
     t_src+=("$slabel"); t_dst+=("$plabel"); t_body+=("$body")
     if [[ -z "${src_seen[$slabel]:-}" ]]; then src_seen[$slabel]=1; src_order+=("$slabel"); fi
@@ -811,6 +1184,80 @@ status_graph() {
       done
     done
     printf '\n'
+  done
+}
+
+# rule_slug PATTERN — deterministic TOML-safe rule name (so re-adding the same
+# source overwrites its rule).
+rule_slug() { printf '%s' "$1" | tr 'A-Z' 'a-z' | sed 's/[^a-z0-9]/_/g'; }
+
+# add_main — register/overwrite a mirror rule.
+add_main() {
+  local squash=false src="" dest=""
+  while (( $# )); do
+    case "$1" in
+      --squash) squash=true; shift ;;
+      -h|--help) help_add; exit 0 ;;
+      -*) echo "jj-mirror: add: unknown flag '$1'" >&2; exit 2 ;;
+      *) if [[ -z "$src" ]]; then src=$1
+         elif [[ -z "$dest" ]]; then dest=$1
+         else echo "jj-mirror: add: too many arguments" >&2; exit 2; fi; shift ;;
+    esac
+  done
+  [[ -n "$src" ]] || { echo "usage: jj-mirror add <source> [<dest>] [--squash]" >&2; exit 2; }
+  local slug; slug=$(rule_slug "$src")
+  jj config set --repo "jj-mirror.rules.$slug.source" "$src"
+  jj config set --repo "jj-mirror.rules.$slug.mirror" true    # add always includes
+  if [[ -n "$dest" ]]; then jj config set --repo "jj-mirror.rules.$slug.dest" "$dest"
+  else jj config unset "jj-mirror.rules.$slug.dest" 2>/dev/null || true; fi
+  if [[ "$squash" == true ]]; then jj config set --repo "jj-mirror.rules.$slug.squash" true
+  else jj config unset "jj-mirror.rules.$slug.squash" 2>/dev/null || true; fi
+  printf 'jj-mirror: added rule %s — %s -> %s%s\n' \
+    "$slug" "$src" "${dest:-<default>}" "$([[ $squash == true ]] && printf ' (squash)')"
+}
+
+# rm_main — guarantee SOURCE will not mirror. Removes an exact rule; if a broader
+# glob still covers a concrete source, writes an exclusion carve-out.
+rm_main() {
+  local src=${1:-}
+  [[ -n "$src" ]] || { echo "usage: jj-mirror rm <source>" >&2; exit 2; }
+  ensure_rules
+  local i k removed=0
+  for (( i=0; i<${#R_SRC[@]}; i++ )); do
+    [[ "${R_NAME[i]}" == "default" ]] && continue
+    if [[ "${R_SRC[i]}" == "$src" ]]; then
+      for k in source dest squash mirror source-root prime-root; do
+        jj config unset "jj-mirror.rules.${R_NAME[i]}.$k" 2>/dev/null || true
+      done
+      removed=1
+    fi
+  done
+  load_rules   # refresh after removal
+  if [[ "$src" != *'*' ]] && is_included "$src"; then
+    local es; es=$(rule_slug "$src")
+    jj config set --repo "jj-mirror.rules.$es.source" "$src"
+    jj config set --repo "jj-mirror.rules.$es.mirror" false
+    printf 'jj-mirror: excluded %s (carve-out — a broader rule still covers it)\n' "$src"
+  elif (( removed )); then
+    printf 'jj-mirror: removed rule(s) for %s\n' "$src"
+  else
+    echo "jj-mirror: no rule matched '$src'" >&2; exit 1
+  fi
+}
+
+# list_main — print the mirror rules.
+list_main() {
+  ensure_rules
+  (( ${#R_SRC[@]} > 0 )) || { printf '(no rules)\n'; return 0; }
+  printf 'jj-mirror rules (most-specific wins):\n'
+  local i flags
+  for (( i=0; i<${#R_SRC[@]}; i++ )); do
+    flags=""
+    [[ "${R_MIRROR[i]}" == "false" ]] && flags+=" EXCLUDE"
+    [[ "${R_SQUASH[i]}" == "true"  ]] && flags+=" squash"
+    [[ -n "${R_SROOT[i]}" ]] && flags+=" source-root=${R_SROOT[i]}"
+    [[ -n "${R_PROOT[i]}" ]] && flags+=" prime-root=${R_PROOT[i]}"
+    printf '  %-14s %-14s -> %s%s\n' "${R_NAME[i]}" "${R_SRC[i]}" "${R_DEST[i]:-<default>}" "$flags"
   done
 }
 
@@ -919,6 +1366,36 @@ case "${1:-status}" in
     if (( $# > 0 )) && wants_help "$1"; then help_config; exit 0; fi
     load_config
     config_main
+    exit 0
+    ;;
+  add)
+    (( $# > 0 )) && shift
+    if (( $# > 0 )) && wants_help "$1"; then help_add; exit 0; fi
+    load_config
+    add_main "$@"
+    exit 0
+    ;;
+  rm)
+    (( $# > 0 )) && shift
+    if (( $# > 0 )) && wants_help "$1"; then help_rm; exit 0; fi
+    load_config
+    rm_main "${1:-}"
+    exit 0
+    ;;
+  list)
+    (( $# > 0 )) && shift
+    if (( $# > 0 )) && wants_help "$1"; then help_list; exit 0; fi
+    load_config
+    list_main
+    exit 0
+    ;;
+  _dump-rules)
+    load_config
+    ensure_rules
+    for (( _i=0; _i<${#R_SRC[@]}; _i++ )); do
+      printf 'rule\t%s\t%s\t%s\tsquash=%s\tmirror=%s\n' \
+        "${R_NAME[_i]}" "${R_SRC[_i]}" "${R_DEST[_i]}" "${R_SQUASH[_i]}" "${R_MIRROR[_i]}"
+    done
     exit 0
     ;;
   abandon)

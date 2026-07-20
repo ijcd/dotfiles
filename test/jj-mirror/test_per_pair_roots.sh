@@ -35,8 +35,10 @@ pb=$(jj log --no-graph    -r "pr/feat-b-"  -T 'commit_id.short() ++ "\n"')
 assert_eq "$trunk" "$pa" "pr/feat-a on global prime-root (trunk)"
 assert_eq "$rel"   "$pb" "pr/feat-b on its per-pair prime-root (rel)"
 
-# config should surface the override.
-"$SCRIPT" config | grep -q 'feat-b\.prime' || fail "config did not list the per-pair override"
+# config should surface the override. (Capture first — `config | grep -q` would
+# SIGPIPE config under pipefail once grep matches mid-stream.)
+cfg="$("$SCRIPT" config)"
+[[ "$cfg" == *"feat-b.prime"* ]] || fail "config did not list the per-pair override: $cfg"
 
 # graph should render both threads and mark feat-b's prime root as an override.
 g="$("$SCRIPT" status --graph)"
