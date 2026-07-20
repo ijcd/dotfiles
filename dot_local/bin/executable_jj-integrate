@@ -1,0 +1,305 @@
+#!/usr/bin/env bash
+# jj-integrate — maintain a jj octopus-merge "integration" bookmark as a chosen,
+# PERSISTENT set of branches, refreshable to their current tips. The membership
+# is stored by NAME in repo jj config (not the merge's commit-parents, which go
+# stale when a branch advances); `catchup` re-parents the bookmark onto those
+# members at their current tips. Companion to jj-mirror.
+
+set -euo pipefail
+
+# bash 4+ for `${arr[@]+"${arr[@]}"}` safe expansion + arrays under set -u.
+if (( BASH_VERSINFO[0] < 4 )); then
+  echo "jj-integrate: bash ${BASH_VERSION} too old — needs bash 4+" >&2
+  exit 1
+fi
+
+# ─── Help ───────────────────────────────────────────────────────────────────
+usage() {
+  cat <<'EOF'
+jj-integrate — keep a jj octopus-merge bookmark (default local/integration) as a
+chosen, persistent SET of branches, refreshable to their current tips.
+
+Usage:
+  jj-integrate [status|list]            show members + drift (default, read-only)
+  jj-integrate add <name|glob>...       add branch(es) to the set, then catchup
+  jj-integrate drop <name>...           remove branch(es) from the set, then catchup
+  jj-integrate catchup                  rebase the bookmark onto the set at current tips
+  jj-integrate reset                    set = all matching the `all` glob, then catchup
+  jj-integrate clear                    set = empty (bare on base), then catchup
+  jj-integrate config                   print the resolved config (read-only)
+  jj-integrate help <command>           per-command help
+
+`catchup` also accepts the alias `reintegrate`. Membership persists across runs.
+
+Config (jj config, [jj-integrate] section, repo-scoped):
+  bookmark   integration bookmark name        (default local/integration)
+  base       bare/empty-state revset          (default local/main)
+  all        glob for `reset`                 (default wip/*)
+  members    space-separated member names     (managed by add/drop/reset/clear)
+
+Set config (repo-scoped — the bookmark/base names are repo-specific):
+  jj config set --repo jj-integrate.bookmark my/integ
+  jj config set --repo jj-integrate.base     trunk()
+  jj config set --repo jj-integrate.all      "wip/*"
+
+Model:
+  Every wip/* sits on `base`, so `base` is an ancestor of each member and jj
+  simplifies it out of the merge automatically — the set collapses to just the
+  members. A member that advances shows as drift in `status`; `catchup` re-parents
+  onto its new tip. `@` never moves (create uses --no-edit; rebase doesn't check out).
+EOF
+}
+
+help_add() { cat <<'EOF'
+Usage: jj-integrate add <name|glob>...
+
+Add branch(es) to the integration set and catchup. A glob (contains *) expands
+against the current LOCAL bookmarks (e.g. `add 'wip/*'` = integrate all wip/*);
+a literal name is added as-is (warns if it isn't a local bookmark). Idempotent.
+EOF
+}
+help_drop() { cat <<'EOF'
+Usage: jj-integrate drop <name>...
+
+Remove member(s) from the set and catchup. Persists — the dropped branch stays
+out until you `add` it again (unlike a glob-based refresh that would re-add it).
+EOF
+}
+help_catchup() { cat <<'EOF'
+Usage: jj-integrate catchup   (alias: reintegrate)
+
+Rebase the integration bookmark onto its current members at their current tips —
+picking up new commits on any member. Creates the bookmark if it doesn't exist
+yet (self-bootstrap). Empty set → bare single-parent on `base`. A conflicted
+result is reported, not auto-resolved.
+EOF
+}
+help_status() { cat <<'EOF'
+Usage: jj-integrate status   (also: list, or no argument)
+
+Read-only. Prints the configured members, whether each is up-to-date in the
+bookmark (✓) or has drifted / gone missing (✗), and whether the merge is
+conflicted. Tells you to run `catchup` when anything drifted.
+EOF
+}
+help_reset() { cat <<'EOF'
+Usage: jj-integrate reset
+
+Set the members to every local bookmark matching the `all` glob (default wip/*)
+and catchup — i.e. "integrate all wip/*".
+EOF
+}
+help_clear() { cat <<'EOF'
+Usage: jj-integrate clear
+
+Empty the set and catchup — the bookmark becomes a bare single-parent commit on
+`base` (default local/main), nothing merged.
+EOF
+}
+help_config() { cat <<'EOF'
+Usage: jj-integrate config
+
+Read-only. Print the resolved bookmark, base, all-glob, and members, plus the
+`jj config set --repo` commands to change the bookmark/base (repo-scoped, since
+the names are repo-specific).
+EOF
+}
+print_help() {
+  case "${1:-}" in
+    ""|jj-integrate) usage ;;
+    add) help_add ;; drop) help_drop ;;
+    catchup|reintegrate) help_catchup ;;
+    status|list) help_status ;;
+    reset) help_reset ;; clear) help_clear ;; config) help_config ;;
+    *) echo "jj-integrate: no help for '$1'" >&2; usage >&2; return 2 ;;
+  esac
+}
+wants_help() { [[ "${1:-}" == "--help" || "${1:-}" == "-h" ]]; }
+
+# ─── Config ─────────────────────────────────────────────────────────────────
+load_config() {
+  BM=$(jj config get jj-integrate.bookmark 2>/dev/null || echo 'local/integration')
+  BASE=$(jj config get jj-integrate.base 2>/dev/null || echo 'local/main')
+  ALL_GLOB=$(jj config get jj-integrate.all 2>/dev/null || echo 'wip/*')
+  local mstr m
+  mstr=$(jj config get jj-integrate.members 2>/dev/null || echo '')
+  MEMBERS=()
+  for m in $mstr; do [[ -n "$m" ]] && MEMBERS+=("$m"); done
+}
+save_members() {
+  jj config set --repo jj-integrate.members "${MEMBERS[*]}" >/dev/null 2>&1 \
+    || { echo "jj-integrate: could not persist members" >&2; return 1; }
+}
+
+# ─── Bookmark helpers ───────────────────────────────────────────────────────
+# LOCAL bookmark names only (drop remote-tracking rows and no-target/conflicted
+# ones, whose commit_id() would error — same guard jj-mirror uses).
+list_local_bookmarks() {
+  jj bookmark list -T 'if(remote, "", if(normal_target, name ++ "\n", ""))' 2>/dev/null | awk 'NF'
+}
+is_local_bookmark() { list_local_bookmarks | grep -qxF "$1"; }
+revset_nonempty() { [[ -n "$(jj log --no-graph -r "$1" -T '"x"' 2>/dev/null)" ]]; }
+is_conflicted()   { [[ "$(jj log --no-graph -r "$1" -T 'if(conflict,"y","n")' 2>/dev/null | head -n1)" == "y" ]]; }
+
+contains() { local x=$1; shift; local e; for e in "$@"; do [[ "$e" == "$x" ]] && return 0; done; return 1; }
+
+# ─── Membership mutation (in-memory MEMBERS array) ──────────────────────────
+members_add() {
+  local n
+  for n in "$@"; do
+    contains "$n" ${MEMBERS[@]+"${MEMBERS[@]}"} || MEMBERS+=("$n")
+  done
+}
+members_drop() {
+  local -a keep=(); local e drop
+  for e in ${MEMBERS[@]+"${MEMBERS[@]}"}; do
+    drop=0; for n in "$@"; do [[ "$e" == "$n" ]] && { drop=1; break; }; done
+    (( drop )) || keep+=("$e")
+  done
+  MEMBERS=(${keep[@]+"${keep[@]}"})
+}
+
+# ─── catchup — re-parent BM onto members at current tips (or bootstrap) ───────
+catchup_main() {
+  # Only members that currently resolve to a local bookmark participate.
+  local -a live=(); local m
+  for m in ${MEMBERS[@]+"${MEMBERS[@]}"}; do
+    if is_local_bookmark "$m"; then live+=("$m")
+    else echo "jj-integrate: member '$m' has no local bookmark — skipping (jj-integrate drop $m to remove)" >&2; fi
+  done
+
+  local -a dests=()
+  if (( ${#live[@]} )); then
+    for m in "${live[@]}"; do dests+=(-d "$m"); done
+  else
+    dests=(-d "$BASE")
+  fi
+
+  if is_local_bookmark "$BM"; then
+    jj rebase -r "$BM" "${dests[@]}" >/dev/null 2>&1 \
+      || { echo "jj-integrate: rebase of $BM failed" >&2; return 1; }
+  else
+    # Self-bootstrap: create the merge without moving @.
+    local -a pargs=(); local desc out ch
+    if (( ${#live[@]} )); then pargs=("${live[@]}"); desc="${live[*]}"; else pargs=("$BASE"); desc="(base) $BASE"; fi
+    out=$(jj new --no-edit -m "integration: $desc" "${pargs[@]}" 2>&1) \
+      || { echo "jj-integrate: could not create integration commit" >&2; printf '%s\n' "$out" >&2; return 1; }
+    ch=$(printf '%s\n' "$out" | awk '/^Created/{print $4; exit}')
+    [[ -n "$ch" ]] || { echo "jj-integrate: could not parse new commit id" >&2; printf '%s\n' "$out" >&2; return 1; }
+    jj bookmark create "$BM" -r "$ch" >/dev/null 2>&1 \
+      || { echo "jj-integrate: bookmark create failed for $BM" >&2; return 1; }
+  fi
+
+  if is_conflicted "$BM"; then
+    echo "jj-integrate: $BM is CONFLICTED — resolve with: jj edit $BM ; jj resolve" >&2
+  fi
+  printf 'jj-integrate: %s ← %s\n' "$BM" "${live[*]:-$BASE (bare)}"
+}
+
+# ─── status ─────────────────────────────────────────────────────────────────
+status_main() {
+  local exists="missing"; is_local_bookmark "$BM" && exists="exists"
+  printf 'jj-integrate\n'
+  printf '  bookmark  %s  (%s)\n' "$BM" "$exists"
+  printf '  base      %s\n' "$BASE"
+  printf '  all       %s\n' "$ALL_GLOB"
+  local n=${#MEMBERS[@]}
+  printf '  members (%d):\n' "$n"
+  (( n )) || printf '    (none — bare on base)\n'
+
+  local m mark note drift=0
+  for m in ${MEMBERS[@]+"${MEMBERS[@]}"}; do
+    if ! is_local_bookmark "$m"; then
+      mark="✗"; note="  (bookmark missing — catchup or drop)"; drift=1
+    elif [[ "$exists" == "missing" ]]; then
+      mark="·"; note="  (not merged yet — run catchup)"; drift=1
+    elif revset_nonempty "$m & ::$BM"; then
+      mark="✓"; note=""
+    else
+      mark="✗"; note="  (advanced — run catchup)"; drift=1
+    fi
+    printf '    %s %s%s\n' "$mark" "$m" "$note"
+  done
+
+  if [[ "$exists" == "exists" ]] && is_conflicted "$BM"; then
+    printf '  ! %s is CONFLICTED — jj edit %s ; jj resolve\n' "$BM" "$BM"
+  fi
+  (( drift )) && printf '  → drift: run `jj-integrate catchup`\n'
+  return 0
+}
+
+# ─── command handlers ───────────────────────────────────────────────────────
+add_main() {
+  (( $# )) || { echo "usage: jj-integrate add <name|glob>..." >&2; exit 2; }
+  local arg bn any=0; local -a toadd=()
+  for arg in "$@"; do
+    if [[ "$arg" == *'*'* ]]; then
+      while IFS= read -r bn; do
+        [[ -n "$bn" && "$bn" == $arg ]] && { toadd+=("$bn"); any=1; }
+      done < <(list_local_bookmarks)
+      (( any )) || echo "jj-integrate: glob '$arg' matched no local bookmarks" >&2
+    else
+      is_local_bookmark "$arg" || echo "jj-integrate: warning — '$arg' is not a local bookmark (adding anyway)" >&2
+      toadd+=("$arg"); any=1
+    fi
+  done
+  (( any )) || { echo "jj-integrate: nothing to add from '$*'" >&2; exit 1; }
+  members_add ${toadd[@]+"${toadd[@]}"}
+  save_members
+  catchup_main
+}
+drop_main() {
+  (( $# )) || { echo "usage: jj-integrate drop <name>..." >&2; exit 2; }
+  members_drop "$@"
+  save_members
+  catchup_main
+}
+reset_main() {
+  MEMBERS=(); local bn
+  while IFS= read -r bn; do
+    [[ -n "$bn" && "$bn" == $ALL_GLOB ]] && MEMBERS+=("$bn")
+  done < <(list_local_bookmarks)
+  save_members
+  catchup_main
+}
+clear_main() { MEMBERS=(); save_members; catchup_main; }
+
+config_main() {
+  printf 'jj-integrate config (repo-scoped, [jj-integrate]):\n'
+  printf '  bookmark   %s\n' "$BM"
+  printf '  base       %s\n' "$BASE"
+  printf '  all        %s\n' "$ALL_GLOB"
+  printf '  members    %s\n' "${MEMBERS[*]:-(none)}"
+  printf '\nSet (repo-scoped — the names are repo-specific):\n'
+  printf '  jj config set --repo jj-integrate.bookmark my/integ\n'
+  printf '  jj config set --repo jj-integrate.base     trunk()\n'
+  printf '  jj config set --repo jj-integrate.all      "wip/*"\n'
+}
+
+# ─── dispatch ───────────────────────────────────────────────────────────────
+case "${1:-status}" in
+  --help|-h) usage; exit 0 ;;
+  help) print_help "${2:-}"; exit $? ;;
+  status|list|"")
+    (( $# > 0 )) && shift; wants_help "${1:-}" && { help_status; exit 0; }
+    load_config; status_main; exit 0 ;;
+  add)
+    shift; wants_help "${1:-}" && { help_add; exit 0; }
+    load_config; add_main "$@"; exit 0 ;;
+  drop)
+    shift; wants_help "${1:-}" && { help_drop; exit 0; }
+    load_config; drop_main "$@"; exit 0 ;;
+  catchup|reintegrate)
+    shift; wants_help "${1:-}" && { help_catchup; exit 0; }
+    load_config; catchup_main; exit 0 ;;
+  reset)
+    shift; wants_help "${1:-}" && { help_reset; exit 0; }
+    load_config; reset_main; exit 0 ;;
+  clear)
+    shift; wants_help "${1:-}" && { help_clear; exit 0; }
+    load_config; clear_main; exit 0 ;;
+  config)
+    shift; wants_help "${1:-}" && { help_config; exit 0; }
+    load_config; config_main; exit 0 ;;
+  *) echo "jj-integrate: unknown command: $1" >&2; usage >&2; exit 2 ;;
+esac
