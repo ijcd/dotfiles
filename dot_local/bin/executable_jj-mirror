@@ -775,6 +775,9 @@ sync_thread() {
         || { echo "jj-mirror: diff_hash failed on existing prime $existing" >&2; return 1; }
       s_hash=$(diff_hash "$scid") \
         || { echo "jj-mirror: diff_hash failed on source $scid" >&2; return 1; }
+      # Keep-condition MUST stay in lockstep with thread_verdicts (which drives
+      # status/graph/dry-run): same parent==prev AND diff_hash match. If you change
+      # one, change the other or status will drift from what sync actually does.
       if [[ "$e_parent" == "$prev" && "$e_hash" == "$s_hash" ]]; then
         # up-to-date — keep the existing prime commit, just ensure bookmarks.
         set_dest_bookmarks "$existing" "$bms" || return 1
@@ -850,28 +853,35 @@ squash_thread() {
   fi
 }
 
-# dry_run_thread LEAF CHAIN_STR — print intended actions for one thread
-# without mutating anything.
-#
-# Tracks cascade the same way sync_thread does: once one commit is marked
-# create-or-rebuild, every downstream commit's parent moves, so it must
-# rebuild too — even if its own diff hasn't changed. Without this, dry-run
-# undercounts the real work sync would do.
-dry_run_thread() {
+# thread_verdicts LEAF — the single read-only verdict engine shared by status,
+# status --graph, and dry-run. Emits one line per INCLUDED source bookmark in the
+# thread, oldest-first:  <kind>\t<action>\t<bm>\t<dname>
+#   kind:   commit | squash
+#   action: create | keep | diff | cascade
+# The non-squash walk MUST stay in lockstep with sync_thread's positional walk and
+# keep-condition (existing parent == prev AND diff_hash(existing)==diff_hash(source));
+# that lockstep is what makes status/graph exactly as accurate as a real sync.
+thread_verdicts() {
   local leaf=$1
   local sroot proot dleaf squash
   sroot=$(resolve_source_root "$leaf")
   proot=$(resolve_prime_root "$leaf")
   dleaf=$(dest_for "$leaf")
   squash=$(rule_squash_for "$leaf")
-  printf 'thread %s (dry-run)\n' "$leaf"
 
   if [[ "$squash" == "true" ]]; then
-    if jj log --no-graph -r "$dleaf" -T '""' >/dev/null 2>&1; then
-      printf '  would rebuild %s (squash)\n' "$dleaf"
+    local existing action cum e_hash e_parent proot_cid
+    existing=$(jj log --no-graph -r "$dleaf" -T 'commit_id.short() ++ "\n"' 2>/dev/null | head -n1 || true)
+    if [[ -z "$existing" ]]; then
+      action="create"
     else
-      printf '  would create %s (squash) from %s\n' "$dleaf" "$leaf"
+      cum=$(range_diff_hash "$sroot" "$leaf") || cum=""
+      e_hash=$(diff_hash "$existing") || e_hash=""
+      e_parent=$(jj log --no-graph -r "$existing-" -T 'commit_id.short() ++ "\n"' | head -n1)
+      proot_cid=$(jj log --no-graph -r "$proot" -T 'commit_id.short() ++ "\n"' | head -n1)
+      if [[ -n "$cum" && "$cum" == "$e_hash" && "$e_parent" == "$proot_cid" ]]; then action="keep"; else action="diff"; fi
     fi
+    printf 'squash\t%s\t%s\t%s\n' "$action" "$leaf" "$dleaf"
     return 0
   fi
 
@@ -882,6 +892,7 @@ dry_run_thread() {
     c_cid+=("$_cid"); c_bm+=("$_bms")
   done < <(range_commits "$sroot" "$leaf")
   local n=${#c_cid[@]}
+  (( n > 0 )) || return 0
 
   local -a e_cid=()
   local dleaf_cid ecid
@@ -892,7 +903,7 @@ dry_run_thread() {
       | awk 'NF' | awk '{a[NR]=$0} END{for(i=NR;i>=1;i--)print a[i]}')
   fi
 
-  local prev cascade=0 i scid bms existing e_parent e_hash s_hash bm dname action
+  local prev cascade=0 i scid bms existing e_parent e_hash s_hash action bm dname
   local -a _bmarr
   prev=$(jj log --no-graph -r "$proot" -T 'commit_id.short() ++ "\n"' | head -n1)
   for (( i=0; i<n; i++ )); do
@@ -917,14 +928,45 @@ dry_run_thread() {
     for bm in "${_bmarr[@]}"; do
       is_included "$bm" || continue
       dname=$(dest_for "$bm")
+      printf 'commit\t%s\t%s\t%s\n' "$action" "$bm" "$dname"
+    done
+  done
+}
+
+# verdict_state ACTION DNAME — map a thread_verdicts action + dest-bookmark
+# existence to ok/stale/missing (shared by status and status --graph). The dest
+# existence check matters: a "keep" commit whose specific dest bookmark was
+# deleted must read missing, not ok.
+verdict_state() {
+  local action=$1 dname=$2
+  if [[ "$action" == "create" ]] || ! jj log --no-graph -r "$dname" -T '""' >/dev/null 2>&1; then
+    printf 'missing'
+  elif [[ "$action" == "keep" ]]; then printf 'ok'
+  else printf 'stale'; fi
+}
+
+# dry_run_thread LEAF — print intended actions for one thread without mutating
+# anything, from the shared thread_verdicts engine.
+dry_run_thread() {
+  local leaf=$1
+  printf 'thread %s (dry-run)\n' "$leaf"
+  local kind action bm dname
+  while IFS=$'\t' read -r kind action bm dname; do
+    if [[ "$kind" == "squash" ]]; then
+      case "$action" in
+        create) printf '  would create %s (squash) from %s\n' "$dname" "$bm" ;;
+        keep)   printf '  would keep %s (squash) (up-to-date)\n' "$dname" ;;
+        diff)   printf '  would rebuild %s (squash)\n' "$dname" ;;
+      esac
+    else
       case "$action" in
         create)  printf '  would create %s from %s\n' "$dname" "$bm" ;;
         cascade) printf '  would rebuild %s (cascade)\n' "$dname" ;;
         diff)    printf '  would rebuild %s (diff changed)\n' "$dname" ;;
         keep)    printf '  would keep %s (up-to-date)\n' "$dname" ;;
       esac
-    done
-  done
+    fi
+  done < <(thread_verdicts "$leaf")
 }
 
 # thread_matches_filter LEAF CHAIN_STR — true if THREAD_FILTER is unset, or
@@ -1055,44 +1097,18 @@ sync_main() {
 status_main() {
   validate_source_bookmarks_or_die
 
-  local leaf chain source_name existing state hs hp dname sroot proot sc pc
-  local -a parts
+  local leaf chain kind action bm dname state
   while IFS=$'\t' read -r leaf chain; do
     [[ -n "$leaf" && -n "$chain" ]] || continue
     printf 'thread %s\n' "$leaf"
-    if [[ "$(rule_squash_for "$leaf")" == "true" ]]; then
-      dname=$(dest_for "$leaf"); sroot=$(resolve_source_root "$leaf")
-      existing=$(jj log --no-graph -r "$dname" -T 'commit_id.short() ++ "\n"' 2>/dev/null | head -n1 || true)
-      if [[ -z "$existing" ]]; then state="missing"
+    while IFS=$'\t' read -r kind action bm dname; do
+      state=$(verdict_state "$action" "$dname")
+      if [[ "$kind" == "squash" ]]; then
+        printf '  %s -> %s (squash)    [%s]\n' "$bm" "$dname" "$state"
       else
-        hs=$(range_diff_hash "$sroot" "$leaf") || hs=""
-        hp=$(diff_hash "$existing") || hp=""
-        if [[ "$hs" == "$hp" && -n "$hs" ]]; then state="ok"; else state="stale"; fi
+        printf '  %s -> %s    [%s]\n' "$bm" "$dname" "$state"
       fi
-      printf '  %s -> %s (squash)    [%s]\n' "$leaf" "$dname" "$state"
-      continue
-    fi
-    parts=()
-    IFS='|' read -ra parts <<< "$chain"
-    sroot=$(resolve_source_root "$leaf")
-    proot=$(resolve_prime_root "$leaf")
-    for source_name in "${parts[@]}"; do
-      dname=$(dest_for "$source_name")
-      existing=$(jj log --no-graph -r "$dname" -T 'commit_id.short() ++ "\n"' 2>/dev/null | head -n1 || true)
-      if [[ -z "$existing" ]]; then
-        state="missing"
-      else
-        # Full-branch faithfulness: compare the CUMULATIVE diff AND commit count of
-        # the whole sub-branch (sroot..source) against the prime chain (proot..dest),
-        # not just the tip's own diff — else a tip-only / incomplete prime reads "ok".
-        hs=$(range_diff_hash "$sroot" "$source_name") || hs=""
-        hp=$(range_diff_hash "$proot" "$dname") || hp=""
-        sc=$(jj log --no-graph -r "$sroot..\"$source_name\"" -T '"x\n"' 2>/dev/null | awk 'END{print NR}')
-        pc=$(jj log --no-graph -r "$proot..\"$dname\"" -T '"x\n"' 2>/dev/null | awk 'END{print NR}')
-        if [[ -n "$hs" && "$hs" == "$hp" && "$sc" == "$pc" ]]; then state="ok"; else state="stale"; fi
-      fi
-      printf '  %s -> %s    [%s]\n' "$source_name" "$dname" "$state"
-    done
+    done < <(thread_verdicts "$leaf")
   done < <(list_source_threads)
 }
 
@@ -1126,34 +1142,25 @@ status_graph() {
 
     body=""
     if [[ "$(rule_squash_for "$leaf")" == "true" ]]; then
-      local sq_dest sq_exist sq_h sq_g
-      sq_dest=$(dest_for "$leaf")
-      sq_exist=$(jj log --no-graph -r "$sq_dest" -T 'commit_id.short() ++ "\n"' 2>/dev/null | head -n1 || true)
-      if [[ -z "$sq_exist" ]]; then sq_g="○"; else
-        sq_h=$(range_diff_hash "$(resolve_source_root "$leaf")" "$leaf") || sq_h=""
-        hp=$(diff_hash "$sq_exist") || hp=""
-        if [[ "$sq_h" == "$hp" && -n "$sq_h" ]]; then sq_g="●"; else sq_g="◐"; fi
-      fi
-      printf -v row '        ● %-34s ══▶  %s %s (squash)' "$leaf" "$sq_g" "$sq_dest"
-      body="$row"$'\n'
+      local sq_k sq_a sq_bm sq_d sq_g
+      while IFS=$'\t' read -r sq_k sq_a sq_bm sq_d; do
+        case "$(verdict_state "$sq_a" "$sq_d")" in ok) sq_g="●" ;; stale) sq_g="◐" ;; *) sq_g="○" ;; esac
+        printf -v row '        ● %-34s ══▶  %s %s (squash)' "$sq_bm" "$sq_g" "$sq_d"
+        body="$row"$'\n'
+      done < <(thread_verdicts "$leaf")
     else
-    IFS='|' read -ra parts <<< "$chain"
-    for (( k=${#parts[@]}-1; k>=0; k-- )); do
-      sname=${parts[k]}
-      dname=$(dest_for "$sname")
-      existing=$(jj log --no-graph -r "$dname" -T 'commit_id.short() ++ "\n"' 2>/dev/null | head -n1 || true)
-      if [[ -z "$existing" ]]; then
-        glyph="○"
-      else
-        hs=$(range_diff_hash "$sroot_rev" "$sname") || hs=""
-        hp=$(range_diff_hash "$proot_rev" "$dname") || hp=""
-        sc=$(jj log --no-graph -r "$sroot_rev..\"$sname\"" -T '"x\n"' 2>/dev/null | awk 'END{print NR}')
-        pc=$(jj log --no-graph -r "$proot_rev..\"$dname\"" -T '"x\n"' 2>/dev/null | awk 'END{print NR}')
-        if [[ -n "$hs" && "$hs" == "$hp" && "$sc" == "$pc" ]]; then glyph="●"; else glyph="◐"; fi
-      fi
-      printf -v row '        ● %-34s ──▶  %s %s' "$sname" "$glyph" "$dname"
-      body+="$row"$'\n'
-    done
+      # Collect verdicts (oldest-first), render tip-first (newest on top).
+      local -a vlines=()
+      local va vb vd vk g j
+      while IFS=$'\t' read -r vk va vb vd; do
+        vlines+=("$va"$'\t'"$vb"$'\t'"$vd")
+      done < <(thread_verdicts "$leaf")
+      for (( j=${#vlines[@]}-1; j>=0; j-- )); do
+        IFS=$'\t' read -r va vb vd <<< "${vlines[j]}"
+        case "$(verdict_state "$va" "$vd")" in ok) g="●" ;; stale) g="◐" ;; *) g="○" ;; esac
+        printf -v row '        ● %-34s ──▶  %s %s' "$vb" "$g" "$vd"
+        body+="$row"$'\n'
+      done
     fi
 
     t_src+=("$slabel"); t_dst+=("$plabel"); t_body+=("$body")
