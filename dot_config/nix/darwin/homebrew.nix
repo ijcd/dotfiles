@@ -64,6 +64,7 @@ in
       "rtk"              # LLM token compressor — proxies Claude Code Bash output (rtk-ai/rtk; not in nixpkgs)
       "eask-cli"         # Emacs Lisp project build tool (emacs-eask.github.io; binary is `eask`)
       "lefthook"         # git hook manager — config in repo-root lefthook.yml; run `lefthook install` per clone
+      "mkcert"           # locally-trusted dev TLS certs (local CA + leaf certs); `mkcert -install`
     ];
 
     # Universal cask set — installed on EVERY host, including the generic
