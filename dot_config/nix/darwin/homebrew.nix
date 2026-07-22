@@ -65,6 +65,7 @@ in
       "eask-cli"         # Emacs Lisp project build tool (emacs-eask.github.io; binary is `eask`)
       "lefthook"         # git hook manager — config in repo-root lefthook.yml; run `lefthook install` per clone
       "mkcert"           # locally-trusted dev TLS certs (local CA + leaf certs); `mkcert -install`
+      "qpdf"             # structural PDF transforms (encrypt/linearize/split/merge)
     ];
 
     # Universal cask set — installed on EVERY host, including the generic
