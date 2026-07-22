@@ -5,6 +5,13 @@
   response to a question. Only act when I give an explicit instruction to do
   so. This is non-negotiable.
 
+- NEVER touch public-facing / outward things — PRs, issues, comments, remote
+  branches, published content, anything on GitHub or an external service —
+  unless I explicitly instruct that exact change. "Give me a better X",
+  "what's a good Y", "how would you word Z" = produce the TEXT only. Do not
+  apply, push, edit, publish, or set it anywhere. Applying is a separate step
+  that needs its own explicit go-ahead. This is non-negotiable.
+
 - In all interactions and commit messages, be extremely concise and sacrifice grammar for the sake of concision.
 
 ## Writing style
