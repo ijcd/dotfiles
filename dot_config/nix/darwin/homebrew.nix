@@ -66,6 +66,7 @@ in
       "lefthook"         # git hook manager — config in repo-root lefthook.yml; run `lefthook install` per clone
       "mkcert"           # locally-trusted dev TLS certs (local CA + leaf certs); `mkcert -install`
       "qpdf"             # structural PDF transforms (encrypt/linearize/split/merge)
+      "weasyprint"       # HTML/CSS → PDF renderer; doc/PDF generators shell out to it
     ];
 
     # Universal cask set — installed on EVERY host, including the generic
