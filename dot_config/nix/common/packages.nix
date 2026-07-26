@@ -92,8 +92,12 @@ in
       # Runtime + proxy are wired as launchd agents in common/local-ai.nix.
       # ─────────────────────────────────────────────────────────────────────────
       ollama             # local LLM runtime (Metal accel on arm64-darwin); serve on :11434
-      litellm            # OpenAI-compatible routing proxy (local↔cloud) on :4000
-      opencode           # terminal AI coding agent; talks only to the litellm proxy
+      # litellm  — dropped from nix on 2026-07-25: pyarrow propagates arrow-cpp
+      # 23.0.0 which nixpkgs marks broken on x86_64-darwin.
+      # opencode — dropped same day: nixpkgs opencode has meta.platforms without
+      # x86_64-darwin. Install both outside nix:
+      #   uv tool install litellm
+      #   npm install -g opencode-ai          # or grab release from opencode.ai
 
       # ─────────────────────────────────────────────────────────────────────────
       # Cloud & infrastructure
