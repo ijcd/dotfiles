@@ -6,11 +6,21 @@ let
   # Wrapper: source the (optional, 0600, user-created) key file, then exec the
   # proxy. Keeps ANTHROPIC_API_KEY out of the nix store and out of git. Absent
   # key file → local aliases still work; only `smart`/`auto`-fallback need it.
+  #
+  # litellm binary comes from a user-managed install, not nix: pyarrow (a
+  # litellm dep) propagates arrow-cpp 23.0.0 which nixpkgs marks broken on
+  # x86_64-darwin. Install with `uv tool install litellm` or `pipx install
+  # litellm` — both land the binary at ~/.local/bin/litellm.
+  litellmBin = "${homeDir}/.local/bin/litellm";
   litellmLauncher = pkgs.writeShellScript "litellm-launch" ''
     set -a
     [ -f "${homeDir}/.config/litellm/env" ] && . "${homeDir}/.config/litellm/env"
     set +a
-    exec ${pkgs.litellm}/bin/litellm \
+    if [ ! -x "${litellmBin}" ]; then
+      echo "litellm not installed at ${litellmBin} — install with: uv tool install litellm" >&2
+      exit 78  # EX_CONFIG
+    fi
+    exec "${litellmBin}" \
       --config "${homeDir}/.config/litellm/config.yaml" \
       --host 127.0.0.1 --port 4000
   '';
