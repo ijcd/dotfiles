@@ -92,12 +92,12 @@ in
       # Runtime + proxy are wired as launchd agents in common/local-ai.nix.
       # ─────────────────────────────────────────────────────────────────────────
       ollama             # local LLM runtime (Metal accel on arm64-darwin); serve on :11434
-      # litellm  — dropped from nix on 2026-07-25: pyarrow propagates arrow-cpp
-      # 23.0.0 which nixpkgs marks broken on x86_64-darwin.
-      # opencode — dropped same day: nixpkgs opencode has meta.platforms without
-      # x86_64-darwin. Install both outside nix:
-      #   uv tool install litellm
-      #   npm install -g opencode-ai          # or grab release from opencode.ai
+      # litellm  — not in nix: pyarrow propagates arrow-cpp 23.0.0, nixpkgs-broken
+      # on x86_64-darwin. BOTH machines use a user install (`uv tool install
+      # litellm`) wrapped by the launchd agent in common/local-ai.nix.
+      # opencode — machine split: arm64 gets it from nix, guarded at the END of
+      # this list; x86_64-darwin (bearcat) has no nixpkgs build → install there
+      # with `npm install -g opencode-ai`.
 
       # ─────────────────────────────────────────────────────────────────────────
       # Cloud & infrastructure
@@ -180,6 +180,9 @@ in
       # ─────────────────────────────────────────────────────────────────────────
       nerd-fonts.fira-code
       nerd-fonts.fira-mono
-    ];
+    ]
+    # opencode: arm64 only — nixpkgs has no x86_64-darwin build, so bearcat (Intel)
+    # installs it via npm (see the AI-section note); blackbird (arm64) gets it here.
+    ++ lib.optionals stdenv.hostPlatform.isAarch64 [ opencode ];
   };
 }
