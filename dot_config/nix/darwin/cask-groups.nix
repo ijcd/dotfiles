@@ -60,6 +60,11 @@
     "omnifocus" # GTD task manager
   ];
 
+  # ── Work: blackbird (work laptop) only ──────────────────────────────────────
+  work = [
+    "aws-vpn-client" # AWS Client VPN — lunar AWS access (setup: lunar config repo)
+  ];
+
   # ── Home / personal: bearcat only ──────────────────────────────────────────
   creative = [
     "affinity" # vector/raster/publishing suite

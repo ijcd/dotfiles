@@ -23,6 +23,10 @@
   # from a session not running off /opt/homebrew.
   nix-homebrew.enable = lib.mkForce false;
 
+  # Work-only casks (AWS Client VPN for lunar). Merges with the universal casks
+  # from darwin/homebrew.nix.
+  homebrew.casks = (import ../../darwin/cask-groups.nix).work;
+
   # host-specific home-manager configuration
   home-manager.users.${primaryUser} = {
     # Lunar pgAdmin connection (declarative servers.json + importer).
