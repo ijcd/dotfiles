@@ -212,11 +212,31 @@ chezmoi repo and `~/work/prs/*` PR forks — have a `.git` and no `.jj` → use 
 - "Commit" = finalize the current change with a description AND move to a fresh
   empty change: `jj commit -m "msg"` (describes `@`, creates a new empty `@`).
   Equivalent: `jj describe -m "msg"` then `jj new`.
-- Branches are **bookmarks** (`jj bookmark`); prefix mine with `ijcd/`. Bookmarks
-  do NOT auto-advance with the working copy — move them explicitly, e.g.
-  `jj bookmark set ijcd/x -r @-`.
+- Branches are **bookmarks** (`jj bookmark`); prefix mine with `ijcd/` unless I say
+  otherwise (this repo also uses `wip/*` for in-flight work). Bookmarks do NOT
+  auto-advance with the working copy — move them explicitly.
+  - `jj bookmark create NAME -r <rev>` — new bookmark. `set` moves an existing one.
+    `jj bookmark rename OLD NEW` — rename in place (don't create+delete by hand).
+    `jj bookmark delete NAME`.
+- **Sibling changes off one base** (e.g. two independent branches off `main`, each
+  its own PR): write the file → `jj describe -m …` → `jj bookmark create NAME -r @`,
+  then `jj new <base>` for the next sibling. Because jj snapshots the working copy
+  into `@`, to give each sibling only *its* files, `mv` the other files aside first
+  (there's no staging area to select with).
 - After each commit, show the description + `jj show --stat @-` inline (once the
   new empty `@` exists, the change you just described is `@-`).
+
+### jj workspaces (multiple working-copy dirs, one repo)
+- `jj workspace add --name NAME <path> -r <rev>` — new working-copy dir sharing the
+  same repo/op-log. Its `@` becomes a fresh empty child of `<rev>` (parent = `<rev>`,
+  so a bookmark's handoff/base commit stays visible as `@-`). Good for handing a
+  branch to an implementing agent that `cd`s into the dir.
+- `jj workspace list` shows `name: change` but NOT paths. `jj workspace forget NAME`
+  detaches one (leaves the dir).
+- Each repo has its own dir convention — find it before adding: `find <root> -maxdepth 4
+  -name .jj` on the existing workspaces. **lunar**: workspaces live at
+  `~/work/lunar/<bookmark-suffix>` (suffix = bookmark minus the `wip/`/`ijcd/` prefix),
+  and the workspace `--name` matches that suffix.
 
 ### git repos
 - When creating branches, prefix them with `ijcd/`.
@@ -230,8 +250,13 @@ chezmoi repo and `~/work/prs/*` PR forks — have a `.git` and no `.jj` → use 
 
 Reference knowledge at `~/work/principia/` (private repo at github.com/ijcd/principia).
 
-If not cloned locally: `gh repo clone ijcd/principia ~/work/principia`
-For updates: `cd ~/work/principia && git pull`
+**The local copy may be at `~/work/principia/` (default) OR `~/work/repos/ijcd/principia/`
+— check both; read the `~/work/principia/...` paths below relative to whichever exists.**
+If it's the `~/work/repos/...` copy it may be a downloaded zip (no git — re-download to
+refresh rather than `git pull`).
+
+If neither location has it: `gh repo clone ijcd/principia ~/work/principia` (needs the
+`ijcd` GitHub account — the work `iangolunar` account can't access this private repo).
 
 When you need a specific area:
 - **Planning a non-trivial change** → `~/work/principia/practices/planning.md` (overview, files, function names, test names, unresolved questions)
