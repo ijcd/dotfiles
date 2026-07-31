@@ -58,9 +58,10 @@ restack-mine = ["rebase", "-b", "mine", "-d", "local/main"]
 # = the bottom commit, so -s lifts the whole stack as one unit (works for a 1- or
 # N-commit local/main; roots of a single commit is itself). Verified in a scratch repo.
 restack = ["rebase", "-s", "roots(trunk()..local/main)", "-d", "trunk()"]
-# tug: move the nearest bookmark up to @- (the last real commit; @ is the empty
-# working-copy commit). Standard jj idiom for "advance my branch to here".
-tug = ["bookmark", "move", "--from", "closest_bookmark(@-)", "--to", "@-"]
+# tug: advance the nearest bookmark up to @- (the last real commit). Delegates to
+# jj-tug, which also does `jj tug --all [glob]` across every workspace (glob
+# defaults to wip/*), addressing each via `<ws>@` — no cd, stale-safe.
+tug = ["util", "exec", "--", "jj-tug"]
 # rp/lp: patch logs. rp = work since local main with --stat; lp = plain -p.
 rp = ["log", "--no-graph", "-r", "sincemain", "--stat", "-p"]
 lp = ["log", "--no-graph", "-p"]
