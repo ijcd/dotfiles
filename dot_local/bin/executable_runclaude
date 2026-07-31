@@ -37,8 +37,25 @@ project_dir="$HOME/.claude/projects/$encoded"
 shopt -s nullglob
 sessions=("$project_dir"/*.jsonl)
 
-if [ "${#sessions[@]}" -gt 0 ]; then
-    exec claude --dangerously-skip-permissions --continue
+# Name the auto-started Remote Control session (the one you see on the phone).
+# RC is enabled via settings.json (remoteControlAtStartup=true); its name is a
+# SEPARATE namespace from --name (defaults to <hostname>-<random>), so the
+# explicit name arg on --remote-control is the only lever. Format is
+# "<prefix>-<name>": the prefix disambiguates the machine on the phone (which is
+# why RC's own default is the hostname). Default = short hostname; blackbird is
+# the lunar work laptop, so give it a semantic label. Override with CLAUDE_RC_PREFIX.
+if [ -n "${CLAUDE_RC_PREFIX:-}" ]; then
+    rc_prefix="$CLAUDE_RC_PREFIX"
 else
-    exec claude --dangerously-skip-permissions
+    case "$(hostname -s)" in
+        blackbird) rc_prefix="lunar/ijcd" ;;
+        *)         rc_prefix="$(hostname -s)" ;;
+    esac
+fi
+rc=(--remote-control "${rc_prefix}-${name}")
+
+if [ "${#sessions[@]}" -gt 0 ]; then
+    exec claude --dangerously-skip-permissions "${rc[@]}" --continue
+else
+    exec claude --dangerously-skip-permissions "${rc[@]}"
 fi
