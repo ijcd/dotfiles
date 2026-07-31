@@ -35,3 +35,22 @@ assert_eq() {
 
 # fail msg — print to stderr and return 1
 fail() { printf 'FAIL: %s\n' "$*" >&2; return 1; }
+
+# mk_divergent_thread — build a "stuck-stale" thread. local/main (source root)
+# adds a top line to cfg, shifting line numbers, so wip/x's edit to a mid-file
+# line rebuilds cleanly onto master (prime root) but its diff hunk header never
+# byte-matches the source — a base divergence sync cannot resolve. Run inside a
+# fresh `cd "$(mkrepo)"`.
+mk_divergent_thread() {
+  printf 'L1\nL2\nL3\nL4\ntarget=1\nL6\nL7\n' > cfg
+  jj commit -m "master base" >/dev/null 2>&1; jj bookmark set master -r @- >/dev/null 2>&1
+  jj new master >/dev/null 2>&1
+  printf 'LOCALHEADER\nL1\nL2\nL3\nL4\ntarget=1\nL6\nL7\n' > cfg
+  jj commit -m "local personal tweak" >/dev/null 2>&1; jj bookmark set local/main -r @- >/dev/null 2>&1
+  jj new local/main >/dev/null 2>&1
+  printf 'LOCALHEADER\nL1\nL2\nL3\nL4\ntarget=2\nL6\nL7\n' > cfg
+  jj commit -m "feat-x" >/dev/null 2>&1; jj bookmark set wip/x -r @- >/dev/null 2>&1
+  jj new @- >/dev/null 2>&1
+  jj config set --repo jj-mirror.source-root local/main >/dev/null 2>&1
+  jj config set --repo jj-mirror.prime-root  master     >/dev/null 2>&1
+}

@@ -132,6 +132,10 @@ Exit codes:
   1    a thread hit a runtime error — that thread rolled back, others synced
   2    a thread conflicted (rolled back, others synced), OR a precondition
        failed before any sync (ambiguous pairing, non-linear thread, bad arg)
+  3    a thread rebuilt cleanly but stays STALE — its diff can't byte-match on
+       the prime base (base divergence). Re-syncing won't clear it; fix the
+       base (jj-catch-up, or deconflict the file). See the WARNING it prints,
+       or `jj-mirror status --graph`.
 EOF
 }
 
@@ -945,6 +949,66 @@ verdict_state() {
   else printf 'stale'; fi
 }
 
+# thread_stale_p LEAF — true (0) if any commit in the thread's verdict reads
+# stale. Used AFTER sync to catch a thread that rebuilt cleanly yet still
+# diverges: its source diff can't byte-match on the prime base (a base
+# divergence), so re-syncing will never make it ok. Distinct from a cherry-pick
+# conflict (which rolls the thread back and never counts as synced).
+thread_stale_p() {
+  local leaf=$1 kind action bm dname
+  while IFS=$'\t' read -r kind action bm dname; do
+    [[ "$kind" == commit || "$kind" == squash ]] || continue
+    [[ "$(verdict_state "$action" "$dname")" == stale ]] && return 0
+  done < <(thread_verdicts "$leaf")
+  return 1
+}
+
+# thread_collisions LEAF — emit `<file>\t<cause>` for each file that both
+# differs between the thread's source root and prime root AND is touched by the
+# thread. That intersection is exactly what makes a thread's diff un-matchable
+# on the prime base. cause is:
+#   base  the source root's own commits edit the file (fold into thread / drop)
+#   lag   only the prime root moved ahead on it (jj-catch-up realigns the base)
+# Shared by sync's diagnose_stuck and status --graph's footer.
+thread_collisions() {
+  local leaf=$1 sroot proot f
+  sroot=$(resolve_source_root "$leaf")
+  proot=$(resolve_prime_root "$leaf")
+  comm -12 \
+    <(jj diff --name-only --from "$proot" --to "$sroot" 2>/dev/null | sort -u) \
+    <(jj diff --name-only --from "$sroot" --to "$leaf"  2>/dev/null | sort -u) \
+  | while IFS= read -r f; do
+      [[ -n "$f" ]] || continue
+      if jj log --no-graph -r "$proot..$sroot & files(\"$f\")" -T '"x"' 2>/dev/null | grep -q x; then
+        printf '%s\tbase\n' "$f"
+      else
+        printf '%s\tlag\n' "$f"
+      fi
+    done
+}
+
+# diagnose_stuck LEAF — explain (to stderr) WHY a stuck thread can't sync and
+# HOW to fix it, from thread_collisions.
+diagnose_stuck() {
+  local leaf=$1 dname f cause sroot proot any=0
+  dname=$(dest_for "$leaf")
+  sroot=$(render_root "$(resolve_source_root "$leaf")")
+  printf '  x %s -> %s  [stale after rebuild]\n' "$leaf" "$dname" >&2
+  while IFS=$'\t' read -r f cause; do
+    [[ -n "$f" ]] || continue
+    any=1
+    if [[ "$cause" == base ]]; then
+      printf '        %s — %s edits it; fold the change into the thread, or drop it from the base\n' "$f" "$sroot" >&2
+    else
+      printf '        %s — prime root moved ahead; run  jj-catch-up  to restack %s onto it\n' "$f" "$sroot" >&2
+    fi
+  done < <(thread_collisions "$leaf")
+  if (( ! any )); then
+    proot=$(render_root "$(resolve_prime_root "$leaf")")
+    printf '        diff does not byte-match on the prime base; inspect: jj diff --from %s --to %s\n' "$proot" "$sroot" >&2
+  fi
+}
+
 # dry_run_thread LEAF — print intended actions for one thread without mutating
 # anything, from the shared thread_verdicts engine.
 dry_run_thread() {
@@ -1065,7 +1129,7 @@ sync_main() {
   # orphan cull above still uses the whole-sync pre_op (atomic with itself, and it
   # runs before any thread).
   local synced=0 failed=0 worst_rc=0 i thread_op proot
-  local -a failed_threads=()
+  local -a failed_threads=() synced_leaves=()
   for (( i=0; i<${#leaves[@]}; i++ )); do
     thread_op=$(capture_pre_op)
     rc=0
@@ -1080,6 +1144,16 @@ sync_main() {
       continue
     fi
     synced=$((synced + 1))
+    synced_leaves+=("${leaves[i]}")
+  done
+
+  # A thread can rebuild without error yet stay stale: its source diff can't
+  # byte-match on the prime base (base divergence, not a transient conflict).
+  # Re-syncing will never clear it, so surface it loudly instead of letting the
+  # "synced N" line read as success.
+  local -a stuck=() leaf
+  for leaf in "${synced_leaves[@]+"${synced_leaves[@]}"}"; do
+    thread_stale_p "$leaf" && stuck+=("$leaf")
   done
 
   if [[ -n "$THREAD_FILTER" ]]; then
@@ -1087,11 +1161,17 @@ sync_main() {
   else
     printf 'jj-mirror: synced %d thread(s)\n' "$synced"
   fi
+  if (( ${#stuck[@]} > 0 )); then
+    printf 'jj-mirror: WARNING — %d thread(s) rebuilt but STILL STALE (base divergence, not transient):\n' "${#stuck[@]}" >&2
+    for leaf in "${stuck[@]}"; do diagnose_stuck "$leaf"; done
+    printf 'jj-mirror: these will NOT clear by re-syncing — fix the base divergence above, then re-sync.\n' >&2
+    if (( worst_rc < 3 )); then worst_rc=3; fi
+  fi
   if (( failed > 0 )); then
     printf 'jj-mirror: %d thread(s) NOT mirrored (rolled back): %s\n' "$failed" "${failed_threads[*]}" >&2
     printf 'jj-mirror: fix each so its diff applies cleanly onto its prime root, then re-sync.\n' >&2
-    exit "$worst_rc"
   fi
+  if (( worst_rc > 0 )); then exit "$worst_rc"; fi
 }
 
 status_main() {
@@ -1129,7 +1209,7 @@ status_graph() {
   printf 'defaults:   %s   ──▶   %s\n\n' "$def_src" "$def_dst"
 
   # Gather per-thread records into parallel arrays (body = pre-rendered rows).
-  local -a t_src=() t_dst=() t_body=() src_order=()
+  local -a t_src=() t_dst=() t_body=() t_leaf=() src_order=()
   local -A src_seen=()
   local leaf chain lname slabel plabel body sname dname existing hs hp glyph k row
   local sroot_rev proot_rev sc pc
@@ -1163,7 +1243,7 @@ status_graph() {
       done
     fi
 
-    t_src+=("$slabel"); t_dst+=("$plabel"); t_body+=("$body")
+    t_src+=("$slabel"); t_dst+=("$plabel"); t_body+=("$body"); t_leaf+=("$leaf")
     if [[ -z "${src_seen[$slabel]:-}" ]]; then src_seen[$slabel]=1; src_order+=("$slabel"); fi
   done < <(list_source_threads)
 
@@ -1191,6 +1271,28 @@ status_graph() {
       done
     done
     printf '\n'
+  done
+
+  # Footer: threads whose staleness is a base divergence — sync CANNOT clear
+  # these by re-running; they need a base fix (jj-catch-up, or deconflict).
+  local warned=0 line f cause src_lbl
+  for (( i=0; i<${#t_leaf[@]}; i++ )); do
+    local -a cols=()
+    while IFS= read -r line; do [[ -n "$line" ]] && cols+=("$line"); done < <(thread_collisions "${t_leaf[i]}")
+    (( ${#cols[@]} )) || continue
+    if (( ! warned )); then
+      printf '⚠ base divergence — sync cannot clear these (fix the base, not by re-syncing):\n'
+      warned=1
+    fi
+    src_lbl=$(render_root "$(resolve_source_root "${t_leaf[i]}")")
+    for line in "${cols[@]}"; do
+      IFS=$'\t' read -r f cause <<< "$line"
+      if [[ "$cause" == base ]]; then
+        printf '    %s  %s — %s edits it; fold into the thread or drop from the base\n' "${t_leaf[i]}" "$f" "$src_lbl"
+      else
+        printf '    %s  %s — prime root moved ahead; run jj-catch-up\n' "${t_leaf[i]}" "$f"
+      fi
+    done
   done
 }
 
