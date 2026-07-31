@@ -70,10 +70,10 @@
       ]
     }
   },
+  "tui": "default",
   "skipDangerousModePermissionPrompt": true,
   "theme": "auto",
-  "inputNeededNotifEnabled": true,
-  "agentPushNotifEnabled": true,
   "remoteControlAtStartup": true,
-  "tui": "default"
+  "inputNeededNotifEnabled": true,
+  "agentPushNotifEnabled": true
 }
