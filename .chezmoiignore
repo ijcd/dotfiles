@@ -4,6 +4,17 @@ ideas/
 legacy/
 plans/
 macos-config                      # repo-only: capture/apply source, not deployed
+# repo-management files — the chezmoi source root IS the repo root, so any
+# un-prefixed, un-ignored file here would mirror into ~. Anchor with `/` so
+# these match ONLY the repo root (not the tracked .claude/CLAUDE.md, .claude/hooks).
+/docs/                            # design specs/plans/runbooks — repo-only
+/test/                            # jj-tool test suites — repo-only
+/hooks/                           # lefthook nix-eval/dry-build hooks — repo-only
+/result                           # nix build output symlink (repo root)
+/CLAUDE.md                        # repo project instructions (global lives at .claude/CLAUDE.md)
+/README.md                        # repo readme
+/lefthook.yml                     # repo precommit config
+/authinfo-keychain.sh             # repo helper script
 *.txt
 
 # Home Directories
