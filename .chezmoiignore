@@ -1,83 +1,63 @@
-# Stuff in the Repo
-archive/
-ideas/
-legacy/
-plans/
-macos-config                      # repo-only: capture/apply source, not deployed
-# repo-management files — the chezmoi source root IS the repo root, so any
-# un-prefixed, un-ignored file here would mirror into ~. Anchor with `/` so
-# these match ONLY the repo root (not the tracked .claude/CLAUDE.md, .claude/hooks).
-/docs/                            # design specs/plans/runbooks — repo-only
-/test/                            # jj-tool test suites — repo-only
-/hooks/                           # lefthook nix-eval/dry-build hooks — repo-only
-/result                           # nix build output symlink (repo root)
-/CLAUDE.md                        # repo project instructions (global lives at .claude/CLAUDE.md)
-/README.md                        # repo readme
-/lefthook.yml                     # repo precommit config
-/authinfo-keychain.sh             # repo helper script
-*.txt
+# ═══════════════════════════════════════════════════════════════════════════
+# TOP-LEVEL: DENY BY DEFAULT
+# ═══════════════════════════════════════════════════════════════════════════
+# The chezmoi source root IS the git repo root, so any un-prefixed top-level
+# entry — docs/, test/, a build artifact, a stray lib, README.md — would mirror
+# straight into ~. So: ignore EVERY top-level entry, then allow ONLY the dotfiles
+# chezmoi should deploy. A new top-level source entry is IGNORED until you add
+# its `!/<dest-name>` line below. (`/*` matches one path segment, so files nested
+# inside an allowed dir are unaffected and deploy normally.)
+/*
+!/.authinfo
+!/.claude
+!/.claude-ijcd
+!/.config
+!/.editorconfig
+!/.hammerspoon
+!/.homebrew
+!/.local
+!/.ssh
+!/.vim
+!/.zshenv
+!/authinfo-keychain.sh            # run_once_before_ keychain bootstrap (a script, not a deployed file)
 
-# Home Directories
-Applications
-Desktop
-Documents
-Downloads
-Dropbox
-Google Drive
-Library
-Movies
-Music
-Pictures
-Public
-Sites
-VirtualBox VMs
-work
-
-# Misc files
+# ═══════════════════════════════════════════════════════════════════════════
+# MISC (any level)
+# ═══════════════════════════════════════════════════════════════════════════
 **/.DS_Store
 **/.Trash
+*.txt
 
-# Config
+# ═══════════════════════════════════════════════════════════════════════════
+# CARVE-OUTS inside allowed dirs — machine-local / generated / secret
+# ═══════════════════════════════════════════════════════════════════════════
 .config/zsh/.zcompdump
-.config/chezmoi                   # Chezmoi's own state
+.config/chezmoi                   # chezmoi's own state
 .config/hub                       # GitHub credentials
-.config/iterm2                    # Syncs separately or machine-specific
-.config/nix/result                # Nix build output (symlink)
-.config/emacs                     # Separate git repo (dotemacs)
-.config/zed                       # Zed syncs via account
-
-##############################################
-# Ignore (machine-local, generated, or secrets)
-##############################################
-
-.android                          # SDK/emulator state
-.aws                              # Credentials - don't commit
-.aws-sso                          # Credentials - don't commit
-.cache                            # Cache
-.claude/*                         # Local AI state
-!.claude/CLAUDE.md                # Track global claude instructions
-!.claude/settings.json            # Track plugin config
-!.claude/.credentials.json        # Track OAuth tokens (encrypted)
-!.claude/statusline.sh            # Track custom statusline
-!.claude/skills                   # Track custom skills
-!.claude/hooks                    # Track custom hooks
-!.claude/hooks/**                 # Track files inside hooks
-!.claude/RTK.md                   # Track RTK instructions (rtk init -g output)
-!.claude/.rtk-version             # Track installed RTK version (drift marker)
-.claude.json*                     # Local AI state
-.cups                             # Printer state
-.docker                           # Docker credentials/state
-.dropbox                          # Dropbox state
-.fly                              # Fly.io credentials
-.keychain                         # SSH agent helper state
+.config/iterm2                    # machine-specific
+.config/nix/result                # nix build output (symlink)
+.config/emacs                     # separate git repo (dotemacs)
+.config/zed                       # syncs via account
 .local/share                      # XDG runtime data
 .local/state                      # XDG runtime data
-.lpass                            # LastPass credentials
-.mitmproxy                        # Certs/state
-.nix-defexpr                      # Nix manages these
-.nix-profile                      # Nix manages these
-.pgadmin                          # DB tool state
-.ssh/*                            # Never commit private keys
+.ssh/*                            # never commit private keys
 !.ssh/config                      # ...except the managed agent/keychain config
-.vscode                           # Syncs via account
-.zsh_history                      # History
+
+# ═══════════════════════════════════════════════════════════════════════════
+# ~/.claude — track only specific config; the rest is local AI state.
+# LOCKSTEP: each tracked file below is ALSO symlinked into ~/.claude-ijcd via
+# private_dot_claude-ijcd/symlink_<name>. Track a new file here → add a matching
+# symlink_<name> there so both account profiles share it.
+# Credentials are deliberately NOT tracked — per-account secret, Keychain/file,
+# machine-local. (Never re-add !.claude/.credentials.json.)
+# ═══════════════════════════════════════════════════════════════════════════
+.claude/*
+!.claude/CLAUDE.md
+!.claude/settings.json
+!.claude/statusline.sh
+!.claude/skills
+!.claude/hooks
+!.claude/hooks/**
+!.claude/RTK.md
+!.claude/.rtk-version
+.claude.json*
