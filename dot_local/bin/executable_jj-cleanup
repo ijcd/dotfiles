@@ -39,11 +39,27 @@ list_workspaces() {
     done
 }
 
-pr_state() { # <suffix>
-  local suffix=$1 json state
-  json="$(gh pr view "ijcd/$suffix" --json state,mergedAt 2>/dev/null)" || { printf 'NONE\n'; return; }
-  [[ -n "$json" ]] || { printf 'NONE\n'; return; }
-  # jq-free extract: state is a quoted word.
+# GitHub repo (owner/name) for gh queries. jj workspaces here aren't git-colocated,
+# so gh can't infer the repo from cwd — always pass -R. Source order:
+# $JJ_CLEANUP_REPO → jj-vine's configured project → origin URL.
+gh_repo() {
+  local r="${JJ_CLEANUP_REPO:-}"
+  [[ -n "$r" ]] && { printf '%s\n' "$r"; return; }
+  r="$(jj config get jj-vine.github.project 2>/dev/null)"
+  [[ -n "$r" ]] && { printf '%s\n' "$r"; return; }
+  jj git remote list --ignore-working-copy 2>/dev/null | awk '/^origin /{print $2}' \
+    | sed -E 's#(git@github\.com:|https://github\.com/)##; s#\.git$##'
+}
+
+pr_state() { # <suffix> -> MERGED|CLOSED|OPEN|NONE|ERROR
+  local suffix=$1 repo json state
+  repo="$(gh_repo)"
+  [[ -n "$repo" ]] || { printf 'ERROR\n'; return; }
+  # pr list --head --state all finds MERGED/CLOSED PRs even after the head branch
+  # was auto-deleted (pr view <branch> misses those). Returns a JSON array ([] = none).
+  json="$(gh pr list -R "$repo" --head "ijcd/$suffix" --state all --json state,mergedAt --limit 1 2>/dev/null)" \
+    || { printf 'ERROR\n'; return; }
+  [[ -n "$json" && "$json" != "[]" ]] || { printf 'NONE\n'; return; }
   state="$(printf '%s' "$json" | sed -n 's/.*"state":"\([A-Z]*\)".*/\1/p')"
   case "$state" in MERGED|CLOSED|OPEN) printf '%s\n' "$state";; *) printf 'ERROR\n';; esac
 }

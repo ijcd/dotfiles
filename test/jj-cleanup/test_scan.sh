@@ -2,7 +2,8 @@
 set -euo pipefail
 source "$(dirname "$0")/lib.sh"
 stub_dir
-stub_cmd gh 'echo "{\"state\":\"MERGED\",\"mergedAt\":\"2026-07-20T00:00:00Z\"}"'
+export JJ_CLEANUP_REPO="owner/repo"   # gh_repo short-circuits in the fixture
+stub_cmd gh 'echo "[{\"state\":\"MERGED\",\"mergedAt\":\"2026-07-20T00:00:00Z\"}]"'
 repo="$(mkrepo)"; cd "$repo"
 wsA="$(mkwip "$repo" feat 2)"
 jj bookmark create ijcd/feat -r "$(cid wip/feat)" 2>/dev/null   # fully mirrored → lost:0

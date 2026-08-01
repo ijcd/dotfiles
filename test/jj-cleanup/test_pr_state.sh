@@ -4,14 +4,14 @@ source "$(dirname "$0")/lib.sh"
 stub_dir
 repo="$(mkrepo)"; cd "$repo"
 
-# gh stub: reads branch from args, maps via $FAKE. "MERGED@time" | "OPEN" | exits 1 for none/error.
+export JJ_CLEANUP_REPO="owner/repo"   # gh_repo short-circuits (fixture has no colocated git/origin)
+
+# gh stub: `gh pr list --json …` prints a JSON array ([] = no PR). Maps via $FAKE.
 stub_cmd gh '
-br="";
-for a in "$@"; do case "$a" in ijcd/*) br="$a";; esac; done
 case "$FAKE" in
-  merged) echo "{\"state\":\"MERGED\",\"mergedAt\":\"2026-07-20T00:00:00Z\"}";;
-  open)   echo "{\"state\":\"OPEN\",\"mergedAt\":null}";;
-  none)   echo "no pull requests found" >&2; exit 1;;
+  merged) echo "[{\"state\":\"MERGED\",\"mergedAt\":\"2026-07-20T00:00:00Z\"}]";;
+  open)   echo "[{\"state\":\"OPEN\",\"mergedAt\":null}]";;
+  none)   echo "[]";;
 esac'
 
 # FAKE must reach the gh stub (a child process), so export it via the SCRIPT call —
