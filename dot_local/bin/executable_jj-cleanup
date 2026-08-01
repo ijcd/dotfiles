@@ -1,0 +1,194 @@
+#!/usr/bin/env bash
+# jj-cleanup — tear down a merged/closed PR's bookmarks, workspace, dir, kitty tab.
+# See docs/superpowers/plans/2026-07-29-jj-pr-cleanup.md and the jj-pr-cleanup skill.
+set -uo pipefail
+
+usage() {
+  cat <<'EOF'
+jj-cleanup — clean up after a merged/closed PR (lunar wip/* → ijcd/* model)
+
+  jj-cleanup scan                     list workspaces + PR state + would-be-lost (read-only)
+  jj-cleanup teardown <suffix> [opts] tear down one workspace
+      --park todo/<name>              park unmerged tail under this bookmark
+      --dry-run                       print commands, mutate nothing
+  jj-cleanup help
+
+Never touches: default/local-main workspaces, local/main bookmark.
+EOF
+}
+
+DENY_WS="default local-main"
+
+resolve_base() {
+  if jj log --no-graph -r 'present(local/main)' -T '""' >/dev/null 2>&1 \
+     && [[ -n "$(jj log --no-graph -r 'present(local/main)' -T '"x"' 2>/dev/null)" ]]; then
+    printf 'local/main\n'
+  else
+    printf 'trunk()\n'
+  fi
+}
+
+list_workspaces() {
+  # name<TAB>root; drop denylisted + broken roots.
+  jj workspace list --ignore-working-copy -T 'name ++ "\t" ++ root ++ "\n"' 2>/dev/null \
+  | while IFS=$'\t' read -r name root; do
+      [[ -n "$name" ]] || continue
+      case " $DENY_WS " in *" $name "*) continue;; esac
+      [[ -n "$root" && "$root" != *"<Error"* && -d "$root" ]] || continue
+      printf '%s\t%s\n' "$name" "$root"
+    done
+}
+
+pr_state() { # <suffix>
+  local suffix=$1 json state
+  json="$(gh pr view "ijcd/$suffix" --json state,mergedAt 2>/dev/null)" || { printf 'NONE\n'; return; }
+  [[ -n "$json" ]] || { printf 'NONE\n'; return; }
+  # jq-free extract: state is a quoted word.
+  state="$(printf '%s' "$json" | sed -n 's/.*"state":"\([A-Z]*\)".*/\1/p')"
+  case "$state" in MERGED|CLOSED|OPEN) printf '%s\n' "$state";; *) printf 'ERROR\n';; esac
+}
+
+exists()   { jj log --no-graph -r "$1" -T '""' >/dev/null 2>&1; }
+countrev() { jj log --no-graph -r "$1" -T '"x\n"' 2>/dev/null | grep -c x; }
+
+# Prime commit count = commits the mirror captured (== what the PR contained).
+# Counted over <base>..ijcd/<suffix> (base = resolve_base), matching how the
+# thread itself is measured; equivalent to trunk()..ijcd where prime-root=master.
+# (Hermetic-test deviation, see plan Task 4: <base>.. not trunk()..)
+prime_count() { # <suffix>
+  local s=$1 base; base="$(resolve_base)"
+  exists "ijcd/$s" || { printf ''; return; }
+  countrev "$base..ijcd/$s"
+}
+
+lost_tail_root() { # <suffix> -> commit_id of first unmerged thread commit, or ""/NOPRIME
+  local s=$1 base pc n; base="$(resolve_base)"
+  exists "ijcd/$s" || { printf 'NOPRIME\n'; return; }
+  pc="$(prime_count "$s")"; n="$(countrev "$base..wip/$s")"
+  (( n > pc )) || { printf ''; return; }               # nothing beyond the prime
+  # Thread commits bottom->top; index pc (0-based) is the first unmerged one.
+  jj log --no-graph -r "$base..wip/$s" --reversed -T 'commit_id ++ "\n"' 2>/dev/null \
+    | sed -n "$((pc + 1))p"
+}
+
+ws_dirty() { # <name>  -> exit 0 if that workspace @ has uncommitted diff
+  local name=$1
+  # jj diff -s (summary) is empty when clean; --stat always prints "0 files changed".
+  [[ -n "$(jj diff --ignore-working-copy -r "${name}@" -s 2>/dev/null)" ]]
+}
+
+do_park() { # <suffix> <todo-name>
+  local s=$1 todo=$2 base root; base="$(resolve_base)"
+  root="$(lost_tail_root "$s")"
+  [[ "$root" != NOPRIME ]] || { echo "park: no local ijcd/$s prime — refusing to guess" >&2; return 1; }
+  [[ -n "$root" ]] || { echo "park: nothing to park"; return 0; }
+  # Detach the tail (root + descendants within the thread) onto base, dropping the
+  # merged middle; then bookmark the rebased tip. After rebase, wip/<suffix> follows
+  # its commits to the new location, so -r wip/<suffix> is the rebased tip.
+  jj rebase -s "$root" -d "$base" >/dev/null 2>&1
+  jj bookmark create "$todo" -r "wip/$s" >/dev/null 2>&1
+}
+
+del_bookmarks() { # <suffix>
+  local s=$1
+  jj bookmark delete "wip/$s"  >/dev/null 2>&1 || true
+  jj bookmark delete "ijcd/$s" >/dev/null 2>&1 || true
+}
+forget_ws() { jj workspace forget "$1" >/dev/null 2>&1 || true; }
+
+rm_ws_dir() { # <root>
+  local root=$1 prefix="${JJ_CLEANUP_WS_ROOT:-$HOME/work/lunar}" real
+  # Canonicalize the prefix too so /tmp vs /private/tmp (macOS) compares equal.
+  [[ -d "$prefix" ]] && prefix="$(cd "$prefix" && pwd -P)"
+  real="$(cd "$root" 2>/dev/null && pwd -P)" || { echo "rm: $root gone" >&2; return 0; }
+  case "$real/" in "$prefix"/*) :;; *) echo "rm: refusing $real (outside $prefix)" >&2; return 1;; esac
+  [[ -d "$real/.jj" ]] || { echo "rm: refusing $real (no .jj workspace marker)" >&2; return 1; }
+  rm -rf "$real"
+}
+
+del_remote() { # <suffix>
+  # jj git push --deleted takes no --bookmark; delete the local bookmark then push
+  # that one bookmark to propagate the deletion. Tolerates already-gone.
+  local s=$1
+  jj bookmark delete "ijcd/$s" >/dev/null 2>&1 || true
+  jj git push --bookmark "ijcd/$s" >/dev/null 2>&1 \
+    || echo "remote: ijcd/$s already gone or push skipped" >&2
+  return 0
+}
+
+close_tab() { # <suffix> <root>
+  local s=$1 root=$2 title="cc:$1"
+  [[ -n "${KITTY_LISTEN_ON:-}" ]] || return 0
+  # Close by title match (cheap, exact). cwd fallback left to the skill if needed.
+  kitty @ ls >/dev/null 2>&1 || return 0
+  kitty @ close-tab --match "title:^${title}$" >/dev/null 2>&1 || true
+  return 0
+}
+
+cmd_scan() {
+  [[ "${1:-}" == "--fetch" ]] && jj git fetch >/dev/null 2>&1
+  printf '%-28s %-8s %-9s %-7s %s\n' SUFFIX PR IJCD LOST TAB
+  local base; base="$(resolve_base)"
+  list_workspaces | while IFS=$'\t' read -r name root; do
+    local ps ijcd nlost tabname
+    ps="$(pr_state "$name")"
+    ijcd=no; exists "ijcd/$name" && ijcd=yes
+    if [[ "$ijcd" == yes ]]; then
+      local n pc; n="$(countrev "$base..wip/$name")"; pc="$(prime_count "$name")"
+      nlost=$(( n > pc ? n - pc : 0 ))
+    else nlost='?'; fi
+    ws_dirty "$name" && nlost="${nlost}+dirty"
+    tabname="cc:$name"
+    printf '%-28s %-8s %-9s %-7s %s\n' "$name" "$ps" "ijcd:$ijcd" "lost:$nlost" "$tabname"
+  done
+}
+
+cmd_teardown() {
+  local suffix="" park="" dry=0
+  while (( $# )); do
+    case "$1" in
+      --park) park="$2"; shift 2;;
+      --dry-run) dry=1; shift;;
+      -*) echo "teardown: unknown flag $1" >&2; return 2;;
+      *) suffix="$1"; shift;;
+    esac
+  done
+  [[ -n "$suffix" ]] || { echo "teardown: need a <suffix>" >&2; return 2; }
+  case " $DENY_WS " in *" $suffix "*) echo "teardown: refusing denylisted $suffix" >&2; return 1;; esac
+  [[ "$suffix" != "local/main" ]] || { echo "teardown: refusing local/main" >&2; return 1; }
+
+  local root; root="$(list_workspaces | awk -F'\t' -v n="$suffix" '$1==n{print $2}')"
+
+  run() { if (( dry )); then echo "DRYRUN: $*"; else "$@"; fi; }
+  # Park FIRST so no unmerged work is lost.
+  if [[ -n "$park" ]]; then run do_park "$suffix" "$park"; fi
+  run del_bookmarks "$suffix"
+  run del_remote    "$suffix"
+  run forget_ws     "$suffix"
+  [[ -n "$root" ]] && run rm_ws_dir "$root"
+  run close_tab     "$suffix" "${root:-}"
+}
+
+main() {
+  local cmd="${1:-scan}"; shift || true
+  case "$cmd" in
+    scan)     cmd_scan "$@";;
+    teardown) cmd_teardown "$@";;
+    help|-h|--help) usage;;
+    __test_resolve_base)    resolve_base;;
+    __test_list_workspaces) list_workspaces;;
+    __test_pr_state)        pr_state "$@";;
+    __test_prime_count)     prime_count "$@";;
+    __test_lost_tail_root)  lost_tail_root "$@";;
+    __test_ws_dirty)        ws_dirty "$@";;
+    __test_do_park)         do_park "$@";;
+    __test_del_bookmarks)   del_bookmarks "$@";;
+    __test_forget_ws)       forget_ws "$@";;
+    __test_rm_ws_dir)       rm_ws_dir "$@";;
+    __test_del_remote)      del_remote "$@";;
+    __test_close_tab)       close_tab "$@";;
+    *) usage >&2; return 2;;
+  esac
+}
+
+main "$@"
