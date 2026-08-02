@@ -24,6 +24,22 @@ fi
 source ${ZIM_HOME}/init.zsh
 
 ###########################################
+### Nix profile PATH precedence
+###########################################
+# nix-darwin's /etc/zshrc runs `brew shellenv`, which internally invokes
+# /usr/libexec/path_helper -s. path_helper prepends /etc/paths dirs
+# (/usr/local/bin, /usr/bin, /bin, ...) to PATH, demoting nix profile paths
+# below Apple's /usr/bin/git (2.39.5). jujutsu's git-subprocess backend
+# needs git >= 2.41 or `jj git fetch/push` fails with:
+#   Git does not recognize required option: porcelain
+#
+# Re-prepend nix here — BEFORE the HM zshrc source below so mise activation
+# (appended to HM zshrc via common/mise.nix `lib.mkAfter`) still lands its
+# shims at head. Final: mise shims > nix profiles > /usr/local/bin > /usr/bin.
+typeset -U path
+path=(/etc/profiles/per-user/$USER/bin /run/current-system/sw/bin $path)
+
+###########################################
 ### Home Manager Integrations
 ###########################################
 
