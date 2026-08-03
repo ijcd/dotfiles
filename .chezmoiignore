@@ -20,6 +20,7 @@
 !/.vim
 !/.zshenv
 !/authinfo-keychain.sh            # run_once_before_ keychain bootstrap (a script, not a deployed file)
+!/brew-trust-taps.sh              # run_once_after_ brew-trust bootstrap (a script, not a deployed file)
 
 # ═══════════════════════════════════════════════════════════════════════════
 # MISC (any level)

@@ -38,6 +38,14 @@ sudo nix run "nix-darwin/master#darwin-rebuild" -- switch --flake ".#default" -L
 the `nix run` form. `sudo` strips PATH, so use an absolute path to `nix` if it
 isn't found: `/nix/var/nix/profiles/default/bin/nix`.)
 
+**Homebrew third-party cask taps** — `brew bundle` (run by activation) hard-aborts
+loading a cask from an *untrusted* tap, and nix-darwin treats that failure as
+non-fatal, so the switch silently installs nothing new. `chezmoi apply` runs
+`run_once_after_brew-trust-taps.sh` to `brew trust` the offending taps (currently
+`nikitabobko/tap`, for `aerospace`). If a new cask-shipping third-party tap ever
+aborts the bundle, add it to that script's `TAPS` list. Formula-only taps aren't
+gated.
+
 ## Apply (day-to-day)
 
 ```
