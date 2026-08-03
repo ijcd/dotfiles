@@ -26,6 +26,7 @@ in
     taps = [
       "nikitabobko/tap" # for aerospace
       "raine/workmux" # for workmux (brews list references raine/workmux/workmux)
+      "ijcd/tap" # for dev-ip (brews list references ijcd/tap/dev-ip)
     ];
 
     brews = [
@@ -61,6 +62,7 @@ in
       "aws-sso-util"     # AWS SSO utilities
       "mise"             # version manager (nix broken on x86_64-darwin, nixpkgs#427748)
       "raine/workmux/workmux" # tmux workspace manager (nix flake needs rust 1.88+)
+      "ijcd/tap/dev-ip"  # dev-ip helper (personal tap ijcd/tap; not in nixpkgs)
       "rtk"              # LLM token compressor — proxies Claude Code Bash output (rtk-ai/rtk; not in nixpkgs)
       "eask-cli"         # Emacs Lisp project build tool (emacs-eask.github.io; binary is `eask`)
       "lefthook"         # git hook manager — config in repo-root lefthook.yml; run `lefthook install` per clone
