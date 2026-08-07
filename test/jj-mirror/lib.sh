@@ -36,6 +36,14 @@ assert_eq() {
 # fail msg — print to stderr and return 1
 fail() { printf 'FAIL: %s\n' "$*" >&2; return 1; }
 
+# first_parent_of REV — short commit id of REV's FIRST parent, order-preserving
+# (the `-` operator returns parents unordered; a merge-forward prime commit has
+# two). Mirrors the tool's internal first_parent for assertions.
+first_parent_of() {
+  jj log --no-graph -r "$1" -T 'parents.map(|p| p.commit_id().short()).join("\n") ++ "\n"' 2>/dev/null \
+    | awk 'NF' | head -n1
+}
+
 # mk_divergent_thread — build a "stuck-stale" thread. local/main (source root)
 # adds a top line to cfg, shifting line numbers, so wip/x's edit to a mid-file
 # line rebuilds cleanly onto master (prime root) but its diff hunk header never

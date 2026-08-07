@@ -3,7 +3,11 @@
 # "source" (WIP) bookmark chain, so jj-vine pushes clean PRs without
 # force-push churn as the WIP side evolves.
 #
-# See docs/superpowers/specs/2026-07-15-jj-mirror-design.md for the design.
+# Once a prime bookmark backs an OPEN PR it is advanced append-only
+# (merge-forward) rather than rebuilt sideways, so live PRs fast-forward instead
+# of force-pushing. See the designs:
+#   docs/superpowers/specs/2026-07-15-jj-mirror-design.md            (base model)
+#   docs/superpowers/specs/2026-08-06-jj-mirror-merge-resync-design.md (merge mode)
 
 set -euo pipefail
 
@@ -117,6 +121,13 @@ Behavior:
        thread are abandoned (repo-wide orphan cull; skipped under --thread).
     3. Prime commits already matching parent + diff-hash are left in place —
        the "no-op path". This is what keeps jj-vine PRs stable across resyncs.
+    3a. A prime bookmark that already backs an OPEN PR is advanced append-only
+       (merge-forward) instead of rebuilt sideways: the dest moves to a
+       descendant of its old tip, so the push fast-forwards and review comments
+       survive. Base bumps and content edits both apply this way; the cascade to
+       downstream live PRs is one appended merge each, never a force-push.
+       Liveness = an open PR on the dest branch (`gh pr list`; tests inject via
+       JJ_MIRROR_LIVE_PRS). A never-pushed prime still uses the clean cherry-pick.
     4. A thread whose cherry-pick conflicts is rolled back to its own
        pre-thread savepoint and skipped (reported to stderr); the clean
        threads still sync. jj refuses to `git push` a conflicted commit, so a
@@ -338,6 +349,62 @@ load_config() {
   load_rules
 }
 
+# ─── Live-PR detection ─────────────────────────────────────────────────────────
+# A prime bookmark that already backs an open PR is "live": it must only ever
+# advance to a descendant (merge-forward), never be rewritten sideways (which
+# would force-push and detach review comments). live_pr_set resolves the set of
+# live dest bookmark names, memoized for the process.
+#
+# Resolution order:
+#   1. JJ_MIRROR_LIVE_PRS env (space-separated dest names) — the test seam; the
+#      tool has no other forge coupling and the harness has no network. Set-but-
+#      empty means "nothing live" and short-circuits (no gh call).
+#   2. `gh pr list --state open` head branches — the real signal.
+#   3. Fallback: local bookmarks with a remote-tracking ref (pushed ≈ live), with
+#      a one-time warning that gh was unavailable.
+# _resolve_live_pr_set — populate _LIVE_PR_SET once for this process. MUST be
+# called as a plain command (never in $(...) or a pipe) so the memo persists in
+# the caller — otherwise the resolution (a gh network call) reruns per member.
+_LIVE_PR_SET=""; _LIVE_PR_SET_DONE=0
+_resolve_live_pr_set() {
+  (( _LIVE_PR_SET_DONE )) && return 0
+  local out=""
+  if [[ -n "${JJ_MIRROR_LIVE_PRS+x}" ]]; then
+    # shellcheck disable=SC2086  # intentional word-split on spaces
+    out=$(printf '%s\n' $JJ_MIRROR_LIVE_PRS | awk 'NF')
+  elif command -v gh >/dev/null 2>&1; then
+    out=$(gh pr list --state open --json headRefName -q '.[].headRefName' 2>/dev/null | awk 'NF' || true)
+  else
+    out=$(jj bookmark list -T 'if(remote, name ++ "\n", "")' 2>/dev/null | awk 'NF' | sort -u || true)
+    [[ -n "$out" ]] && echo "jj-mirror: gh not found — treating pushed bookmarks as live (merge mode)" >&2
+  fi
+  _LIVE_PR_SET="$out"; _LIVE_PR_SET_DONE=1
+}
+
+# live_pr_set — print the live dest-bookmark set, one per line.
+live_pr_set() { _resolve_live_pr_set; printf '%s' "$_LIVE_PR_SET"; }
+
+# dest_is_live DEST — true if dest bookmark DEST currently backs an open PR.
+# Resolves in-process (no fork) so the memo survives across members in one sync.
+dest_is_live() { _resolve_live_pr_set; printf '%s\n' "$_LIVE_PR_SET" | grep -qxF "$1"; }
+
+# live_dest_for EXISTING BMS — echo the dest bookmark for this prime position if
+# it backs an open PR (so merge-forward applies), else empty. Requires a non-empty
+# EXISTING (there must be a prior prime tip to advance from) and a live dest among
+# this commit's included source bookmarks BMS.
+live_dest_for() {
+  local existing=$1 bms=$2 bm dname
+  [[ -n "$existing" && -n "$bms" ]] || return 0
+  local -a _arr
+  IFS=',' read -ra _arr <<< "$bms"
+  for bm in "${_arr[@]}"; do
+    is_included "$bm" || continue
+    dname=$(dest_for "$bm")
+    [[ -n "$dname" ]] || continue
+    if dest_is_live "$dname"; then printf '%s' "$dname"; return 0; fi
+  done
+}
+
 # list_bookmarks_with_prefix PREFIX
 # Emits: <name>\t<short-commit-id> per line, filtered by PREFIX.
 # Empty PREFIX matches every bookmark.
@@ -541,6 +608,46 @@ range_diff_hash() {
   printf '%s' "$patch" | shasum -a 256 | awk '{print $1}'
 }
 
+# first_parent REV — REV's FIRST parent's short commit id, order-preserving.
+# The `-` revset operator returns parents unordered; a merge-forward prime commit
+# has two parents (base, old-tip) and the keep-condition needs parent index 0
+# (the base). parents.map(...) preserves index order.
+first_parent() {
+  jj log --no-graph -r "$1" -T 'parents.map(|p| p.commit_id().short()).join("\n") ++ "\n"' 2>/dev/null \
+    | awk 'NF' | head -n1
+}
+
+# member_diff_hash CID — SHA-256 of CID's own diff vs its FIRST parent. Works for
+# both single-parent (cherry-pick) and two-parent (merge-forward) prime commits.
+# Used on BOTH sides of the keep-condition so source and existing-prime compare
+# like-for-like (same `jj diff --from --to --git` mechanism).
+member_diff_hash() {
+  local cid=$1 fp
+  fp=$(first_parent "$cid"); [[ -n "$fp" ]] || return 1
+  range_diff_hash "$fp" "$cid"
+}
+
+# prime_chain PROOT DLEAF_CID — echo the existing prime chain's commit ids,
+# oldest-first, by walking FIRST parents from DLEAF down to (excluding) PROOT.
+# First-parent-only is essential once merge-forward exists: a merge-forwarded
+# prime's second parent is the OLD tip, whose branch must NOT be enumerated as
+# chain positions — only the spine commit counts. Stops at the first commit that
+# is PROOT or an ancestor of PROOT (robust across base drift). Replaces the old
+# `PROOT..DLEAF` range, which was correct only while every prime commit was a
+# base-stripped single-parent cherry-pick.
+prime_chain() {
+  local proot=$1 cur=$2 guard=0 j
+  local -a acc=()
+  while [[ -n "$cur" ]]; do
+    # Base reached: cur is PROOT or already an ancestor of it.
+    jj log --no-graph -r "$cur & ::$proot" -T '"y"' 2>/dev/null | grep -q y && break
+    acc+=("$cur")
+    cur=$(first_parent "$cur")
+    (( ++guard > 10000 )) && break
+  done
+  for (( j=${#acc[@]}-1; j>=0; j-- )); do printf '%s\n' "${acc[j]}"; done
+}
+
 # render_root REVSET — a friendly one-token label for a root: the local bookmark
 # name on the commit it resolves to, else the revset as written. So a base reads
 # as `local/main` rather than the raw `coalesce(...)` default, while `trunk()`
@@ -723,6 +830,68 @@ set_dest_bookmarks() {
   done
 }
 
+# advance_merge SCID PREV E DEST
+# Merge-forward a LIVE prime member: advance DEST to a descendant of its current
+# tip E instead of rewriting it sideways (which would force-push). Builds:
+#   D = duplicate SCID onto PREV      (freshly derived content, base-stripped)
+#   F = merge(first-parent=PREV, second-parent=E)   via `jj new --no-edit` (@ stays put)
+#   tree(F) := tree(D)                (jj restore — the merge is shape-only, never a 3-way,
+#                                      so it cannot conflict; PR diff-vs-base = derived content)
+# first-parent=PREV keeps jj-vine's base derivation correct; second-parent=E makes
+# F a descendant of E so the push fast-forwards. Prints F's short commit id.
+# Returns 2 on a cherry-pick conflict in D or a broken append-only invariant
+# (E not an ancestor of F) — sync_main's per-thread op-restore then unwinds it.
+# merge_forward_to CONTENT PREV E DEST — given a CONTENT commit that already
+# carries the exact intended tree (built on PREV), create F = merge(first-parent
+# PREV, second-parent E), force tree(F) := tree(CONTENT), assert E is an ancestor
+# of F (append-only), and move DEST to F forward-only. Prints F's short id.
+# Does NOT abandon CONTENT (the caller owns it). Returns 2 on a broken invariant.
+merge_forward_to() {
+  local content=$1 prev=$2 e=$3 dest=$4 out fchange f
+  out=$(jj new "$prev" "$e" --no-edit -m "jj-mirror: merge-forward $dest" 2>&1) \
+    || { echo "jj-mirror: merge_forward_to — merge create failed ($prev + $e)" >&2; return 1; }
+  # Track the merge by CHANGE id (field 4): `jj restore` rewrites the commit id
+  # but the change id survives, so we re-resolve the final commit id AFTER restore.
+  # Using the pre-restore commit id would leave DEST on the auto-merge tree (old
+  # content from the second parent) — the merge would silently drop the change.
+  fchange=$(printf '%s\n' "$out" | awk '/^Created new commit/{print $4; exit}')
+  [[ -n "$fchange" ]] || { echo "jj-mirror: merge_forward_to — could not parse merge change id for $dest" >&2; return 1; }
+  jj restore --from "$content" --into "$fchange" >/dev/null 2>&1 \
+    || { echo "jj-mirror: merge_forward_to — restore of derived tree failed for $dest" >&2; return 1; }
+  f=$(jj log --no-graph -r "$fchange" -T 'commit_id.short() ++ "\n"' 2>/dev/null | head -n1)
+  [[ -n "$f" ]] || { echo "jj-mirror: merge_forward_to — could not resolve merge commit for $dest" >&2; return 1; }
+  # Append-only invariant: E must be an ancestor of F, else moving DEST to F would
+  # be a force-push. Fail loudly rather than churn the PR.
+  if ! jj log --no-graph -r "$e & ancestors($f)" -T '"y"' 2>/dev/null | grep -q y; then
+    echo "jj-mirror: merge_forward_to — append-only violation: $e is not an ancestor of $f for $dest" >&2
+    return 2
+  fi
+  # Forward-only bookmark move (no --allow-backwards — F is a descendant of E).
+  jj bookmark set "$dest" -r "$f" >/dev/null 2>&1 \
+    || { echo "jj-mirror: merge_forward_to — bookmark set failed for $dest at $f" >&2; return 1; }
+  printf '%s' "$f"
+}
+
+advance_merge() {
+  local scid=$1 prev=$2 e=$3 dest=$4 out d f cflag rc
+  out=$(jj duplicate "$scid" --destination "$prev" 2>&1)
+  d=$(printf '%s\n' "$out" | awk '/^Duplicated/{print $5; exit}')
+  [[ -n "$d" ]] || { echo "jj-mirror: advance_merge — duplicate produced no commit for $scid" >&2; return 1; }
+  # A conflicted duplicate means the source diff doesn't apply on PREV — same
+  # failure the clean path hits; bail so the thread rolls back (never a merge of a
+  # conflict).
+  cflag=$(jj log --no-graph -r "$d" -T 'if(conflict,"y","n") ++ "\n"' 2>/dev/null | head -n1)
+  if [[ "$cflag" == "y" ]]; then
+    echo "jj-mirror: conflict cherry-picking $scid onto ${prev} (for merge-forward of $dest)" >&2
+    jj abandon "$d" >/dev/null 2>&1 || true
+    return 2
+  fi
+  rc=0; f=$(merge_forward_to "$d" "$prev" "$e" "$dest") || rc=$?
+  jj abandon "$d" >/dev/null 2>&1 || true
+  (( rc == 0 )) || return $rc
+  printf '%s' "$f"
+}
+
 # sync_thread LEAF _CHAIN PRIME_ROOT
 # Mirror the FULL branch SOURCE_ROOT..LEAF commit-for-commit onto PRIME_ROOT:
 # every commit is replayed (a strict cherry-pick of its own diff), and where a
@@ -753,35 +922,38 @@ sync_thread() {
   local n=${#c_cid[@]}
   (( n > 0 )) || return 0
 
-  # Existing prime chain (oldest-first) for positional no-op reuse.
+  # Existing prime chain (oldest-first, first-parent spine) for positional no-op
+  # reuse. First-parent-only so a merge-forwarded prime's buried old tip is not
+  # miscounted as a chain position (see prime_chain).
   local -a e_cid=()
   local dleaf_cid ecid
   dleaf_cid=$(jj log --no-graph -r "$dleaf" -T 'commit_id.short() ++ "\n"' 2>/dev/null | head -n1 || true)
   if [[ -n "$dleaf_cid" ]]; then
     while IFS= read -r ecid; do
       [[ -n "$ecid" ]] && e_cid+=("$ecid")
-    done < <(jj log --no-graph -r "$prime_root..$dleaf_cid" -T 'commit_id.short() ++ "\n"' 2>/dev/null \
-             | awk 'NF' | awk '{a[NR]=$0} END{for(i=NR;i>=1;i--)print a[i]}')
+    done < <(prime_chain "$prime_root" "$dleaf_cid")
   fi
 
   local prev
   prev=$(jj log --no-graph -r "$prime_root" -T 'commit_id.short() ++ "\n"' | head -n1)
 
-  local cascade=0 i scid bms existing e_parent e_hash s_hash new_cid out cflag
+  local cascade=0 i scid bms existing e_parent e_hash s_hash new_cid out cflag live_here _b _d
+  local -a _lbm
   for (( i=0; i<n; i++ )); do
     scid=${c_cid[i]}; bms=${c_bm[i]}
     existing=""
     (( i < ${#e_cid[@]} )) && existing=${e_cid[i]}
 
     if [[ $cascade -eq 0 && -n "$existing" ]]; then
-      e_parent=$(jj log --no-graph -r "$existing-" -T 'commit_id.short() ++ "\n"' | head -n1)
-      e_hash=$(diff_hash "$existing") \
-        || { echo "jj-mirror: diff_hash failed on existing prime $existing" >&2; return 1; }
-      s_hash=$(diff_hash "$scid") \
-        || { echo "jj-mirror: diff_hash failed on source $scid" >&2; return 1; }
-      # Keep-condition MUST stay in lockstep with thread_verdicts (which drives
-      # status/graph/dry-run): same parent==prev AND diff_hash match. If you change
-      # one, change the other or status will drift from what sync actually does.
+      # Keep-condition: first-parent (order-preserving) == prev AND the member's
+      # own diff (vs its first parent) matches the source's. member_diff_hash is
+      # first-parent-based so this holds for a two-parent merge-forward prime too.
+      # MUST stay in lockstep with thread_verdicts (drives status/graph/dry-run).
+      e_parent=$(first_parent "$existing")
+      e_hash=$(member_diff_hash "$existing") \
+        || { echo "jj-mirror: member_diff_hash failed on existing prime $existing" >&2; return 1; }
+      s_hash=$(member_diff_hash "$scid") \
+        || { echo "jj-mirror: member_diff_hash failed on source $scid" >&2; return 1; }
       if [[ "$e_parent" == "$prev" && "$e_hash" == "$s_hash" ]]; then
         # up-to-date — keep the existing prime commit, just ensure bookmarks.
         set_dest_bookmarks "$existing" "$bms" || return 1
@@ -790,20 +962,44 @@ sync_thread() {
       fi
     fi
 
-    # (Re)build: strict cherry-pick of this commit's own diff onto prev.
-    # jj 0.43.0's `duplicate` has no -T flag; parse "Duplicated <old> as
-    # <change> <commit_id> <desc>" — field 5 is the new short commit id.
-    out=$(jj duplicate "$scid" --destination "$prev" 2>&1)
-    new_cid=$(printf '%s\n' "$out" | awk '/^Duplicated/ {print $5; exit}')
-    [[ -n "$new_cid" ]] || { echo "jj-mirror: duplicate produced no commit for $scid" >&2; return 1; }
-    set_dest_bookmarks "$new_cid" "$bms" || return 1
+    # This position must (re)build. If it backs a LIVE PR, advance it forward
+    # (merge-forward) so the push fast-forwards; otherwise clean cherry-pick.
+    # Checked inline (not via $() ) so _resolve_live_pr_set runs in THIS process
+    # and its memo persists across members/threads — one gh call per sync, not one
+    # per stale member.
+    live_here=""
+    if [[ -n "$existing" && -n "$bms" ]]; then
+      IFS=',' read -ra _lbm <<< "$bms"
+      for _b in "${_lbm[@]}"; do
+        is_included "$_b" || continue
+        _d=$(dest_for "$_b")
+        [[ -n "$_d" ]] || continue
+        if dest_is_live "$_d"; then live_here=$_d; break; fi
+      done
+    fi
 
-    # Bookmark BEFORE the conflict check; a conflicted commit triggers `return 2`
-    # → sync_main's per-thread `jj op restore` atomically unwinds it.
-    cflag=$(jj log --no-graph -r "$new_cid" -T 'if(conflict, "y", "n") ++ "\n"' 2>/dev/null | head -n1)
-    if [[ "$cflag" == "y" ]]; then
-      echo "jj-mirror: conflict cherry-picking $scid onto ${prev} (prime commit $new_cid)" >&2
-      return 2
+    if [[ -n "$live_here" ]]; then
+      # Append-only merge-forward; advance_merge handles conflict + invariant and
+      # returns 2 on failure → sync_main's per-thread op-restore unwinds the thread.
+      new_cid=$(advance_merge "$scid" "$prev" "$existing" "$live_here") || return $?
+      [[ -n "$new_cid" ]] || { echo "jj-mirror: merge-forward produced no commit for $scid" >&2; return 1; }
+      set_dest_bookmarks "$new_cid" "$bms" || return 1
+    else
+      # (Re)build: strict cherry-pick of this commit's own diff onto prev.
+      # jj 0.43.0's `duplicate` has no -T flag; parse "Duplicated <old> as
+      # <change> <commit_id> <desc>" — field 5 is the new short commit id.
+      out=$(jj duplicate "$scid" --destination "$prev" 2>&1)
+      new_cid=$(printf '%s\n' "$out" | awk '/^Duplicated/ {print $5; exit}')
+      [[ -n "$new_cid" ]] || { echo "jj-mirror: duplicate produced no commit for $scid" >&2; return 1; }
+      set_dest_bookmarks "$new_cid" "$bms" || return 1
+
+      # Bookmark BEFORE the conflict check; a conflicted commit triggers `return 2`
+      # → sync_main's per-thread `jj op restore` atomically unwinds it.
+      cflag=$(jj log --no-graph -r "$new_cid" -T 'if(conflict, "y", "n") ++ "\n"' 2>/dev/null | head -n1)
+      if [[ "$cflag" == "y" ]]; then
+        echo "jj-mirror: conflict cherry-picking $scid onto ${prev} (prime commit $new_cid)" >&2
+        return 2
+      fi
     fi
 
     prev=$new_cid
@@ -824,8 +1020,10 @@ squash_thread() {
 
   existing=$(jj log --no-graph -r "$dleaf" -T 'commit_id.short() ++ "\n"' 2>/dev/null | head -n1 || true)
   if [[ -n "$existing" ]]; then
-    existing_parent=$(jj log --no-graph -r "$existing-" -T 'commit_id.short() ++ "\n"' | head -n1)
-    existing_hash=$(diff_hash "$existing") || existing_hash=""
+    # first-parent-aware so a merge-forwarded squash commit (2 parents) reads its
+    # cumulative diff vs the prime root, matching `cum`.
+    existing_parent=$(first_parent "$existing")
+    existing_hash=$(member_diff_hash "$existing") || existing_hash=""
     if [[ "$existing_parent" == "$proot_cid" && "$existing_hash" == "$cum" ]]; then
       return 0   # already the squashed cumulative diff on prime_root
     fi
@@ -847,13 +1045,29 @@ squash_thread() {
   fi
   one=$(jj log --no-graph -r "$root_change" -T 'commit_id.short() ++ "\n"' 2>/dev/null | head -n1)
   [[ -n "$one" ]] || one=$root_cid
-  jj bookmark set --allow-backwards "$dleaf" -r "$one" >/dev/null 2>&1 \
-    || { echo "jj-mirror: bookmark set failed for $dleaf at $one" >&2; return 1; }
+
+  # A conflicted fold can never reach a PR (jj refuses to push conflicts) — bail
+  # in either mode so the thread rolls back. Checked before the bookmark move.
   local cflag
   cflag=$(jj log --no-graph -r "$one" -T 'if(conflict, "y", "n") ++ "\n"' 2>/dev/null | head -n1)
   if [[ "$cflag" == "y" ]]; then
     echo "jj-mirror: conflict squashing $leaf onto $prime_root (prime commit $one)" >&2
+    jj abandon "$one" >/dev/null 2>&1 || true
     return 2
+  fi
+
+  if [[ -n "$existing" ]] && dest_is_live "$dleaf"; then
+    # Live PR: advance dleaf to a DESCENDANT carrying `one`'s cumulative tree
+    # (append-only, no force-push). `one` is a throwaway content donor.
+    local rc=0
+    merge_forward_to "$one" "$prime_root" "$existing" "$dleaf" >/dev/null || rc=$?
+    jj abandon "$one" >/dev/null 2>&1 || true
+    (( rc == 0 )) || return $rc
+  else
+    # Not live (or first creation): the fold IS the dest commit. Sideways move is
+    # free — no PR to churn.
+    jj bookmark set --allow-backwards "$dleaf" -r "$one" >/dev/null 2>&1 \
+      || { echo "jj-mirror: bookmark set failed for $dleaf at $one" >&2; return 1; }
   fi
 }
 
@@ -861,10 +1075,13 @@ squash_thread() {
 # status --graph, and dry-run. Emits one line per INCLUDED source bookmark in the
 # thread, oldest-first:  <kind>\t<action>\t<bm>\t<dname>
 #   kind:   commit | squash
-#   action: create | keep | diff | cascade
+#   action: create | keep | diff | cascade | merge-forward
+#           merge-forward = a rebuild whose dest backs a live PR; sync advances it
+#           append-only (see advance_merge) instead of rewriting sideways.
 # The non-squash walk MUST stay in lockstep with sync_thread's positional walk and
-# keep-condition (existing parent == prev AND diff_hash(existing)==diff_hash(source));
-# that lockstep is what makes status/graph exactly as accurate as a real sync.
+# keep-condition (first_parent(existing)==prev AND member_diff_hash(existing)==
+# member_diff_hash(source)); that lockstep is what makes status/graph exactly as
+# accurate as a real sync. A live rebuild reads merge-forward on both sides.
 thread_verdicts() {
   local leaf=$1
   local sroot proot dleaf squash
@@ -880,10 +1097,16 @@ thread_verdicts() {
       action="create"
     else
       cum=$(range_diff_hash "$sroot" "$leaf") || cum=""
-      e_hash=$(diff_hash "$existing") || e_hash=""
-      e_parent=$(jj log --no-graph -r "$existing-" -T 'commit_id.short() ++ "\n"' | head -n1)
+      e_hash=$(member_diff_hash "$existing") || e_hash=""
+      e_parent=$(first_parent "$existing")
       proot_cid=$(jj log --no-graph -r "$proot" -T 'commit_id.short() ++ "\n"' | head -n1)
-      if [[ -n "$cum" && "$cum" == "$e_hash" && "$e_parent" == "$proot_cid" ]]; then action="keep"; else action="diff"; fi
+      if [[ -n "$cum" && "$cum" == "$e_hash" && "$e_parent" == "$proot_cid" ]]; then
+        action="keep"
+      elif dest_is_live "$dleaf"; then
+        action="merge-forward"
+      else
+        action="diff"
+      fi
     fi
     printf 'squash\t%s\t%s\t%s\n' "$action" "$leaf" "$dleaf"
     return 0
@@ -902,9 +1125,7 @@ thread_verdicts() {
   local dleaf_cid ecid
   dleaf_cid=$(jj log --no-graph -r "$dleaf" -T 'commit_id.short() ++ "\n"' 2>/dev/null | head -n1 || true)
   if [[ -n "$dleaf_cid" ]]; then
-    while IFS= read -r ecid; do [[ -n "$ecid" ]] && e_cid+=("$ecid"); done < <(
-      jj log --no-graph -r "$proot..$dleaf_cid" -T 'commit_id.short() ++ "\n"' 2>/dev/null \
-      | awk 'NF' | awk '{a[NR]=$0} END{for(i=NR;i>=1;i--)print a[i]}')
+    while IFS= read -r ecid; do [[ -n "$ecid" ]] && e_cid+=("$ecid"); done < <(prime_chain "$proot" "$dleaf_cid")
   fi
 
   local prev cascade=0 i scid bms existing e_parent e_hash s_hash action bm dname
@@ -913,19 +1134,27 @@ thread_verdicts() {
   for (( i=0; i<n; i++ )); do
     scid=${c_cid[i]}; bms=${c_bm[i]}
     existing=""; (( i < ${#e_cid[@]} )) && existing=${e_cid[i]}
+    # Keep-condition MUST match sync_thread exactly: first-parent (order-preserving)
+    # == prev AND member_diff_hash (diff vs first parent — correct for a two-parent
+    # merge-forward prime) equal. On rebuild, a position whose dest backs a live PR
+    # reads `merge-forward` (sync would advance_merge it); others create/diff/cascade.
     if (( cascade )); then
       action="cascade"
     elif [[ -z "$existing" ]]; then
       action="create"; cascade=1
     else
-      e_parent=$(jj log --no-graph -r "$existing-" -T 'commit_id.short() ++ "\n"' | head -n1)
-      e_hash=$(diff_hash "$existing") || e_hash=""
-      s_hash=$(diff_hash "$scid") || s_hash=""
+      e_parent=$(first_parent "$existing")
+      e_hash=$(member_diff_hash "$existing") || e_hash=""
+      s_hash=$(member_diff_hash "$scid") || s_hash=""
       if [[ "$e_parent" == "$prev" && -n "$s_hash" && "$e_hash" == "$s_hash" ]]; then
         action="keep"; prev=$existing
       else
         action="diff"; cascade=1
       fi
+    fi
+    if [[ "$action" != "keep" && "$action" != "create" && -n "$existing" ]] \
+       && [[ -n "$(live_dest_for "$existing" "$bms")" ]]; then
+      action="merge-forward"
     fi
     [[ -n "$bms" ]] || continue
     IFS=',' read -ra _bmarr <<< "$bms"
@@ -1024,10 +1253,11 @@ dry_run_thread() {
       esac
     else
       case "$action" in
-        create)  printf '  would create %s from %s\n' "$dname" "$bm" ;;
-        cascade) printf '  would rebuild %s (cascade)\n' "$dname" ;;
-        diff)    printf '  would rebuild %s (diff changed)\n' "$dname" ;;
-        keep)    printf '  would keep %s (up-to-date)\n' "$dname" ;;
+        create)       printf '  would create %s from %s\n' "$dname" "$bm" ;;
+        cascade)      printf '  would rebuild %s (cascade)\n' "$dname" ;;
+        diff)         printf '  would rebuild %s (diff changed)\n' "$dname" ;;
+        merge-forward) printf '  would merge-forward %s (live PR — append-only)\n' "$dname" ;;
+        keep)         printf '  would keep %s (up-to-date)\n' "$dname" ;;
       esac
     fi
   done < <(thread_verdicts "$leaf")
@@ -1444,6 +1674,16 @@ case "${1:-status}" in
     load_config
     list_source_threads
     exit 0
+    ;;
+  _live-pr-set)
+    live_pr_set
+    exit 0
+    ;;
+  _advance-merge)
+    load_config
+    [[ $# -eq 5 ]] || { echo "usage: jj-mirror _advance-merge SCID PREV E DEST" >&2; exit 2; }
+    advance_merge "$2" "$3" "$4" "$5"
+    exit $?
     ;;
   _diff-hash)
     load_config
