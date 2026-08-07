@@ -129,6 +129,11 @@ alias -g thisbranch:thisbranch='$(git rev-parse --abbrev-ref HEAD)':'$(git rev-p
 # alias jj='fasd_cd -d -i' # cd with interactive selection
 
 ############
+# jj-flow (personal-stack → PR porcelain)
+############
+alias jjf='jj-flow'                                    # jjf status [--graph], etc.
+
+############
 # media (yt script in ~/.local/bin)
 ############
 alias ytv='mpv'                                        # video (foreground)

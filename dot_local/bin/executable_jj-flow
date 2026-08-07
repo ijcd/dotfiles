@@ -1,0 +1,205 @@
+#!/usr/bin/env bash
+# jj-flow — one porcelain over the personal-stack → PR-projection workflow.
+# Verbs re-home the jj-catch-up / jj-mirror / jj-integrate / jj-tug / jj-cleanup
+# tools over a shared library (jjflow-lib.sh). P1 ships `status` [--graph].
+#
+# See docs/superpowers/specs/2026-08-06-jj-flow-unified-tool-design.md.
+
+set -euo pipefail
+
+if (( BASH_VERSINFO[0] < 4 )); then
+  echo "jj-flow: bash ${BASH_VERSION} too old — needs bash 4+" >&2
+  exit 1
+fi
+
+source "$(dirname "$0")/jjflow-lib.sh"
+
+usage() {
+  cat <<'EOF'
+jj-flow — one porcelain over the personal-stack → PR-projection workflow.
+
+Usage:
+  jj-flow [status] [--graph]   the unified view (default): stack, PR state, drift
+  jj-flow catchup [-f]         fetch + rebase the private stack onto trunk
+  jj-flow mirror [-n]          re-derive ijcd/* from wip/* (no push)
+  jj-flow push [-t <br>]       mirror (merge-forward live PRs) + jj-vine submit
+  jj-flow integrate <cmd>      manage local/integration (add/drop/catchup/…)
+  jj-flow tug [--all]          advance the nearest bookmark to @-
+  jj-flow cleanup <name>       tear down a merged PR (bookmarks, workspace, tab)
+  jj-flow ship                 catchup, then push — gated on a clean catch-up
+  jj-flow help                 this help
+
+Verbs delegate to the underlying jj-catch-up / jj-mirror / jj-integrate /
+jj-tug / jj-cleanup tools; `status` is native. Config: [jj-flow] (falls back to
+[jj-mirror]/[jj-integrate]). See the design spec under docs/superpowers/specs/.
+EOF
+}
+
+# flow_run TOOL ARGS… — run a delegated tool found on PATH (so shims work),
+# with a clear error if it's missing. JJFLOW_DELEGATE_DRYRUN=1 prints the
+# resolved command instead of running it (used by the dispatch tests).
+flow_run() {
+  local tool=$1; shift
+  if [[ -n "${JJFLOW_DELEGATE_DRYRUN:-}" ]]; then
+    printf 'would-run: %s %s\n' "$tool" "$*"; return 0
+  fi
+  command -v "$tool" >/dev/null 2>&1 || { echo "jj-flow: '$tool' not found on PATH — is it installed?" >&2; return 127; }
+  "$tool" "$@"
+}
+
+# flow_ship — the gated pipeline: catch the private stack up to trunk, and only
+# if that lands clean, project + push the PRs. A conflicted catch-up stops here
+# so a mess never rides through to a force-push-free PR update.
+flow_ship() {
+  echo "jj-flow: catching the private stack up to trunk…" >&2
+  flow_run jj-catch-up || { echo "jj-flow: catch-up did not finish clean — resolve conflicts, then 'jj-flow ship' again." >&2; return 1; }
+  echo "jj-flow: projecting + pushing PRs (merge-forward)…" >&2
+  flow_run jj-mirror push
+}
+
+# status_main — the unified table: trunk/base header, one row per wip/* branch
+# (state glyph · PR · drift · workspace), integration line, and `next` hints.
+status_main() {
+  flow_load_config
+  local trunk_cid base_cid
+  trunk_cid=$(flow_cid "$FLOW_TRUNK"); base_cid=$(flow_cid "$FLOW_BASE")
+  printf 'trunk   %-18s %s\n'   "$(flow_render_root "$FLOW_TRUNK")" "$trunk_cid" | sed 's/ *$//'
+  printf 'base    %-18s %s\n'   "$(flow_render_root "$FLOW_BASE")"  "$base_cid"  | sed 's/ *$//'
+  printf '\n'
+
+  printf '%-16s %-11s %-16s %-10s %s\n' BRANCH STATE PR 'vs TRUNK' WORKSPACE
+  local name cid state pr sfx prname drift ws ws_tok ws_health g
+  local has_catchup=0 has_push=0 has_cleanup=0
+  while IFS=$'\t' read -r name cid; do
+    [[ -n "$name" ]] || continue
+    sfx=$(flow_strip_work "$name"); prname=$(flow_pr_name "$sfx")
+    state=$(flow_branch_state "$name"); g=$(flow_glyph "$state")
+    drift=$(flow_branch_drift "$name")
+    if [[ -n "$(flow_cid "$prname")" ]]; then pr="$prname"; else pr='—'; fi
+    IFS=$'\t' read -r ws_tok ws_health < <(flow_ws_for "$name") || true
+    case "$ws_health" in ok) ws="$ws_tok ✓" ;; wip) ws="$ws_tok ✎WIP" ;; missing) ws="$ws_tok ⚠path" ;; *) ws='(none)' ;; esac
+    printf '%-16s %s %-9s %-16s %-10s %s\n' "$name" "$g" "$state" "$pr" "$drift" "$ws"
+    if [[ "$drift" != even   ]]; then has_catchup=1; fi
+    if [[ "$state" == mirrored ]]; then has_push=1; fi
+    if [[ "$state" == merged   ]]; then has_cleanup=1; fi
+  done < <(flow_wip_branches)
+
+  local int_cid; int_cid=$(flow_cid "$FLOW_INTEGRATION")
+  [[ -n "$int_cid" ]] && printf '\nintegration  %-18s %s\n' "$FLOW_INTEGRATION" "$int_cid"
+
+  local hints=()
+  (( has_catchup )) && hints+=("catchup — branches behind trunk")
+  (( has_push ))    && hints+=("push — mirrored branches to submit")
+  (( has_cleanup )) && hints+=("cleanup — merged PRs to retire")
+  (( ${#hints[@]} )) && { printf '\nnext    '; local IFS=' · '; printf '%s\n' "${hints[*]}"; }
+}
+
+# status_graph — the private-stack spine (trunk → base → wip/*) with ──▶ ijcd/*
+# projection edges, state glyphs, PR annotations, integration line, and inline
+# base-divergence notes. Generalizes jj-mirror's status --graph.
+status_graph() {
+  flow_load_config
+  local trunk_lbl base_lbl trunk_cid base_cid
+  trunk_lbl=$(flow_render_root "$FLOW_TRUNK"); trunk_cid=$(flow_cid "$FLOW_TRUNK")
+  base_lbl=$(flow_render_root "$FLOW_BASE");   base_cid=$(flow_cid "$FLOW_BASE")
+
+  # Header: trunk + base each labelled, with the base's drift from trunk and a
+  # catch-up nudge — the actionable "am I current?" the bare axis didn't answer.
+  local drift_n drift_note hw=${#base_lbl}
+  (( ${#trunk_lbl} > hw )) && hw=${#trunk_lbl}
+  drift_n=$(jj log --no-graph -r "$FLOW_BASE..$FLOW_TRUNK" -T '"x\n"' 2>/dev/null | grep -c x || true)
+  if [[ "${drift_n:-0}" -eq 0 ]]; then drift_note='✓ current'; else drift_note="⟳ ${drift_n} behind → catchup"; fi
+  printf '  trunk  %-*s %s\n'     "$hw" "$trunk_lbl" "$trunk_cid"
+  printf '  base   %-*s %s   %s\n\n' "$hw" "$base_lbl" "$base_cid" "$drift_note"
+
+  # Gather branches + the max name width so the ──▶ column aligns regardless of
+  # how long any one branch name is (a flat aligned list, no vertical spine).
+  local -a names=(); local name cid w=0
+  while IFS=$'\t' read -r name cid; do
+    [[ -n "$name" ]] || continue
+    names+=("$name"); (( ${#name} > w )) && w=${#name}
+  done < <(flow_wip_branches)
+
+  if (( ${#names[@]} == 0 )); then
+    printf '  (no %s branches)\n\n' "$FLOW_WORK_PREFIX"
+    printf '  legend  ● live   ◐ mirrored   ○ draft   ⚠ stuck   ✓ merged\n'
+    return 0
+  fi
+
+  local i sfx prname state g pr_cid f cause
+  for (( i=0; i<${#names[@]}; i++ )); do
+    name=${names[i]}
+    sfx=$(flow_strip_work "$name"); prname=$(flow_pr_name "$sfx")
+    state=$(flow_branch_state "$name"); g=$(flow_glyph "$state")
+    pr_cid=$(flow_cid "$prname")
+    if [[ -n "$pr_cid" ]]; then
+      printf '  %s %-*s  ──▶  %s\n' "$g" "$w" "$name" "$prname"
+    else
+      printf '  %s %s\n' "$g" "$name"
+    fi
+    if [[ "$state" == stuck ]]; then
+      while IFS=$'\t' read -r f cause; do
+        [[ -n "$f" ]] || continue
+        if [[ "$cause" == base ]]; then
+          printf '  %*s   ↳ %s — %s edits it; fold in or drop from base\n' "$w" "" "$f" "$base_lbl"
+        else
+          printf '  %*s   ↳ %s — trunk moved ahead; run catchup\n' "$w" "" "$f"
+        fi
+      done < <(flow_collision_files "$name")
+    fi
+  done
+
+  local int_cid; int_cid=$(flow_cid "$FLOW_INTEGRATION")
+  [[ -n "$int_cid" ]] && printf '\n  %s %s  ═╡ integration\n' "$FLOW_INTEGRATION" "$int_cid"
+
+  printf '\n  legend  ● live   ◐ mirrored   ○ draft   ⚠ stuck   ✓ merged\n'
+}
+
+case "${1:-status}" in
+  -h|--help|help) usage; exit 0 ;;
+  status)
+    (( $# > 0 )) && shift
+    case "${1:-}" in
+      -g|--graph) status_graph ;;
+      ""|--)      status_main ;;
+      *) echo "jj-flow: status: unknown argument '$1'" >&2; exit 2 ;;
+    esac
+    exit 0
+    ;;
+  catchup)   shift; flow_run jj-catch-up "$@"; exit $? ;;
+  mirror)    shift; flow_run jj-mirror sync "$@"; exit $? ;;
+  push)      shift; flow_run jj-mirror push "$@"; exit $? ;;
+  integrate) shift; flow_run jj-integrate "$@"; exit $? ;;
+  tug)       shift; flow_run jj-tug "$@"; exit $? ;;
+  cleanup)   shift; flow_run jj-cleanup "$@"; exit $? ;;
+  ship)      shift; flow_ship; exit $? ;;
+  _dump-config)
+    flow_load_config
+    printf 'trunk=%s\nbase=%s\nwork-prefix=%s\npr-prefix=%s\nintegration=%s\nworkspace-dir=%s\nremote=%s\n' \
+      "$FLOW_TRUNK" "$FLOW_BASE" "$FLOW_WORK_PREFIX" "$FLOW_PR_PREFIX" \
+      "$FLOW_INTEGRATION" "$FLOW_WS_DIR" "$FLOW_REMOTE"
+    exit 0
+    ;;
+  _dump-wip)
+    flow_load_config
+    flow_wip_branches
+    exit 0
+    ;;
+  _state)
+    flow_load_config
+    [[ -n "${2:-}" ]] || { echo "usage: jj-flow _state <wip>" >&2; exit 2; }
+    flow_branch_state "$2"; printf '\n'
+    exit 0
+    ;;
+  _drift)
+    flow_load_config
+    [[ -n "${2:-}" ]] || { echo "usage: jj-flow _drift <wip>" >&2; exit 2; }
+    flow_branch_drift "$2"; printf '\n'
+    exit 0
+    ;;
+  *)
+    echo "jj-flow: unknown command: ${1:-}" >&2
+    usage >&2
+    exit 2
+    ;;
+esac
