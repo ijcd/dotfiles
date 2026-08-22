@@ -14,6 +14,19 @@
 
 - In all interactions and commit messages, be extremely concise and sacrifice grammar for the sake of concision.
 
+## Testing (non-negotiable)
+
+- NEVER write a test that asserts known-buggy behavior as its expected/passing
+  result. A green test that certifies a bug is a lie in the suite. No "pinning
+  the defect", no `BUG:`-marked green tests, no "assert current behavior so the
+  suite stays green" — EVER. Doing this requires my EXPLICIT APPROVAL first,
+  every time; absent that, it is forbidden.
+- When coverage surfaces a bug: either fix it (the test asserts CORRECT behavior,
+  red → green), or if the fix is genuinely out of scope, leave a FAILING test —
+  or a skipped test tagged with the ticket — that asserts the CORRECT behavior.
+  Never a passing test encoding the wrong output. Green must mean "correct", not
+  "this is what it currently does".
+
 ## Writing style
 
 Stop the AI-speak. Default to my voice — short, diagnostic, file:line citations. PR descriptions, commit messages, and docs are mementos for future me, not stories for anyone else.
@@ -172,11 +185,6 @@ were added or bugs were fixed.
 ## GitHub
 
 - Your primary method for interacting with GitHub should be the GitHub CLI.
-- After creating any PR with `gh pr create`, **always** request a Copilot review immediately:
-  ```bash
-  gh pr edit <PR-NUMBER> --add-reviewer @copilot
-  ```
-  Every PR, no exceptions. Don't ask first.
 
 ## PR Forks (upstream contributions)
 
@@ -205,6 +213,17 @@ When forking a repo to submit a PR:
 Most repos here use **jj (jujutsu)** over a git backend. Detect: `jj root`
 succeeds (or a `.jj/` dir exists up-tree) → jj repo. Plain-git repos — this
 chezmoi repo and `~/work/prs/*` PR forks — have a `.git` and no `.jj` → use git.
+
+### jj-flow (lunar wip→PR workflow)
+
+In a jj-flow repo (lunar), use **`jjf`** (`jj-flow`) for the wip→PR workflow —
+NOT raw rebase/mirror/catch-up. **Run `jjf guide` first** — task recipes
+(WHEN/DO/VERIFY/WHY) for the whole ecosystem; `jjf guide <verb>` narrows to one.
+- Work off YOUR per-agent base `local/main-<workspace>`; run `jjf base fork` once
+  to mint it. **Never `jjf catchup`/rebase the shared `local/main`** — it drags
+  every other agent.
+- `jjf status --graph` before acting; `jjf push` updates live PRs append-only (no
+  force-push); `jjf catchup` advances only your stream.
 
 ### jj repos
 - No staging area: jj auto-snapshots the working copy at the START of every
@@ -245,6 +264,14 @@ chezmoi repo and `~/work/prs/*` PR forks — have a `.git` and no `.jj` → use 
 ### Both
 - Commit or push **only when I ask**.
 - Never add "Generated with Claude Code" or `Co-Authored-By` lines to commit messages.
+- **NEVER flatten/squash a commit chain to avoid resolving conflicts.** When a
+  rebase/catchup leaves a stack conflicted, deconflict it **in the chain** —
+  every original commit stays. In jj, conflicts propagate up from the earliest
+  conflicted commit: `jj edit <earliest-conflicted>`, resolve its files, let jj
+  rebase descendants (many auto-clear), repeat up the chain; verify the full
+  suite at the tip. Losing history to save effort is never an acceptable trade.
+  If a chain is genuinely un-deconflictable, STOP and ask — never destroy
+  history unilaterally.
 
 ## Principia
 

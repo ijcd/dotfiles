@@ -1,4 +1,5 @@
 {
+  "model": "claude-opus-4-8",
   "hooks": {
     "SessionStart": [
       {
@@ -17,6 +18,12 @@
           {
             "type": "command",
             "command": "rtk hook claude"
+          },
+          {
+            "type": "command",
+            "command": "/Users/ijcd/.claude/hooks/lunar-pr-gate.sh",
+            "timeout": 120,
+            "statusMessage": "lunar PR gate"
           }
         ]
       }
@@ -37,6 +44,19 @@
           {
             "type": "command",
             "command": "/Users/ijcd/.claude/hooks/claude-stop.sh"
+          }
+        ]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": "Write|Edit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "/Users/ijcd/.claude/hooks/lunar-mix-format.sh",
+            "timeout": 60,
+            "statusMessage": "mix format (lunar)"
           }
         ]
       }

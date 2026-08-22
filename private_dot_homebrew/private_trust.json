@@ -1,9 +1,6 @@
 {
-  "trustedtaps": [
-    "nikitabobko/tap",
-    "raine/workmux"
-  ],
   "trustedformulae": [
+    "ijcd/tap/dev-ip",
     "raine/workmux/workmux"
   ]
 }
