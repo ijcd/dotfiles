@@ -14,6 +14,11 @@ fi
 
 source "$(dirname "$0")/jjflow-lib.sh"
 
+# Verb modules are LAZY-sourced (only when their verb runs) so they never coexist
+# in one namespace — keeps `jj-flow status` lean and stops cross-module collisions
+# as more tools fold in.
+_flow_mod() { source "$(dirname "$0")/jjflow-$1.sh"; }
+
 usage() {
   cat <<'EOF'
 jj-flow — one porcelain over the personal-stack → PR-projection workflow.
@@ -24,37 +29,32 @@ Usage:
   jj-flow mirror [-n]          re-derive ijcd/* from wip/* (no push)
   jj-flow push [-t <br>]       mirror (merge-forward live PRs) + jj-vine submit
   jj-flow integrate <cmd>      manage local/integration (add/drop/catchup/…)
+  jj-flow base <fork|list>     per-agent private base (local/main-<workspace>)
+  jj-flow refresh [-f] [-p]    refresh stale workspaces after a history rewrite
   jj-flow tug [--all]          advance the nearest bookmark to @-
   jj-flow cleanup <name>       tear down a merged PR (bookmarks, workspace, tab)
   jj-flow ship                 catchup, then push — gated on a clean catch-up
+  jj-flow guide [verb]         long-form task recipes (for agents) — start here
   jj-flow help                 this help
 
-Verbs delegate to the underlying jj-catch-up / jj-mirror / jj-integrate /
-jj-tug / jj-cleanup tools; `status` is native. Config: [jj-flow] (falls back to
-[jj-mirror]/[jj-integrate]). See the design spec under docs/superpowers/specs/.
-EOF
-}
+Every verb runs in-process from a sourced jjflow-*.sh module (jj-vine is the only
+external tool). Config: [jj-flow] (falls back to [jj-mirror]/[jj-integrate]).
 
-# flow_run TOOL ARGS… — run a delegated tool found on PATH (so shims work),
-# with a clear error if it's missing. JJFLOW_DELEGATE_DRYRUN=1 prints the
-# resolved command instead of running it (used by the dispatch tests).
-flow_run() {
-  local tool=$1; shift
-  if [[ -n "${JJFLOW_DELEGATE_DRYRUN:-}" ]]; then
-    printf 'would-run: %s %s\n' "$tool" "$*"; return 0
-  fi
-  command -v "$tool" >/dev/null 2>&1 || { echo "jj-flow: '$tool' not found on PATH — is it installed?" >&2; return 127; }
-  "$tool" "$@"
+→ New here (or an agent)? Run `jj-flow guide` for task recipes.
+EOF
 }
 
 # flow_ship — the gated pipeline: catch the private stack up to trunk, and only
 # if that lands clean, project + push the PRs. A conflicted catch-up stops here
-# so a mess never rides through to a force-push-free PR update.
+# so a mess never rides through to a PR update. All in-process (module functions),
+# no external delegation.
 flow_ship() {
   echo "jj-flow: catching the private stack up to trunk…" >&2
-  flow_run jj-catch-up || { echo "jj-flow: catch-up did not finish clean — resolve conflicts, then 'jj-flow ship' again." >&2; return 1; }
+  _flow_mod refresh; _flow_mod catchup
+  catchup_main || { echo "jj-flow: catch-up did not finish clean — resolve, then 'jj-flow ship' again." >&2; return 1; }
   echo "jj-flow: projecting + pushing PRs (merge-forward)…" >&2
-  flow_run jj-mirror push
+  _flow_mod mirror
+  mirror_main push
 }
 
 # status_main — the unified table: trunk/base header, one row per wip/* branch
@@ -91,7 +91,7 @@ status_main() {
   (( has_catchup )) && hints+=("catchup — branches behind trunk")
   (( has_push ))    && hints+=("push — mirrored branches to submit")
   (( has_cleanup )) && hints+=("cleanup — merged PRs to retire")
-  (( ${#hints[@]} )) && { printf '\nnext    '; local IFS=' · '; printf '%s\n' "${hints[*]}"; }
+  if (( ${#hints[@]} )); then printf '\nnext    '; local IFS=' · '; printf '%s\n' "${hints[*]}"; fi
 }
 
 # status_graph — the private-stack spine (trunk → base → wip/*) with ──▶ ijcd/*
@@ -166,12 +166,17 @@ case "${1:-status}" in
     esac
     exit 0
     ;;
-  catchup)   shift; flow_run jj-catch-up "$@"; exit $? ;;
-  mirror)    shift; flow_run jj-mirror sync "$@"; exit $? ;;
-  push)      shift; flow_run jj-mirror push "$@"; exit $? ;;
-  integrate) shift; flow_run jj-integrate "$@"; exit $? ;;
-  tug)       shift; flow_run jj-tug "$@"; exit $? ;;
-  cleanup)   shift; flow_run jj-cleanup "$@"; exit $? ;;
+  catchup)   shift; _flow_mod refresh; _flow_mod catchup; catchup_main "$@"; exit $? ;;   # in-process module
+  refresh)   shift; _flow_mod refresh; refresh_main "$@"; exit $? ;;   # workspace refresh (used by catchup)
+  # base-strip against THIS agent's base: set JJ_MIRROR_SOURCE_ROOT from FLOW_BASE
+  # when in a repo (guarded so `--help` outside a repo still works in tests).
+  mirror)    shift; _flow_mod mirror; jj root >/dev/null 2>&1 && { flow_load_config; export JJ_MIRROR_SOURCE_ROOT="$FLOW_BASE"; }; mirror_main sync "$@"; exit $? ;;
+  push)      shift; _flow_mod mirror; jj root >/dev/null 2>&1 && { flow_load_config; export JJ_MIRROR_SOURCE_ROOT="$FLOW_BASE"; }; mirror_main push "$@"; exit $? ;;
+  integrate) shift; _flow_mod integrate; integrate_main "$@"; exit $? ;;   # in-process module
+  base)      shift; _flow_mod base; base_main "$@"; exit $? ;;   # per-agent base management
+  guide)     shift; _flow_mod guide; guide_main "$@"; exit $? ;;   # long-form recipe help for agents
+  tug)       shift; _flow_mod tug; tug_main "$@"; exit $? ;;   # in-process module
+  cleanup)   shift; _flow_mod cleanup; cleanup_main "$@"; exit $? ;;   # in-process module
   ship)      shift; flow_ship; exit $? ;;
   _dump-config)
     flow_load_config

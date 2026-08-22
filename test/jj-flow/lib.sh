@@ -1,6 +1,7 @@
 # test/jj-flow/lib.sh — shared helpers for jj-flow tests. Sourced by every test_*.sh.
 
-SCRIPT="${SCRIPT:-$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)/dot_local/bin/executable_jj-flow}"
+BIN="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)/dot_local/bin"
+SCRIPT="${SCRIPT:-$BIN/executable_jj-flow}"
 
 # mkrepo — scratch jj repo under $TMPDIR; caller cds in and cleans up.
 mkrepo() {

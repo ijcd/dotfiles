@@ -7,17 +7,20 @@ source "$(dirname "$0")/lib.sh"
 
 run() { JJFLOW_DELEGATE_DRYRUN=1 "$SCRIPT" "$@"; }
 
-assert_contains "$(run catchup -f)"       'would-run: jj-catch-up -f'   "catchup → jj-catch-up"
-assert_contains "$(run mirror -n)"        'would-run: jj-mirror sync -n' "mirror → jj-mirror sync"
-assert_contains "$(run push)"             'would-run: jj-mirror push'   "push → jj-mirror push"
-assert_contains "$(run integrate status)" 'would-run: jj-integrate status' "integrate → jj-integrate"
-assert_contains "$(run tug --all)"        'would-run: jj-tug --all'     "tug → jj-tug"
-assert_contains "$(run cleanup foo)"      'would-run: jj-cleanup foo'   "cleanup → jj-cleanup"
+# In-process modules (no delegated binary) — prove routing via their help text.
+assert_contains "$("$SCRIPT" mirror --help 2>&1)"    'Re-derive the prime chain'          "mirror → mirror_main sync"
+assert_contains "$("$SCRIPT" push --help 2>&1)"      'jj-vine'                             "push → mirror_main push"
+assert_contains "$("$SCRIPT" tug --help 2>&1)"       'advance the nearest bookmark'       "tug → tug_main"
+assert_contains "$("$SCRIPT" cleanup --help 2>&1)"   'clean up after a merged/closed PR'  "cleanup → cleanup_main"
+assert_contains "$("$SCRIPT" integrate --help 2>&1)" 'octopus-merge bookmark'             "integrate → integrate_main"
+assert_contains "$("$SCRIPT" catchup --help 2>&1)"   'rebase the private stack'           "catchup → catchup_main"
 
-# ship is the gated composition: catch-up THEN push.
-ship=$(run ship 2>&1)
-assert_contains "$ship" 'would-run: jj-catch-up'  "ship runs catch-up first"
-assert_contains "$ship" 'would-run: jj-mirror push' "ship then pushes"
+# ship is the gated composition: catch-up THEN push, in-process. Outside a jj repo
+# catch-up fails first, so ship stops BEFORE any push (the gate).
+rc=0; ship=$(cd /tmp && "$SCRIPT" ship 2>&1) || rc=$?
+[[ "$rc" -ne 0 ]] || fail "ship should fail when catch-up can't run"
+assert_contains "$ship" 'catching the private stack' "ship runs catch-up first"
+[[ "$ship" != *'pushing PRs'* ]] || fail "ship must NOT push when catch-up fails (gate)"
 
 # help lists the verbs.
 help=$("$SCRIPT" help)

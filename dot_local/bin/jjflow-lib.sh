@@ -28,6 +28,18 @@ flow_require_repo() {
   }
 }
 
+# flow_current_workspace — name of the CURRENT jj workspace, or empty. jj 0.43's
+# `workspace list` has no current-marker, but `workspace root` returns the current
+# workspace's path; match it against the list's root column to get the name. This
+# is how each agent (= workspace) gets its own base without per-repo config (which
+# is shared across all workspaces).
+flow_current_workspace() {
+  local cur n r; cur=$(jj workspace root 2>/dev/null) || return 0
+  while IFS=$'\t' read -r n r; do
+    [[ "$r" == "$cur" ]] && { printf '%s' "$n"; return 0; }
+  done < <(jj workspace list -T 'name ++ "\t" ++ root ++ "\n"' 2>/dev/null)
+}
+
 flow_load_config() {
   flow_require_repo
   FLOW_TRUNK=$(_cfg trunk 'trunk()' 'jj-mirror.prime-root')
@@ -37,6 +49,14 @@ flow_load_config() {
   FLOW_INTEGRATION=$(_cfg integration 'local/integration' 'jj-integrate.bookmark')
   FLOW_WS_DIR=$(_cfg workspace-dir '' )
   FLOW_REMOTE=$(_cfg remote 'origin')
+
+  # Per-agent base: if this workspace has its own local/main-<W>, it wins over the
+  # config default (which can't be per-workspace). Falls back cleanly otherwise, so
+  # a single-agent repo is unchanged.
+  FLOW_WS=$(flow_current_workspace)
+  if [[ -n "$FLOW_WS" ]] && jj log --no-graph -r "local/main-$FLOW_WS" -T '""' >/dev/null 2>&1; then
+    FLOW_BASE="local/main-$FLOW_WS"
+  fi
 }
 
 # flow_cid REV — short commit id of REV, or empty.
