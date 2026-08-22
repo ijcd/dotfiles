@@ -27,7 +27,10 @@
     /usr/bin/pmset -c displaysleep 10  # display may sleep — machine stays live
 
     echo "blackbird: pmset — battery (bag-friendly)"
-    /usr/bin/pmset -b sleep        3   # idle-sleep after 3 min on battery
+    # Idle-sleep at 30 min (was 3) so a battery display-sleep doesn't drag the
+    # machine to sleep behind it and drop the VPN/SSH tunnel. Closing the lid
+    # still clamshell-sleeps immediately, so the "bag-friendly" intent holds.
+    /usr/bin/pmset -b sleep        30  # idle-sleep after 30 min on battery
 
     echo "blackbird: Screen Sharing (VNC) daemon — :5900 for the VM to relay"
     /bin/launchctl enable system/com.apple.screensharing 2>/dev/null || true

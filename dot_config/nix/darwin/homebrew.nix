@@ -69,6 +69,7 @@ in
       "mkcert"           # locally-trusted dev TLS certs (local CA + leaf certs); `mkcert -install`
       "qpdf"             # structural PDF transforms (encrypt/linearize/split/merge)
       "weasyprint"       # HTML/CSS → PDF renderer; doc/PDF generators shell out to it
+      "agent-browser"    # browser automation CLI for AI agents (agent-browser.dev; not in nixpkgs)
     ];
 
     # Universal cask set — installed on EVERY host, including the generic

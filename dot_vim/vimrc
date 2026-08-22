@@ -44,7 +44,8 @@ set sidescrolloff=5
 set wrap linebreak
 
 set mouse=a                 " mouse in all modes
-set clipboard=unnamed       " yank to system clipboard (macOS)
+set clipboard=              " keep registers OFF the system clipboard — deletes/changes
+                            " no longer clobber it; use "+y / "*y to copy deliberately
 
 set termguicolors           " 24-bit colors if terminal supports
 set background=dark

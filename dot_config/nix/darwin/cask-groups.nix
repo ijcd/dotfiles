@@ -62,7 +62,8 @@
 
   # ── Work: blackbird (work laptop) only ──────────────────────────────────────
   work = [
-    "aws-vpn-client" # AWS Client VPN — lunar AWS access (setup: lunar config repo)
+    "aws-vpn-client"          # AWS Client VPN — lunar AWS access (setup: lunar config repo)
+    "session-manager-plugin"  # `aws ssm start-session` — SSM into EC2 instances
   ];
 
   # ── Home / personal: bearcat only ──────────────────────────────────────────
