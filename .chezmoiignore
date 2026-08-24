@@ -15,6 +15,7 @@
 !/.editorconfig
 !/.hammerspoon
 !/.homebrew
+/.homebrew/trust.json             # volatile machine state — rewritten on every brew op + by the run_once brew-trust bootstrap; never track (kept drifting → blocking nixhome-rebuild)
 !/.local
 !/.ssh
 !/.vim
