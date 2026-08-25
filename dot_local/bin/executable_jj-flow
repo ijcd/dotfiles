@@ -170,7 +170,10 @@ case "${1:-status}" in
   refresh)   shift; _flow_mod refresh; refresh_main "$@"; exit $? ;;   # workspace refresh (used by catchup)
   # base-strip against THIS agent's base: set JJ_MIRROR_SOURCE_ROOT from FLOW_BASE
   # when in a repo (guarded so `--help` outside a repo still works in tests).
-  mirror)    shift; _flow_mod mirror; jj root >/dev/null 2>&1 && { flow_load_config; export JJ_MIRROR_SOURCE_ROOT="$FLOW_BASE"; }; mirror_main sync "$@"; exit $? ;;
+  # `jjf mirror` alone (or with a flag) = sync shortcut; `jjf mirror <subcmd>`
+  # (status/add/rm/config/…) passes through to the full mirror dispatch.
+  mirror)    shift; _flow_mod mirror; jj root >/dev/null 2>&1 && { flow_load_config; export JJ_MIRROR_SOURCE_ROOT="$FLOW_BASE"; }
+             if [[ $# -eq 0 || "$1" == -* ]]; then mirror_main sync "$@"; else mirror_main "$@"; fi; exit $? ;;
   push)      shift; _flow_mod mirror; jj root >/dev/null 2>&1 && { flow_load_config; export JJ_MIRROR_SOURCE_ROOT="$FLOW_BASE"; }; mirror_main push "$@"; exit $? ;;
   integrate) shift; _flow_mod integrate; integrate_main "$@"; exit $? ;;   # in-process module
   base)      shift; _flow_mod base; base_main "$@"; exit $? ;;   # per-agent base management

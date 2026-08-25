@@ -36,33 +36,28 @@ email = "ian@golunar.com"
 email = "ian@ianduggan.net"
 {{- end }}
 
-# Workflow aliases (host-independent). `mine` = my branches that hang off local/main:
-# bookmarked descendants of local/main's own commits (trunk()..local/main), minus main
-# itself. Topology-based, not naming-based, so a mis-named branch (ijcd- vs ijcd/) can't
-# silently escape restack-mine — it "tugs" whatever is attached to main. The restack
-# aliases rebase that whole set onto trunk() / local main. `sincemain` = my work since
-# local main (swap `local/main` for `trunk()` to measure from remote master).
+# Workflow aliases (host-independent), PER-WORKSPACE-BASE aware. Each agent works
+# off its own base local/main-<workspace> (jj-flow), so these no longer hardcode a
+# shared local/main — that shared base was the source of cross-agent conflicts.
 [revset-aliases]
-'mine' = 'bookmarks() & descendants(trunk()..local/main) ~ local/main'
-'sincemain' = 'local/main..@'
+# mine = my wip branches ON THIS WORKSPACE'S base (wip/* descending from the nearest
+# local/main-* ancestor of @). Base-agnostic — no shared-base reference.
+'mine' = 'bookmarks(regex:"^wip/") & descendants(heads(::@ & bookmarks(regex:"^local/main")))'
+# sincemain = my work since MY base: the nearest local/main-* bookmark at-or-behind
+# @ (= this workspace's base) .. @. Per-workspace by construction.
+'sincemain' = 'heads(::@ & bookmarks(regex:"^local/main"))..@'
 'sincemaster' = 'trunk()..@'
 # closest_bookmark(to) = the nearest bookmark at-or-behind `to` (used by `jj tug`).
 'closest_bookmark(to)' = 'heads(::to & bookmarks())'
 
 [aliases]
-restack-mine-to-trunk = ["rebase", "-b", "mine", "-d", "trunk()"]
-restack-mine = ["rebase", "-b", "mine", "-d", "local/main"]
-# restack: -s from the ROOT of the personal stack, NOT local/main's tip. `-s
-# local/main` shears the tip + its descendants off a multi-commit base, orphaning
-# the base (e.g. settings.json below env-setup) every run. roots(trunk()..local/main)
-# = the bottom commit, so -s lifts the whole stack as one unit (works for a 1- or
-# N-commit local/main; roots of a single commit is itself). Verified in a scratch repo.
-restack = ["rebase", "-s", "roots(trunk()..local/main)", "-d", "trunk()"]
-# tug: advance the nearest bookmark up to @- (the last real commit). Delegates to
-# jj-tug, which also does `jj tug --all [glob]` across every workspace (glob
-# defaults to wip/*), addressing each via `<ws>@` — no cd, stale-safe.
-tug = ["util", "exec", "--", "jj-tug"]
-# rp/lp: patch logs. rp = work since local main with --stat; lp = plain -p.
+# restack / restack-mine REMOVED: jj-flow catchup does the per-workspace rebase now
+# (roots(trunk()..local/main-<W>) → trunk()), and the old aliases hardcoded the
+# shared local/main base, which dragged every other agent. Use `jjf catchup`.
+# tug: advance the nearest bookmark up to @- (across all workspaces with --all).
+# Runs jj-flow's tug (the standalone jj-tug shim was retired).
+tug = ["util", "exec", "--", "jj-flow", "tug"]
+# rp/lp: patch logs. rp = work since my base with --stat; lp = plain -p.
 rp = ["log", "--no-graph", "-r", "sincemain", "--stat", "-p"]
 lp = ["log", "--no-graph", "-p"]
 # vine: run jj-vine (stacked-PR submit helper) as `jj vine …`.

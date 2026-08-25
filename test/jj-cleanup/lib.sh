@@ -1,5 +1,6 @@
 # test/jj-cleanup/lib.sh — shared helpers for jj-cleanup tests.
-SCRIPT="${SCRIPT:-$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)/dot_local/bin/executable_jj-cleanup}"
+source "$(dirname "${BASH_SOURCE[0]}")/../_jjflow_testwrap.sh"
+SCRIPT="${SCRIPT:-$(flow_make_wrapper "jjflow-cleanup.sh" cleanup_main)}"
 
 # Isolate the dev's global jj config.
 _iso="$(mktemp -d "${TMPDIR:-/tmp}/jjclean-cfg.XXXXXX")/config.toml"; : > "$_iso"

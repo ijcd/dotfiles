@@ -1,7 +1,8 @@
 # test/jj-mirror/lib.sh — shared helpers for jj-mirror tests.
 # Sourced by every test_*.sh script.
 
-SCRIPT="${SCRIPT:-$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)/dot_local/bin/executable_jj-mirror}"
+source "$(dirname "${BASH_SOURCE[0]}")/../_jjflow_testwrap.sh"
+SCRIPT="${SCRIPT:-$(flow_make_wrapper "jjflow-mirror.sh" mirror_main euo)}"
 
 # mkrepo — create a scratch jj repo under $TMPDIR and print its path.
 # The caller MUST `cd` into the path — mkrepo runs setup in a subshell so its

@@ -1,7 +1,8 @@
 # test/jj-catch-up/lib.sh — shared helpers for the (new) catch-up suite.
 
 BIN="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)/dot_local/bin"
-SCRIPT="${SCRIPT:-$BIN/executable_jj-refresh-workspaces}"
+source "$(dirname "${BASH_SOURCE[0]}")/../_jjflow_testwrap.sh"
+SCRIPT="${SCRIPT:-$(flow_make_wrapper "jjflow-refresh.sh" refresh_main euo)}"
 
 mkrepo() {
   local dir; dir="$(mktemp -d "${TMPDIR:-/tmp}/jj-catchup-test.XXXXXX")"

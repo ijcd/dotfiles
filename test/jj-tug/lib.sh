@@ -1,5 +1,6 @@
 # test/jj-tug/lib.sh — shared helpers for jj-tug tests.
-SCRIPT="${SCRIPT:-$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)/dot_local/bin/executable_jj-tug}"
+source "$(dirname "${BASH_SOURCE[0]}")/../_jjflow_testwrap.sh"
+SCRIPT="${SCRIPT:-$(flow_make_wrapper "jjflow-tug.sh" tug_main)}"
 
 # Isolate the dev's global jj config (no closest_bookmark alias, no diff-formatter).
 _iso="$(mktemp -d "${TMPDIR:-/tmp}/jjtug-cfg.XXXXXX")/config.toml"; : > "$_iso"

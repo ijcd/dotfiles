@@ -1,7 +1,8 @@
 # test/jj-integrate/lib.sh — shared helpers for jj-integrate tests.
 # Sourced by every test_*.sh script.
 
-SCRIPT="${SCRIPT:-$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)/dot_local/bin/executable_jj-integrate}"
+source "$(dirname "${BASH_SOURCE[0]}")/../_jjflow_testwrap.sh"
+SCRIPT="${SCRIPT:-$(flow_make_wrapper "jjflow-integrate.sh" integrate_main euo)}"
 
 # Isolate the dev's global jj config so it can't mask behavior (e.g. a personal
 # ui.diff-formatter or aliases). Identity still comes from mkrepo's --repo config.
