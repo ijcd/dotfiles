@@ -28,10 +28,11 @@
         ]
       },
       {
+        "matcher": "AskUserQuestion",
         "hooks": [
           {
             "type": "command",
-            "command": "/Users/ijcd/.claude/hooks/claude-attn.sh clear"
+            "command": "/Users/ijcd/.claude/hooks/claude-attn.sh set"
           }
         ]
       }
@@ -83,6 +84,14 @@
             "command": "/Users/ijcd/.claude/hooks/lunar-mix-format.sh",
             "timeout": 60,
             "statusMessage": "mix format (lunar)"
+          }
+        ]
+      },
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "/Users/ijcd/.claude/hooks/claude-attn.sh clear"
           }
         ]
       }
