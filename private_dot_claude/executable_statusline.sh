@@ -121,13 +121,20 @@ if [ -n "${KITTY_LISTEN_ON:-}" ] && [ -n "${KITTY_WINDOW_ID:-}" ] && [ -n "$sess
                 ~/.claude/sessions/*.json 2>/dev/null | head -1)
     [ -z "$status" ] && status="unknown"
 
+    # "waiting on input" is not a native status (Claude Code emits only
+    # busy/idle/shell); the Notification hook drops /tmp/claude-attn-<session>,
+    # cleared when work resumes (PreToolUse) or the turn ends (Stop) / a new
+    # prompt lands (UserPromptSubmit). Presence of the marker wins over busy/idle.
+    [ -f "/tmp/claude-attn-${session}" ] && status="waiting"
+
     # Saturated bg in the state's hue; active fg is white (high-contrast for the
     # focused tab where you're reading), inactive fg is a dim shade of the ball
     # color (state-coded for peripheral scanning of unfocused tabs).
     case "$status" in
-        busy) emoji="🟡"; active_bg="#5e4818"; inactive_bg="#3e3008"; active_fg="#ffffff"; inactive_fg="#cc9030" ;;
-        idle) emoji="🔴"; active_bg="#5e2424"; inactive_bg="#3e1818"; active_fg="#ffffff"; inactive_fg="#cc4040" ;;
-        *)    emoji="" ;;  # status field missing (older Claude Code) — leave tab unchanged
+        busy)    emoji="🟡"; active_bg="#5e4818"; inactive_bg="#3e3008"; active_fg="#ffffff"; inactive_fg="#cc9030" ;;
+        waiting) emoji="🔵"; active_bg="#1e3a5e"; inactive_bg="#14283e"; active_fg="#ffffff"; inactive_fg="#5a9fd4" ;;
+        idle)    emoji="🔴"; active_bg="#5e2424"; inactive_bg="#3e1818"; active_fg="#ffffff"; inactive_fg="#cc4040" ;;
+        *)       emoji="" ;;  # status field missing (older Claude Code) — leave tab unchanged
     esac
 
     if [ -n "$emoji" ]; then
@@ -143,7 +150,7 @@ if [ -n "${KITTY_LISTEN_ON:-}" ] && [ -n "${KITTY_WINDOW_ID:-}" ] && [ -n "$sess
                   '.[].tabs[] | select(.windows[].id == $wid) | .title' 2>/dev/null)
             # strip any leading status prefix (current + legacy markers)
             base="$cur"
-            base="${base#🟢 }"; base="${base#🟡 }"; base="${base#🔴 }"
+            base="${base#🟢 }"; base="${base#🟡 }"; base="${base#🔴 }"; base="${base#🔵 }"
             base="${base#⏳ }"; base="${base#… }"
 
             kitty @ set-tab-title --match "window_id:$KITTY_WINDOW_ID" "$emoji $base" 2>/dev/null

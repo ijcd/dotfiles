@@ -26,6 +26,14 @@
             "statusMessage": "lunar PR gate"
           }
         ]
+      },
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "/Users/ijcd/.claude/hooks/claude-attn.sh clear"
+          }
+        ]
       }
     ],
     "Stop": [
@@ -34,6 +42,10 @@
           {
             "type": "command",
             "command": "/Users/ijcd/.claude/hooks/claude-stop.sh"
+          },
+          {
+            "type": "command",
+            "command": "/Users/ijcd/.claude/hooks/claude-attn.sh clear"
           }
         ]
       }
@@ -44,6 +56,20 @@
           {
             "type": "command",
             "command": "/Users/ijcd/.claude/hooks/claude-stop.sh"
+          },
+          {
+            "type": "command",
+            "command": "/Users/ijcd/.claude/hooks/claude-attn.sh set"
+          }
+        ]
+      }
+    ],
+    "UserPromptSubmit": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "/Users/ijcd/.claude/hooks/claude-attn.sh clear"
           }
         ]
       }

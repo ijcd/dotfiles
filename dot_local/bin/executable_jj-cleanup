@@ -1,5 +1,0 @@
-#!/usr/bin/env bash
-# jj-cleanup — compat entry. Logic lives in jjflow-cleanup.sh, shared with `jj-flow cleanup`.
-set -uo pipefail
-source "$(dirname "$0")/jjflow-cleanup.sh"
-cleanup_main "$@"

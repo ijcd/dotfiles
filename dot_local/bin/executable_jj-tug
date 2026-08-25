@@ -1,8 +1,0 @@
-#!/usr/bin/env bash
-# jj-tug — compat entry. Logic lives in jjflow-tug.sh, shared with `jj-flow tug`.
-set -uo pipefail
-if (( BASH_VERSINFO[0] < 4 )); then
-  echo "jj-tug: bash ${BASH_VERSION} too old — needs bash 4+" >&2; exit 1
-fi
-source "$(dirname "$0")/jjflow-tug.sh"
-tug_main "$@"

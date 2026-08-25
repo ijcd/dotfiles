@@ -1,8 +1,0 @@
-#!/usr/bin/env bash
-# jj-integrate — compat entry. Logic in jjflow-integrate.sh, shared with `jj-flow integrate`.
-set -euo pipefail
-if (( BASH_VERSINFO[0] < 4 )); then
-  echo "jj-integrate: bash ${BASH_VERSION} too old — needs bash 4+" >&2; exit 1
-fi
-source "$(dirname "$0")/jjflow-integrate.sh"
-integrate_main "$@"

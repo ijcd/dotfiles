@@ -1,6 +1,0 @@
-#!/usr/bin/env bash
-# jj-refresh-workspaces — compat entry. Logic lives in jjflow-refresh.sh, shared
-# with `jj-flow refresh` and used by `jj-flow catchup`.
-set -euo pipefail
-source "$(dirname "$0")/jjflow-refresh.sh"
-refresh_main "$@"
