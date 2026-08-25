@@ -111,21 +111,27 @@ echo "${parts[*]}"
 
 # ─── Kitty tab rendering (broad mode: busy=🟡, idle=🔴) ───
 # Statusline runs on every Claude Code UI update, so this is effectively a live
-# state monitor. We read .status from ~/.claude/sessions/<pid>.json (matched by
+# state monitor. We read .status from $CLAUDE_CONFIG_DIR/sessions/<id>.json (matched by
 # sessionId) and reflect it on the kitty tab — title prefix + tab background tint.
 # A small state-cache file avoids redundant kitty @ calls when nothing changed.
 
 if [ -n "${KITTY_LISTEN_ON:-}" ] && [ -n "${KITTY_WINDOW_ID:-}" ] && [ -n "$session" ]; then
     # Live session status; falls back to "unknown" for older Claude versions or fresh sessions.
     status=$(jq -r --arg sid "$session" 'select(.sessionId == $sid) | .status // "unknown"' \
-                ~/.claude/sessions/*.json 2>/dev/null | head -1)
+                "${CLAUDE_CONFIG_DIR:-$HOME/.claude}"/sessions/*.json 2>/dev/null | head -1)
     [ -z "$status" ] && status="unknown"
 
     # "waiting on input" is not a native status (Claude Code emits only
-    # busy/idle/shell); the Notification hook drops /tmp/claude-attn-<session>,
-    # cleared when work resumes (PreToolUse) or the turn ends (Stop) / a new
-    # prompt lands (UserPromptSubmit). Presence of the marker wins over busy/idle.
-    [ -f "/tmp/claude-attn-${session}" ] && status="waiting"
+    # busy/idle/shell); the Notification hook drops /tmp/claude-attn-<session>.
+    # Blue ONLY overrides an active (busy) session that's blocked; once the session
+    # is idle the turn is over — red wins and we clear any stale marker, so exiting
+    # or finishing never leaves a tab stuck blue (the Notification on exit set it).
+    _attn="/tmp/claude-attn-${session}"
+    if [ "$status" = idle ] || [ "$status" = shell ] || [ "$status" = unknown ]; then
+        rm -f "$_attn"
+    elif [ -f "$_attn" ]; then
+        status="waiting"
+    fi
 
     # Saturated bg in the state's hue; active fg is white (high-contrast for the
     # focused tab where you're reading), inactive fg is a dim shade of the ball
