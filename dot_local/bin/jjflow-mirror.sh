@@ -440,9 +440,18 @@ list_all_bookmarks() { list_bookmarks_with_prefix ""; }
 # rule (<source-prefix>*) reproduces it.
 list_source_bookmarks() {
   ensure_rules
-  local name cid
+  local name cid sroot
   while IFS=$'\t' read -r name cid; do
-    is_included "$name" && printf '%s\t%s\n' "$name" "$cid"
+    is_included "$name" || continue
+    # Per-agent isolation: only sources that DESCEND from their source root (this
+    # agent's base, local/main-<W>). A branch on a different base — another agent's
+    # stream, or a cross-base octopus/integration branch — is out of scope and must
+    # not be enumerated, thread-walked, or linearity-checked here; otherwise one
+    # agent's non-linear branch aborts every other agent's mirror. Scoped by the
+    # branch's own resolved source root, so per-pair root overrides still work.
+    sroot=$(resolve_source_root "$name")
+    jj log --no-graph -r "($name) & descendants($sroot)" -T '"x"' 2>/dev/null | grep -q x || continue
+    printf '%s\t%s\n' "$name" "$cid"
   done < <(list_all_bookmarks)
   return 0
 }
