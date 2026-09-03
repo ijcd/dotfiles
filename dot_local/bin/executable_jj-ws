@@ -1,0 +1,134 @@
+#!/usr/bin/env bash
+# jj-ws — thin jujutsu workspace helper. One name = workspace name = bookmark.
+set -euo pipefail
+
+LIB="$HOME/work/repos/github.com/ijcd"
+
+die() { echo "jj-ws: $*" >&2; exit 1; }
+
+usage() {
+  cat <<'BANNER'
+
+    ┌─────────────────────────────────────┐
+    │   jj-ws · jujutsu workspace helper   │
+    └─────────────────────────────────────┘
+
+  USAGE
+    jj-ws <repo> <name> [dir]       new workspace (bookmark = name)
+    jj-ws new <repo> <name> [dir]   explicit form of the above
+    jj-ws rm [name] [--force]       close current (or named) workspace
+    jj-ws ls                        list every live workspace on the machine
+
+  NEW — flags
+    --from <rev>        base revision       (default: repo ws.base, else trunk())
+    --bookmark <name>   full bookmark name  (skips the prefix)
+    --at <dir>          destination dir     (default: ~/work/<repo>/<name>)
+
+  CONFIG — per-repo override:  jj -R <repo> config set --repo <key> <value>
+    ws.base             default base revision
+    ws.bookmark-prefix  bookmark prefix     (default: ijcd/)
+
+  EXAMPLES
+    jj-ws roc fix-parser            → ~/work/roc/fix-parser, bookmark ijcd/fix-parser
+    jj-ws roc hotfix --from v2.1    → base a workspace on a tag
+    jj-ws rm fix-parser             → close it once merged (--force to override safety)
+    jj-ws ls                        → what's in flight, everywhere
+
+BANNER
+}
+
+resolve_store() { # <repo-or-path> -> absolute store path
+  local r="$1"
+  if [ -d "$LIB/$r/.jj" ]; then echo "$LIB/$r"; return; fi
+  if [ -d "$r/.jj" ]; then (cd "$r" && jj workspace root); return; fi
+  die "no jj repo '$r' in library ($LIB/$r) or as a path"
+}
+
+cfg() { jj -R "$1" config get "$2" 2>/dev/null || true; }  # <store> <key>
+
+cmd_new() {
+  local from="" bkmk="" at="" pos=()
+  while [ $# -gt 0 ]; do
+    case "$1" in
+      --from) from="$2"; shift 2;;
+      --bookmark) bkmk="$2"; shift 2;;
+      --at) at="$2"; shift 2;;
+      -*) die "unknown flag $1";;
+      *) pos+=("$1"); shift;;
+    esac
+  done
+  [ "${#pos[@]}" -ge 2 ] || die "usage: jj-ws <repo> <name> [dir]   (jj-ws --help)"
+  local repo="${pos[0]}" name="${pos[1]}" dir="${pos[2]:-}"
+  local store; store="$(resolve_store "$repo")"
+
+  local base="${from:-$(cfg "$store" ws.base)}"; base="${base:-trunk()}"
+  if [ -z "$bkmk" ]; then
+    local prefix; prefix="$(cfg "$store" ws.bookmark-prefix)"
+    if ! jj -R "$store" config get ws.bookmark-prefix >/dev/null 2>&1; then prefix="ijcd/"; fi
+    bkmk="${prefix}${name}"
+  fi
+  dir="${at:-${dir:-$HOME/work/$repo/$name}}"
+
+  [ -e "$dir" ] && die "destination exists: $dir"
+  # nesting guard: refuse if any ancestor of the destination is itself a repo
+  local anc; anc="$(dirname "$dir")"
+  while [ "$anc" != "/" ] && [ "$anc" != "$HOME" ]; do
+    if [ -e "$anc/.git" ] || [ -e "$anc/.jj" ]; then
+      die "would nest inside a repo at $anc — clean up that checkout or pass a different dir (--at)"
+    fi
+    anc="$(dirname "$anc")"
+  done
+
+  echo "jj-ws: new workspace '$name' of $(basename "$store")  base=$base  bookmark=$bkmk"
+  jj -R "$store" workspace add --name "$name" --revision "$base" "$dir" >/dev/null
+  jj -R "$dir" bookmark create "$bkmk" -r @ >/dev/null
+  echo "$dir"
+}
+
+cmd_rm() {
+  local force=0 name=""
+  while [ $# -gt 0 ]; do
+    case "$1" in --force|-f) force=1; shift;; -*) die "unknown flag $1";; *) name="$1"; shift;; esac
+  done
+
+  local dir wsname
+  if [ -z "$name" ]; then
+    dir="$(jj workspace root 2>/dev/null)" || die "not in a workspace (pass a name)"
+  else
+    dir="$(find "$HOME/work" -maxdepth 4 -type d -name "$name" -exec test -e '{}/.jj' ';' -print 2>/dev/null | head -1)"
+    [ -n "$dir" ] || die "no workspace named '$name' found under ~/work"
+  fi
+  wsname="$(basename "$dir")"   # dir name == workspace name (our convention)
+
+  # safety: non-empty commits between trunk and @ = real work (covers uncommitted + committed)
+  local work
+  work="$(jj -R "$dir" log -r '(::@ ~ ::trunk()) & ~empty()' --no-graph -T '"x"' 2>/dev/null || true)"
+  if [ $force -eq 0 ] && [ -n "$work" ]; then
+    die "workspace '$wsname' has un-merged work — use --force to remove anyway"
+  fi
+
+  echo "jj-ws: closing '$wsname' ($dir)"
+  jj -R "$dir" workspace forget "$wsname" 2>/dev/null || true
+  rm -rf "$dir"
+  echo "jj-ws: removed. (bookmark left intact; delete with: jj -R <store> bookmark delete <name>)"
+}
+
+cmd_ls() {
+  printf '%-22s %-26s %s\n' "REPO" "WORKSPACE" "PATH"
+  while IFS= read -r jjdir; do
+    local d; d="$(dirname "$jjdir")"
+    [ -f "$jjdir/repo" ] || continue          # secondary workspace only (.jj/repo is a pointer file)
+    local store repo ws
+    store="$(cd "$d/.jj" && cd "$(dirname "$(cat repo)")/.." && pwd -P 2>/dev/null)" || continue
+    repo="$(basename "$store")"; ws="$(basename "$d")"
+    printf '%-22s %-26s %s\n' "$repo" "$ws" "$d"
+  done < <(find "$HOME/work" -maxdepth 5 -type d -name .jj 2>/dev/null)
+}
+
+case "${1:-}" in
+  ""|-h|--help|help) usage;;
+  new) shift; cmd_new "$@";;
+  rm|close) shift; cmd_rm "$@";;
+  ls|list) shift; cmd_ls "$@";;
+  *) cmd_new "$@";;   # bare: jj-ws <repo> <name>
+esac
