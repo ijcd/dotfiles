@@ -73,6 +73,10 @@ source $ZDOTDIR/functions/dircolor
 
 _dircolor_chpwd() { dircolor apply }
 add-zsh-hook chpwd _dircolor_chpwd
+# Also repaint before each prompt: exiting a fullscreen TUI (runclaude/claude)
+# returns to the SAME shell in the SAME dir, so chpwd never fires and the
+# background stays cleared. Idempotent — a no-op when nothing clobbered it.
+add-zsh-hook precmd _dircolor_chpwd
 dircolor apply  # apply on shell start
 
 ###########################################
