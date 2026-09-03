@@ -12,6 +12,17 @@
   apply, push, edit, publish, or set it anywhere. Applying is a separate step
   that needs its own explicit go-ahead. This is non-negotiable.
 
+- NEVER modify a repo other than the one this session is actively working
+  in. "Active repo" = the CWD when the session began (or the repo whose
+  files were the session's initial focus). If a task appears to need a
+  change in a different repo — a doc that lives there, an adjacent config,
+  a handoff note, ANYTHING — STOP and ASK before making any change.
+  Reading (cat, git status, jj log) for orientation is fine; writes (Edit,
+  Write, jj/git mutations) are not. "Commit and push" said in an active
+  repo A does NOT authorize touching repo B, including "helpful" doc edits
+  or offering revert/cleanup commands. Ask, get explicit go-ahead per repo,
+  then act. This is non-negotiable.
+
 - In all interactions and commit messages, be extremely concise and sacrifice grammar for the sake of concision.
 
 ## Writing style
