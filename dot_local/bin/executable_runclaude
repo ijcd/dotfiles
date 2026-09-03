@@ -6,15 +6,40 @@
 # That way `claude --continue` never errors out on "no session to continue."
 #
 # Usage:
-#   runclaude            # name = basename of cwd
+#   runclaude            # name = <project-root>/<leaf> from ~/work/, or fallback
 #   runclaude <name>     # explicit tab name
+#
+# Default name rule for repos under ~/work/: <first-level>/<leaf>, dropping
+# intermediate dirs. Distinguishes projects while staying short.
+#   ~/work/liberties/main            → liberties/main
+#   ~/work/theliberties/www/main     → theliberties/main   ← drops www
+#   ~/work/gracenote/agents-spine    → gracenote/agents-spine
+#   ~/work/foo                       → foo                 (single level)
+# For paths outside ~/work/: fall back to the path relative to $HOME so the
+# name still identifies the tree.
+#   ~/src/ijcd/foo                   → src/ijcd/foo
 #
 # A script rather than a shell function so session managers (sesh, etc.)
 # that enumerate executables on PATH can find it.
 
-set -uo pipefail
+set -eEuo pipefail
+trap 'echo "runclaude: ERROR line $LINENO exit $?: $BASH_COMMAND" >&2' ERR
 
-name="${1:-$(basename "$PWD")}"
+if [[ "$PWD" == "$HOME/work/"* ]]; then
+    rel="${PWD#$HOME/work/}"           # e.g. "theliberties/www/main"
+    project="${rel%%/*}"                # first-level dir under ~/work
+    leaf="${rel##*/}"                   # deepest dir
+    if [[ "$project" == "$rel" ]]; then
+        default_name="$project"         # only one level below work
+    else
+        default_name="$project/$leaf"   # drop everything between
+    fi
+elif [[ "$PWD" == "$HOME"/* ]]; then
+    default_name="${PWD#$HOME/}"
+else
+    default_name="$(basename "$PWD")"
+fi
+name="${1:-$default_name}"
 
 # Kitty tab title — silent on non-kitty terminals.
 if [ -n "${KITTY_LISTEN_ON:-}" ]; then
@@ -37,8 +62,30 @@ project_dir="$HOME/.claude/projects/$encoded"
 shopt -s nullglob
 sessions=("$project_dir"/*.jsonl)
 
-if [ "${#sessions[@]}" -gt 0 ]; then
-    exec claude --dangerously-skip-permissions --continue
+claude_args=(--dangerously-skip-permissions)
+[ "${#sessions[@]}" -gt 0 ] && claude_args+=(--continue)
+
+# Wrap in a zmx session so the pty survives kitty-tab close and can be
+# reattached locally OR over SSH from another shell — `zmx attach cc:${name}`
+# from anywhere joins the same underlying claude process. Skip wrapping if
+# already inside a zmx session (double-wrap = broken input) or if zmx is
+# unavailable (fresh machine, mid-rebuild) — fall through to bare claude.
+#
+# zmx uses the session name as a socket filename ({socket_dir}/{name}), so
+# `/` in the name (from the path-relative default above) would create a
+# nested path and fail. Sanitize to `-` for zmx while keeping the kitty tab
+# title readable with slashes.
+if command -v zmx >/dev/null && [ -z "${ZMX_SESSION:-}" ]; then
+    zmx_name="${name//\//-}"
+    printf 'runclaude: exec zmx attach %q claude %s\n' \
+        "cc:${zmx_name}" "${claude_args[*]}" >&2
+    exec zmx attach "cc:${zmx_name}" claude "${claude_args[@]}"
+    # exec only returns if the exec itself failed (binary missing, ENOEXEC, etc.).
+    echo "runclaude: exec zmx failed to launch (binary missing / permission?)" >&2
+    exit 127
 else
-    exec claude --dangerously-skip-permissions
+    printf 'runclaude: exec claude %s\n' "${claude_args[*]}" >&2
+    exec claude "${claude_args[@]}"
+    echo "runclaude: exec claude failed to launch (binary missing / permission?)" >&2
+    exit 127
 fi

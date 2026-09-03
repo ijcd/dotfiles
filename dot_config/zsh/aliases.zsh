@@ -45,6 +45,10 @@ alias tsstatus='tailscale status'
 alias tsnetcheck='tailscale netcheck'
 alias tspong='tailscale ping'      # verify direct P2P (not DERP-relayed)
 
+# zmx attach picker — fzf over live zmx sessions, attach to selection.
+# Never creates. For SSH-in-tmux resuming a local claude. Script: zmxa.
+alias zzz='zmxa'
+
 # diff variants
 alias ddiff="/usr/bin/diff"
 alias udiff="/usr/bin/diff -urN"

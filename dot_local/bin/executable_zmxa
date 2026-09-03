@@ -1,0 +1,41 @@
+#!/usr/bin/env bash
+# zmxa — pick an existing zmx session via fzf and attach to it.
+#
+# For the "SSH in, land in tmux, jump to a running local claude" workflow.
+# Never creates a session — if the name you type has a typo, plain
+# `zmx attach` would silently spawn an empty new session; this picker only
+# offers what's live and requires a selection.
+
+set -eEuo pipefail
+trap 'echo "zmxa: ERROR line $LINENO exit $?: $BASH_COMMAND" >&2' ERR
+
+command -v zmx >/dev/null || { echo "zmxa: zmx not on PATH" >&2; exit 127; }
+command -v fzf >/dev/null || { echo "zmxa: fzf not on PATH" >&2; exit 127; }
+
+# Parse `zmx list` output: whitespace-separated key=value fields, cmd multi-word
+# at the end. Extract with anchored seds so a value containing '=' doesn't fool
+# a naive split.
+rows="$(zmx list 2>/dev/null | while IFS= read -r line; do
+    [ -n "$line" ] || continue
+    name="$(sed -n 's/.*name=\([^ ]*\).*/\1/p' <<<"$line")"
+    cwd="$(sed -n 's/.*start_dir=\([^ ]*\).*/\1/p' <<<"$line")"
+    clients="$(sed -n 's/.*clients=\([^ ]*\).*/\1/p' <<<"$line")"
+    cmd="$(sed -n 's/.*cmd=\(.*\)/\1/p' <<<"$line")"
+    printf '%s\t%s\t%s\t%s\n' "$name" "$clients" "$cwd" "$cmd"
+done)"
+
+if [ -z "$rows" ]; then
+    echo "zmxa: no live zmx sessions" >&2
+    exit 1
+fi
+
+sel="$(printf '%s' "$rows" | fzf \
+    --delimiter=$'\t' \
+    --with-nth=1 \
+    --preview 'echo "clients: {2}"; echo "cwd:     {3}"; echo "cmd:     {4}"' \
+    --preview-window=up:3 \
+    --header='zmx attach — pick a session (esc to cancel)')"
+
+[ -n "$sel" ] || exit 1
+name="$(cut -f1 <<<"$sel")"
+exec zmx attach "$name"

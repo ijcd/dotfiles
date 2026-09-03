@@ -86,9 +86,13 @@ dircolor apply  # apply on shell start
 # Uses a SEPARATE tmux socket (`-L ssh`) so local tmux is untouched — you
 # can `tmux ls` locally and see none of these.
 #
-# Skips when: no SSH, already in tmux, non-interactive, dumb term, no tmux.
+# Skips when: no SSH, already in tmux, already inside a zmx session
+# (ZMX_SESSION is injected by zmx into every shell it spawns — see `zmx -h`;
+# without this guard, `ssh host 'zmx attach …'` would spawn tmux on top of
+# the zmx session and break input routing), non-interactive, dumb term, no tmux.
 if [ -n "$SSH_CONNECTION" ] \
    && [ -z "$TMUX" ] \
+   && [ -z "$ZMX_SESSION" ] \
    && [[ -o interactive ]] \
    && [ "$TERM" != "screen" ] && [ "$TERM" != "screen-256color" ] \
    && [ "$TERM" != "dumb" ] \

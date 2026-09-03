@@ -5,6 +5,7 @@
   ],
   "trustedformulae": [
     "ijcd/tap/dev-ip",
+    "neurosnap/tap/zmx",
     "raine/workmux/workmux"
   ]
 }
