@@ -109,60 +109,9 @@ fi
 IFS=' | '
 echo "${parts[*]}"
 
-# ─── Kitty tab rendering (broad mode: busy=🟡, idle=🔴) ───
-# Statusline runs on every Claude Code UI update, so this is effectively a live
-# state monitor. We read .status from $CLAUDE_CONFIG_DIR/sessions/<id>.json (matched by
-# sessionId) and reflect it on the kitty tab — title prefix + tab background tint.
-# A small state-cache file avoids redundant kitty @ calls when nothing changed.
-
-if [ -n "${KITTY_LISTEN_ON:-}" ] && [ -n "${KITTY_WINDOW_ID:-}" ] && [ -n "$session" ]; then
-    # Live session status; falls back to "unknown" for older Claude versions or fresh sessions.
-    status=$(jq -r --arg sid "$session" 'select(.sessionId == $sid) | .status // "unknown"' \
-                "${CLAUDE_CONFIG_DIR:-$HOME/.claude}"/sessions/*.json 2>/dev/null | head -1)
-    [ -z "$status" ] && status="unknown"
-
-    # "waiting on input" is not a native status (Claude Code emits only
-    # busy/idle/shell); the Notification hook drops /tmp/claude-attn-<session>.
-    # Blue ONLY overrides an active (busy) session that's blocked; once the session
-    # is idle the turn is over — red wins and we clear any stale marker, so exiting
-    # or finishing never leaves a tab stuck blue (the Notification on exit set it).
-    _attn="/tmp/claude-attn-${session}"
-    if [ "$status" = idle ] || [ "$status" = shell ] || [ "$status" = unknown ]; then
-        rm -f "$_attn"
-    elif [ -f "$_attn" ]; then
-        status="waiting"
-    fi
-
-    # Saturated bg in the state's hue; active fg is white (high-contrast for the
-    # focused tab where you're reading), inactive fg is a dim shade of the ball
-    # color (state-coded for peripheral scanning of unfocused tabs).
-    case "$status" in
-        busy)    emoji="🟡"; active_bg="#5e4818"; inactive_bg="#3e3008"; active_fg="#ffffff"; inactive_fg="#cc9030" ;;
-        waiting) emoji="🔵"; active_bg="#1e3a5e"; inactive_bg="#14283e"; active_fg="#ffffff"; inactive_fg="#5a9fd4" ;;
-        idle)    emoji="🔴"; active_bg="#5e2424"; inactive_bg="#3e1818"; active_fg="#ffffff"; inactive_fg="#cc4040" ;;
-        *)       emoji="" ;;  # status field missing (older Claude Code) — leave tab unchanged
-    esac
-
-    if [ -n "$emoji" ]; then
-        # Cache last-applied state to skip redundant kitty calls on every render.
-        # Key includes all colors so editing the palette auto-invalidates the cache
-        # — otherwise a color tweak with the same emoji wouldn't re-render.
-        state_file="/tmp/claude-tabstate-${session}"
-        state_key="${emoji}|${active_bg}|${inactive_bg}|${active_fg}|${inactive_fg}"
-        if [ "$state_key" != "$(cat "$state_file" 2>/dev/null)" ]; then
-            echo "$state_key" > "$state_file"
-
-            cur=$(kitty @ ls 2>/dev/null | jq -r --argjson wid "$KITTY_WINDOW_ID" \
-                  '.[].tabs[] | select(.windows[].id == $wid) | .title' 2>/dev/null)
-            # strip any leading status prefix (current + legacy markers)
-            base="$cur"
-            base="${base#🟢 }"; base="${base#🟡 }"; base="${base#🔴 }"; base="${base#🔵 }"
-            base="${base#⏳ }"; base="${base#… }"
-
-            kitty @ set-tab-title --match "window_id:$KITTY_WINDOW_ID" "$emoji $base" 2>/dev/null
-            kitty @ set-tab-color --match "window_id:$KITTY_WINDOW_ID" \
-                active_bg="$active_bg" inactive_bg="$inactive_bg" \
-                active_fg="$active_fg" inactive_fg="$inactive_fg" 2>/dev/null
-        fi
-    fi
-fi
+# ─── Kitty tab rendering — delegated to the shared resolver (hooks/kitty-tab-lib.sh). ───
+# Statusline runs on every Claude Code UI render. But Claude Code does NOT re-invoke it
+# while a blocking modal (AskUserQuestion / permission prompt) is open — so claude-attn.sh
+# calls this SAME resolver on marker set/clear to repaint during the modal. Sourced
+# script-relative so it resolves through the ~/.claude-ijcd symlink too.
+source "$(dirname "${BASH_SOURCE[0]}")/hooks/kitty-tab-lib.sh" 2>/dev/null && kitty_tab_paint "$session"
