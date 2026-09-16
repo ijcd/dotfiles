@@ -12,17 +12,17 @@ jj new master >/dev/null 2>&1; echo lo > lo; jj commit -m lb >/dev/null 2>&1; jj
 # FLOW_TRUNK left at its default trunk() — the revset helpers just FORMAT the
 # string, they don't evaluate it, so the label is what we assert.
 
-# default base = local/main
+# default base = local/main. (catchup_mine's blanket -b revset was retired for
+# nearest-base ownership scoping — see catchup_owned_wip; only the base-lift revset
+# remains parameterized here.)
 flow_load_config
 assert_eq "roots(trunk()..local/main)" "$(catchup_private_root)" "default private-root revset"
-assert_contains "$(catchup_mine)" 'descendants(trunk()..local/main) ~ local/main' "default mine revset"
 
-# base override → test/main flows through EVERY revset, no hardcoded local/main
+# base override → test/main flows through the base-lift revset, no hardcoded local/main
 jj config set --repo jj-flow.base test/main >/dev/null 2>&1
 flow_load_config
 assert_eq "roots(trunk()..test/main)" "$(catchup_private_root)" "base override in private-root"
-assert_contains "$(catchup_mine)" 'test/main' "base override in mine"
-[[ "$(catchup_mine)" != *local/main* ]] || fail "base override still references local/main"
+[[ "$(catchup_private_root)" != *local/main* ]] || fail "base override still references local/main"
 
 cd / && rm -rf "$repo"
 echo "ok: revsets"
