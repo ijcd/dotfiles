@@ -127,9 +127,29 @@
   "sandbox": {
     "filesystem": {
       "allowRead": [
-        "/private/tmp/claude-501/"
+        "/private/tmp/claude-501/",
+
+        "~/.gitconfig",
+        "~/.config/git/config",
+        "~/.config/git/ignore",
+        "~/.config/git/attributes",
+        "~/.config/git/git-machine",
+        "~/.config/git/git-work-lunar",
+        "~/.config/git/git-ijcd",
+
+        "~/.config/jj/config.toml",
+        "~/.config/jj/conf.d/**",
+        "~/.config/jj/repos/**",
+        "~/.config/jj/workspaces/**"
       ]
     }
+  },
+  "permissions": {
+    "deny": [
+      "Read(~/.gnupg/**)",
+      "Read(~/.git-credentials)",
+      "Read(~/.config/git/credentials)"
+    ]
   },
   "tui": "default",
   "skipDangerousModePermissionPrompt": true,
