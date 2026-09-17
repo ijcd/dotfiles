@@ -166,21 +166,21 @@ case "${1:-status}" in
     esac
     exit 0
     ;;
-  catchup)   shift; _flow_mod refresh; _flow_mod catchup; catchup_main "$@"; exit $? ;;   # in-process module
+  catchup)   shift; jj root >/dev/null 2>&1 && flow_lock catchup; _flow_mod refresh; _flow_mod catchup; catchup_main "$@"; exit $? ;;   # in-process module
   refresh)   shift; _flow_mod refresh; refresh_main "$@"; exit $? ;;   # workspace refresh (used by catchup)
   # base-strip against THIS agent's base: set JJ_MIRROR_SOURCE_ROOT from FLOW_BASE
   # when in a repo (guarded so `--help` outside a repo still works in tests).
   # `jjf mirror` alone (or with a flag) = sync shortcut; `jjf mirror <subcmd>`
   # (status/add/rm/config/…) passes through to the full mirror dispatch.
-  mirror)    shift; _flow_mod mirror; jj root >/dev/null 2>&1 && { flow_load_config; export JJ_MIRROR_SOURCE_ROOT="$FLOW_BASE"; }
+  mirror)    shift; _flow_mod mirror; jj root >/dev/null 2>&1 && { flow_lock mirror; flow_load_config; export JJ_MIRROR_SOURCE_ROOT="$FLOW_BASE"; }
              if [[ $# -eq 0 || "$1" == -* ]]; then mirror_main sync "$@"; else mirror_main "$@"; fi; exit $? ;;
-  push)      shift; _flow_mod mirror; jj root >/dev/null 2>&1 && { flow_load_config; export JJ_MIRROR_SOURCE_ROOT="$FLOW_BASE"; }; mirror_main push "$@"; exit $? ;;
+  push)      shift; _flow_mod mirror; jj root >/dev/null 2>&1 && { flow_lock push; flow_load_config; export JJ_MIRROR_SOURCE_ROOT="$FLOW_BASE"; }; mirror_main push "$@"; exit $? ;;
   integrate) shift; _flow_mod integrate; integrate_main "$@"; exit $? ;;   # in-process module
   base)      shift; _flow_mod base; base_main "$@"; exit $? ;;   # per-agent base management
   guide)     shift; _flow_mod guide; guide_main "$@"; exit $? ;;   # long-form recipe help for agents
   tug)       shift; _flow_mod tug; tug_main "$@"; exit $? ;;   # in-process module
-  cleanup)   shift; _flow_mod cleanup; cleanup_main "$@"; exit $? ;;   # in-process module
-  ship)      shift; flow_ship; exit $? ;;
+  cleanup)   shift; jj root >/dev/null 2>&1 && flow_lock cleanup; _flow_mod cleanup; cleanup_main "$@"; exit $? ;;   # in-process module
+  ship)      shift; jj root >/dev/null 2>&1 && flow_lock ship; flow_ship; exit $? ;;
   _dump-config)
     flow_load_config
     printf 'trunk=%s\nbase=%s\nwork-prefix=%s\npr-prefix=%s\nintegration=%s\nworkspace-dir=%s\nremote=%s\n' \

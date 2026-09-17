@@ -59,6 +59,34 @@ flow_load_config() {
   fi
 }
 
+# ─── Advisory lock around mutating verbs ─────────────────────────────────────
+# Two workspaces sharing one repo must not interleave bookmark mutation + push —
+# a reconcile can drop a bookmark (the 2026-09-12 incident's neighbor failure).
+# shlock (BSD, /usr/bin/shlock) is the macOS native — flock is Linux-only. shlock
+# is PID-aware (kill -0 the recorded holder), so a crashed jjf's lock is stolen
+# automatically and never wedges the repo. Best-effort: no shlock / no repo → no
+# lock. Bypass with JJF_NO_LOCK=1; tune the wait with JJF_LOCK_TIMEOUT (seconds).
+_JJF_LOCK_FILE=""
+flow_lock() {
+  local verb=${1:-jjf}
+  [[ -n "${JJF_NO_LOCK:-}" ]] && return 0
+  command -v shlock >/dev/null 2>&1 || return 0
+  local root; root=$(jj root 2>/dev/null) || return 0
+  [[ -n "$root" ]] || return 0
+  local lf="$root/.jj/.jjf-lock" timeout=${JJF_LOCK_TIMEOUT:-30} waited=0 holder
+  while ! shlock -f "$lf" -p $$ 2>/dev/null; do
+    if (( waited >= timeout )); then
+      holder=$(tr -dc '0-9' < "$lf" 2>/dev/null || true)
+      echo "jjf: another jjf op is running (pid ${holder:-?}); '$verb' aborted after ${timeout}s. Retry, or set JJF_NO_LOCK=1 to override." >&2
+      exit 75   # EX_TEMPFAIL
+    fi
+    sleep 1; waited=$((waited + 1))
+  done
+  _JJF_LOCK_FILE="$lf"
+  trap 'flow_unlock' EXIT
+}
+flow_unlock() { [[ -n "$_JJF_LOCK_FILE" ]] && rm -f "$_JJF_LOCK_FILE"; _JJF_LOCK_FILE=""; }
+
 # flow_cid REV — short commit id of REV, or empty.
 flow_cid() { jj log --no-graph -r "$1" -T 'commit_id.short() ++ "\n"' 2>/dev/null | head -n1 || true; }
 

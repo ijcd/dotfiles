@@ -118,12 +118,37 @@ DO     jjf integrate add 'wip/*'
 VERIFY local/integration is an octopus merge of your selected wip
 WHY    local-only, disposable; never pushed
 
+## RECIPE 10 — reap dead orphan PR branches (deliberate housekeeping)
+WHEN   stale ijcd/* linger with no wip source AND no open PR (a routine sync keeps
+       them by default — it won't prove they're safe to delete beside other agents)
+DO     jjf mirror -n --repo-wide      # preview which orphans would be reaped
+       jjf mirror --repo-wide         # reap them
+VERIFY only sourceless, non-open-PR primes are culled; open PRs are NEVER touched
+WHY    the default cull fails safe (keeps anything it can't prove is yours);
+       --repo-wide is the explicit sweep — but Guard 2 still shields every open PR
+
+## CULL SAFETY (why a sync won't close your PRs — the 2026-09-12 incident)
+  A sync's orphan cull deletes a prime ONLY when reaping is provably safe:
+    Guard 2  a prime backing an OPEN PR is never culled — full stop.
+    Guard 1  a sourceless, non-live prime is kept unless it's provably yours
+             (single-lane repo, or your ledger under cull-mode=ledger).
+  Reap the leftovers deliberately with `jjf mirror --repo-wide` (RECIPE 10).
+
+## OVERRIDES (env / flags — all fail safe by default)
+  JJF_NO_LOCK=1            skip the per-repo advisory lock on mutating verbs
+  JJF_LOCK_TIMEOUT=<secs>  how long to wait for the lock before aborting (default 30)
+  --repo-wide              (mirror/push) relax Guard 1 to reap dead orphans; Guard 2 holds
+  jj-mirror.cull-mode=ledger  auto-reap only YOUR OWN recorded leftovers beside peers
+    (env JJ_MIRROR_CULL_MODE=ledger)
+
 ## NEVER
 
   - NEVER `jjf catchup` (or any rebase) on the shared `local/main` — it drags every
     agent. Work off your own local/main-<W> (RECIPE 2).
   - NEVER move another agent's base or wip.
   - NEVER edit an `ijcd/*` PR commit by hand — mirror owns it; next sync overwrites.
+  - NEVER `jj git push --deleted` — it ignores scoping and closes peers' PRs (this
+    is what the 2026-09-12 incident actually did). jjf never runs it; don't either.
   - If unsure, `jjf status --graph` first; it tells you what's safe to do.
 EOF
 }

@@ -24,6 +24,12 @@
             "command": "/Users/ijcd/.claude/hooks/lunar-pr-gate.sh",
             "timeout": 120,
             "statusMessage": "lunar PR gate"
+          },
+          {
+            "type": "command",
+            "command": "/Users/ijcd/.claude/hooks/jj-local-main-jail.sh",
+            "timeout": 30,
+            "statusMessage": "jj local/main jail"
           }
         ]
       },
