@@ -27,6 +27,25 @@
   Never a passing test encoding the wrong output. Green must mean "correct", not
   "this is what it currently does".
 
+## Bug-fix PRs (non-negotiable)
+
+- **Vet before fixing.** Confirm the code is on a live path over real data — not
+  dead/theoretical. A function with no callers gets DELETED (net-negative), not
+  hardened. Check the caller graph and, when unsure, the git history (when the last
+  caller went, and why).
+- **DRY + principia audit the diff BEFORE opening the PR.** Flat `case` over nested
+  if/else, functional core, no duplication, prefer net-negative — see
+  `~/work/principia/architectural-principles.md`. Apply the cleanups, re-test. Never
+  open straight off a green suite.
+- **Every bug-fix PR description MUST carry:**
+  - **Why we think it's a bug** — the concrete defect + its impact.
+  - **Provenance of that belief** — the trail: the code path, the spec/rule it violates
+    (CITE it — FDA/CMS/HIPAA/RFC/Postgres/Elixir docs, with links and a quote), and the
+    evidence (the test that surfaces it, verified before→after). Not "this is wrong" —
+    HOW we know.
+  - **Release note** where the project requires one (lunar: the fenced `release-note`
+    block; one block per distinct bug fixed).
+
 ## Writing style
 
 Stop the AI-speak. Default to my voice — short, diagnostic, file:line citations. PR descriptions, commit messages, and docs are mementos for future me, not stories for anyone else.
@@ -213,6 +232,28 @@ When forking a repo to submit a PR:
 Most repos here use **jj (jujutsu)** over a git backend. Detect: `jj root`
 succeeds (or a `.jj/` dir exists up-tree) → jj repo. Plain-git repos — this
 chezmoi repo and `~/work/prs/*` PR forks — have a `.git` and no `.jj` → use git.
+
+### `@` stays under YOUR `local/main*` stream — before, during, and after (hard rule, recurring failure)
+
+The pathological repeat failure is dragging `@` OFF your own stream — landing it on the
+bare shared `local/main`, or on a random/conflicted commit that isn't a descendant of your
+per-agent base. That's what's banned.
+
+`jj edit` and `jj new` are the ONLY commands that move `@`, and they ARE allowed — as long
+as `@` stays **under a `local/main*` you own** (i.e. `local/main-<workspace>` or one of its
+descendants: your `wip/*` commits or an empty child) the whole time. So `jj edit wip/mine`,
+`jj new wip/mine`, `jj new local/main-<workspace>` are all fine — editing your own feature
+commit in place is normal. Just verify `@`'s position **before AND after every jj command**;
+if it drifted off your `local/main*` stream, STOP.
+
+NEVER land `@` on the bare shared `local/main` (only `local/main-<workspace>` / `wip/*`), and
+never `jj edit` onto another agent's commit or a random/conflicted revision outside your base.
+
+Commit surgery that needs no checkout at all — prefer these when you're not editing file text:
+- `jj squash --from <rev> --into <rev>`
+- `jj rebase -s|-b|-r <rev> -d <dest>`
+- `jj describe -r <rev>` · `jj bookmark set|create <name> -r <rev>`
+- `jj resolve -r <rev>` — resolves a named commit's conflicts, no checkout
 
 ### jj-flow (lunar wip→PR workflow)
 
