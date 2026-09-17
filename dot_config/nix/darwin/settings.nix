@@ -10,6 +10,19 @@
 
     startup.chime = false;
 
+    # nix-darwin's dock-defaults module ends activation with `killall -qu ijcd
+    # Dock`, trusting launchd to respawn it. It doesn't: com.apple.Dock.agent is
+    # on-demand (RunAtLoad = false) with KeepAlive.SuccessfulExit = false, so a
+    # clean SIGTERM (what killall sends, Dock catches it and exits 0) is a
+    # "successful exit" that launchd will NOT relaunch — the Dock stays dead
+    # until some client demands a dock Mach service. During a rebuild nothing
+    # does, so the Dock vanishes every switch. Kickstart it back explicitly.
+    # postActivation runs as root, after the module's killall, hence gui/<uid>.
+    activationScripts.postActivation.text = ''
+      echo "kickstarting Dock..." >&2
+      /bin/launchctl kickstart -k "gui/$(id -u ijcd)/com.apple.Dock.agent" || true
+    '';
+
     defaults = {
       loginwindow = {
         GuestEnabled = false;
