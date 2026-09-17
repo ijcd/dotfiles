@@ -23,3 +23,18 @@
 [includeIf "gitdir:~/.local/share/chezmoi/"]
 	path = git-ijcd
 {{- end }}
+
+# Host-independent, by REMOTE not directory: any repo whose remote is
+# github.com/ijcd (however cloned — SSH, HTTPS, or the github-ijcd alias) gets
+# the personal ijcd identity + ijcd key. Placed AFTER the gitdir rules so it
+# wins (git applies includeIf top-to-bottom; last match takes effect) — an ijcd
+# repo living under ~/work stops inheriting the Lunar identity. hasconfig matches
+# the raw stored URL, before git-ijcd's insteadOf rewrite, so all forms listed.
+[includeIf "hasconfig:remote.*.url:git@github.com:ijcd/**"]
+	path = git-ijcd
+[includeIf "hasconfig:remote.*.url:https://github.com/ijcd/**"]
+	path = git-ijcd
+[includeIf "hasconfig:remote.*.url:ssh://git@github.com/ijcd/**"]
+	path = git-ijcd
+[includeIf "hasconfig:remote.*.url:git@github-ijcd:ijcd/**"]
+	path = git-ijcd
