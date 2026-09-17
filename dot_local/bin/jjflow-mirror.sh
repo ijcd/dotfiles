@@ -1635,12 +1635,20 @@ abandon_main() {
 push_main() {
   sync_main
 
+  # sync above is local + fast and prints; jj-vine's GitHub round-trip (push bookmarks +
+  # create/sync PRs) is the slow, network-bound phase and is SILENT by default — an agent
+  # watching `jjf push` then can't tell "working" from "hung". Mark the phase boundary and
+  # pass -v so jj-vine narrates. (If -v turns out to buffer instead of stream, escalate to
+  # a heartbeat wrapper — see ideas/2026-09-16-jjf-push-vine-liveness.md.)
+  local vine_note="jj-mirror: sync ✓ — handing to jj-vine: GitHub push + PR sync (may take 10-30s; -v streams progress)…"
   if command -v jj-vine >/dev/null 2>&1; then
-    exec jj-vine submit --tracked
+    echo "$vine_note" >&2
+    exec jj-vine submit --tracked -v
   fi
   # Try `jj vine ...` as a jj subcommand plugin
   if jj vine --help >/dev/null 2>&1; then
-    exec jj vine submit --tracked
+    echo "$vine_note" >&2
+    exec jj vine submit --tracked -v
   fi
 
   cat >&2 <<'EOF'
