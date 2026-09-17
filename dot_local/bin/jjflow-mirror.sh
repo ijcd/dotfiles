@@ -77,7 +77,7 @@ EOF
 help_sync() {
   cat <<'EOF'
 Usage:
-  jj-mirror sync [-n|--dry-run] [-t|--thread <bookmark>]
+  jj-mirror sync [-n|--dry-run] [-t|--thread <bookmark>] [--repo-wide]
 
 Re-derive the prime chain from the current source chain. State-free: the
 whole shape is computed from the current jj graph each invocation.
@@ -94,6 +94,21 @@ Options:
         --thread, the orphan cull is skipped entirely so other threads' prime
         bookmarks are not deleted. A filter that matches zero threads prints
         a warning to stderr.
+
+  --repo-wide
+        Relax the ownership fail-safe (Guard 1) so the cull may reap a
+        genuinely-dead orphan prime — one with no source anywhere and no open
+        PR — even in a multi-lane repo where its owner can't be proven. Guard 2
+        still holds: a prime backing an OPEN PR is NEVER culled, repo-wide or
+        not. This is the deliberate housekeeping sweep; the default keeps any
+        prime it can't prove is yours.
+
+Cull safety (a routine sync's orphan cull):
+  Guard 2  a prime backing an OPEN PR is never culled (the 2026-09-12 incident).
+  Guard 1  a sourceless, non-live prime is culled only when reaping is provably
+           safe — a single-lane repo, or (with jj-mirror.cull-mode=ledger, env
+           JJ_MIRROR_CULL_MODE) a prime this lane recorded building. Otherwise
+           it is KEPT (fail-safe); use --repo-wide to reap it deliberately.
 
 Behavior:
   For each thread (a linear chain of source bookmarks descending from trunk()):
@@ -375,6 +390,68 @@ live_pr_set() { _resolve_live_pr_set; printf '%s' "$_LIVE_PR_SET"; }
 # Resolves in-process (no fork) so the memo survives across members in one sync.
 dest_is_live() { _resolve_live_pr_set; printf '%s\n' "$_LIVE_PR_SET" | grep -qxF "$1"; }
 
+# has_peer_lane — true if the repo carries a per-agent base (local/main-<W>) other
+# than this sync's SOURCE_ROOT, i.e. more than one lane could own a prime. When
+# true, a sourceless non-live prime whose owner we can't prove is KEPT (Guard 1
+# fail-safe); when false (single lane) culling our own leftover is safe. The empty
+# base (`local/main`) counts as ours, not a peer.
+has_peer_lane() {
+  local name _cid
+  while IFS=$'\t' read -r name _cid; do
+    [[ "$name" == local/main-* ]] || continue
+    [[ "$name" == "$SOURCE_ROOT" ]] && continue
+    return 0
+  done < <(list_bookmarks_with_prefix "local/main-")
+  return 1
+}
+
+# cull_mode — "ledger" enables reclaiming our own recorded leftovers (mode B);
+# anything else is the default fail-safe (mode A). Env seam (set by jjf / tests)
+# wins over repo config.
+cull_mode() { printf '%s' "${JJ_MIRROR_CULL_MODE:-$(jj config get jj-mirror.cull-mode 2>/dev/null || true)}"; }
+
+# ledger_file — per-lane ownership ledger under .jj (jj's internal dir — files
+# there are never snapshotted). Keyed by SOURCE_ROOT (the lane's base) so each
+# agent reclaims only what it recorded. Empty when outside a repo.
+ledger_file() {
+  local root; root=$(jj root 2>/dev/null) || return 1
+  [[ -n "$root" ]] || return 1
+  printf '%s/.jj/.jjf-owned-%s' "$root" "${SOURCE_ROOT//\//_}"
+}
+# ledger_has NAME — NAME recorded as owned by this lane?
+ledger_has() { local f; f=$(ledger_file) || return 1; [[ -f "$f" ]] && grep -qxF "$1" "$f"; }
+# ledger_record NAME... — add names to this lane's ledger (dedup, order-stable).
+ledger_record() {
+  local f; f=$(ledger_file) || return 0
+  (( $# )) || return 0
+  { [[ -f "$f" ]] && cat "$f"; printf '%s\n' "$@"; } | awk 'NF && !seen[$0]++' > "$f.tmp" && mv "$f.tmp" "$f"
+}
+# ledger_forget NAME — drop NAME from this lane's ledger (after a successful cull).
+ledger_forget() {
+  local f; f=$(ledger_file) || return 0
+  [[ -f "$f" ]] || return 0
+  grep -vxF "$1" "$f" > "$f.tmp" 2>/dev/null; mv "$f.tmp" "$f"
+}
+
+# cull_owned PRIME — may this sourceless, non-live PRIME be reaped? (return 0 = yes.)
+cull_owned() {
+  local prime=$1
+  (( ${REPO_WIDE:-0} )) && return 0                            # explicit reaper → cull any dead orphan
+  has_peer_lane || return 0                                    # single lane → safe
+  [[ "$(cull_mode)" == ledger ]] && ledger_has "$prime" && return 0   # my recorded leftover
+  return 1                                                     # unproven → keep (mode A)
+}
+
+# should_cull_orphan PRIME — the cull decision for a prime not in `wanted` (return 0 = cull).
+# Single gate shared by the dry-run preview and the real cull, so they can't drift.
+should_cull_orphan() {
+  local prime=$1
+  dest_is_live "$prime" && return 1                                    # Guard 2: open PR → keep
+  local src="${SOURCE_PREFIX}$(strip_prime_prefix "$prime")"
+  jj log --no-graph -r "$src" -T '""' >/dev/null 2>&1 && return 1      # source exists → keep
+  cull_owned "$prime"                                                  # Guard 1
+}
+
 # live_dest_for EXISTING BMS — echo the dest bookmark for this prime position if
 # it backs an open PR (so merge-forward applies), else empty. Requires a non-empty
 # EXISTING (there must be a prior prime tip to advance from) and a live dest among
@@ -415,16 +492,18 @@ list_bookmarks_with_prefix() {
 
 DRY_RUN=0
 THREAD_FILTER=""
+REPO_WIDE=0
 
-# parse_sync_flags — pull -n/--dry-run and -t/--thread out of "$@" as globals.
-# Rejects unknown positionals: `sync` takes no positional args, so anything
-# left over is a typo. (Previously silently discarded — a footgun.)
+# parse_sync_flags — pull -n/--dry-run, -t/--thread, --repo-wide out of "$@" as
+# globals. Rejects unknown positionals: `sync` takes no positional args, so
+# anything left over is a typo. (Previously silently discarded — a footgun.)
 parse_sync_flags() {
   while (( $# )); do
     case "$1" in
-      -n|--dry-run) DRY_RUN=1; shift ;;
-      -t|--thread)  THREAD_FILTER=${2:-}; shift 2 ;;
-      --thread=*)   THREAD_FILTER=${1#--thread=}; shift ;;
+      -n|--dry-run)  DRY_RUN=1; shift ;;
+      -t|--thread)   THREAD_FILTER=${2:-}; shift 2 ;;
+      --thread=*)    THREAD_FILTER=${1#--thread=}; shift ;;
+      --repo-wide)   REPO_WIDE=1; shift ;;
       *)
         echo "jj-mirror: sync: unknown argument '$1'" >&2
         exit 2
@@ -1305,11 +1384,9 @@ sync_main() {
           dry_wanted["$(dest_for "$source_name")"]=1
         done
       done
-      local pname pcid _src
+      local pname pcid
       while IFS=$'\t' read -r pname pcid; do
-        if [[ -z "${dry_wanted[$pname]:-}" ]]; then
-          _src="${SOURCE_PREFIX}$(strip_prime_prefix "$pname")"
-          jj log --no-graph -r "$_src" -T '""' >/dev/null 2>&1 && continue   # source exists elsewhere → keep
+        if [[ -z "${dry_wanted[$pname]:-}" ]] && should_cull_orphan "$pname"; then
           printf 'would cull orphan %s\n' "$pname"
         fi
       done < <(list_prime_bookmarks)
@@ -1338,18 +1415,18 @@ sync_main() {
       done
     done
 
-    local pname pcid _src
+    # ledger mode: record wanted primes so a lane can reclaim its own sourceless leftover (cull_owned).
+    [[ "$(cull_mode)" == ledger && ${#wanted[@]} -gt 0 ]] && ledger_record "${!wanted[@]}"
+
+    # should_cull_orphan is the whole decision; a prime it rejects is KEPT (fail-safe).
+    local pname pcid
     while IFS=$'\t' read -r pname pcid; do
-      if [[ -z "${wanted[$pname]:-}" ]]; then
-        # Per-agent safety: this sync only enumerated the CURRENT base's threads, so
-        # `wanted` misses other agents' bookmarks. Only cull if the source bookmark
-        # is gone REPO-WIDE — another agent's base may still own it (wip/<x> exists).
-        _src="${SOURCE_PREFIX}$(strip_prime_prefix "$pname")"
-        if jj log --no-graph -r "$_src" -T '""' >/dev/null 2>&1; then continue; fi
+      if [[ -z "${wanted[$pname]:-}" ]] && should_cull_orphan "$pname"; then
         jj bookmark delete "$pname" >/dev/null 2>&1 \
           || { echo "jj-mirror: orphan cull bookmark delete failed for $pname; rolling back to op $pre_op" >&2; jj op restore "$pre_op" >/dev/null 2>&1 || true; exit 1; }
         jj abandon "$pcid" >/dev/null 2>&1 \
           || { echo "jj-mirror: orphan cull abandon failed for $pcid; rolling back to op $pre_op" >&2; jj op restore "$pre_op" >/dev/null 2>&1 || true; exit 1; }
+        ledger_forget "$pname"
       fi
     done < <(list_prime_bookmarks)
   fi
