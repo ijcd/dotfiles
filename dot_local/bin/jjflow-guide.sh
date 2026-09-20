@@ -89,7 +89,8 @@ WHEN   `jjf status` header says "N behind → catchup"
 DO     jjf catchup            # add -f to also refresh workspaces holding WIP
 VERIFY jjf status header reads "✓ current"
 WHY    rebases ONLY local/main-<W> + your wip onto new trunk; other agents untouched.
-       A conflict rolls back cleanly (nothing rewritten) — resolve, then re-run
+       A conflict rolls back cleanly (nothing rewritten) — resolve, then re-run.
+       Stack-safe: a parent/child wip chain keeps its shape (see RECIPE 12 WHY)
 
 ## RECIPE 6 — do it all: catch up then push
 WHEN   you want your stream current AND your PRs updated in one go
@@ -127,6 +128,38 @@ VERIFY only sourceless, non-open-PR primes are culled; open PRs are NEVER touche
 WHY    the default cull fails safe (keeps anything it can't prove is yours);
        --repo-wide is the explicit sweep — but Guard 2 still shields every open PR
 
+## RECIPE 11 — stack a PR on another PR (ijcd/<child> based on ijcd/<parent>)
+WHEN   <child> builds on unmerged work in <parent>, and you want the child PR to review
+       as only its own commits instead of parent's + child's
+DO     path B (default) — stack the SOURCE, the mirror follows:
+         jj rebase -b wip/<child> -d wip/<parent>
+         jjf push -t wip/<child>
+       path A (keep the wips siblings, stack only the PRs):
+         jj config set --repo jj-mirror.roots.<child>.prime "ijcd/<parent>"
+         jjf push -t wip/<child>
+VERIFY gh pr view ijcd/<child> --json baseRefName    # => ijcd/<parent>, NOT master
+       jjf status --graph                            # child rides above parent, both live
+WHY    mirror replays the whole source-root..leaf range and lands each included
+       bookmark's dest on its mirrored commit, so a stacked source mirrors to a stacked
+       dest with no config (jjflow-mirror.sh:47-48,970-996). Path A instead re-points
+       just this thread's prime root (jjflow-mirror.sh:671-676). jjf owns neither PR
+       base — jj-vine re-asserts it from the bookmark graph on every submit.
+
+## RECIPE 12 — parent PR squash-merged: re-mirror every child
+WHEN   a stacked parent merged. lunar is SQUASH-MERGE-ONLY (squash:true, merge:false,
+       rebase:false), so parent's commits are now ONE NEW id on master — the child's
+       copies of them match nothing upstream
+DO     jjf catchup                  # your base + wips onto the new trunk
+       jjf push -t wip/<child>      # re-mirror each child, bottom-up
+       jjf cleanup <parent>         # retire the merged parent
+VERIFY gh pr view ijcd/<child> --json baseRefName   # => master
+       the child PR diff shows ONLY <child>'s changes — no re-application of parent's
+WHY    skip the re-mirror and the child PR carries content-duplicate commits against
+       master and a diff that re-applies work already merged. catchup is SAFE for a
+       stack: `jj rebase -b X -d BASE` is `-s roots(BASE..X)` — only the chain ROOT is
+       re-parented, internal parent/child edges survive, and a repeat pass is a no-op
+       ("already in place"). Verified on jj 0.43, 2026-09-19.
+
 ## CULL SAFETY (why a sync won't close your PRs — the 2026-09-12 incident)
   A sync's orphan cull deletes a prime ONLY when reaping is provably safe:
     Guard 2  a prime backing an OPEN PR is never culled — full stop.
@@ -147,6 +180,9 @@ WHY    the default cull fails safe (keeps anything it can't prove is yours);
     agent. Work off your own local/main-<W> (RECIPE 2).
   - NEVER move another agent's base or wip.
   - NEVER edit an `ijcd/*` PR commit by hand — mirror owns it; next sync overwrites.
+  - NEVER `gh pr edit --base` to stack a PR — jj-vine re-asserts every PR base from the
+    bookmark graph on each submit, so the edit is silently reverted by the next `jjf
+    push`. Stack the source, or set roots.<sfx>.prime (RECIPE 11).
   - NEVER `jj git push --deleted` — it ignores scoping and closes peers' PRs (this
     is what the 2026-09-12 incident actually did). jjf never runs it; don't either.
   - If unsure, `jjf status --graph` first; it tells you what's safe to do.

@@ -22,6 +22,15 @@ out=$( cd /tmp && "$SCRIPT" guide catchup 2>&1 )
 assert_contains "$out" 'catchup' "filtered guide mentions catchup"
 [[ "$out" != *'RECIPE 8 — retire a merged PR'* ]] || fail "verb filter should exclude unrelated recipes"
 
+# stacked-PR recipes are discoverable by the word an agent would actually grep for
+out=$( cd /tmp && "$SCRIPT" guide stack 2>&1 )
+assert_contains "$out" 'RECIPE 11' "guide stack surfaces the stacking recipe"
+assert_contains "$out" 'roots.<child>.prime' "stacking recipe shows the prime-root override path"
+assert_contains "$out" 'RECIPE 12' "guide stack surfaces the squash-merge follow-up"
+assert_contains "$out" 'SQUASH-MERGE-ONLY' "squash-merge constraint is stated"
+assert_contains "$( cd /tmp && "$SCRIPT" guide 2>&1 )" 'gh pr edit --base' \
+  "NEVER warns that a hand-set PR base is reverted by jj-vine"
+
 # help points to the guide
 assert_contains "$("$SCRIPT" help 2>&1)" 'jj-flow guide' "help points agents to the guide"
 
