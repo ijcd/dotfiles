@@ -3,6 +3,8 @@
   inputs,
   self,
   primaryUser,
+  systemNixpkgs,
+  systemHomeManager,
   ...
 }:
 {
@@ -17,7 +19,7 @@
     # (mise .tool-versions / devenv / flake). The base ships only the psql
     # client (common/packages.nix).
     ./settings.nix
-    inputs.home-manager.darwinModules.home-manager
+    systemHomeManager.darwinModules.home-manager
     inputs.nix-homebrew.darwinModules.nix-homebrew
   ];
 
@@ -42,35 +44,21 @@
       ];
     };
     enable = false; # nix installed separately, don't let nix-darwin manage it
+
+    # Route ambient `nixpkgs` (flake registry + <nixpkgs>/NIX_PATH) to the same
+    # source the system builds against. Per-host: bearcat -> 26.05-darwin,
+    # blackbird -> unstable. Without this, tools like devenv resolve
+    # `flake:nixpkgs` from the user registry / channel default, which on
+    # x86_64-darwin lands on unstable (26.11) and throws. `systemNixpkgs` is
+    # passed in via specialArgs from `mkDarwin` in flake.nix.
+    registry.nixpkgs.flake = systemNixpkgs;
+    nixPath = [ "nixpkgs=${systemNixpkgs}" ];
   };
 
-  nixpkgs.config.allowUnfree = true;
-  nixpkgs.overlays = [
-    inputs.emacs-overlay.overlay
-    # See nixpkgs-bash52 input comment in flake.nix.
-    (final: prev:
-      let
-        # Fresh minimal config: prev.config carries replaceStdenv=null from
-        # current unstable nixpkgs, which the pinned (Jul-2025) nixpkgs calls
-        # as a function without an isFunction guard -> eval error.
-        pkgs-bash52 = import inputs.nixpkgs-bash52 {
-          inherit (prev.stdenv.hostPlatform) system;
-          config = { allowUnfree = true; };
-        };
-      in
-      {
-        # Only override the interactive bash. bashNonInteractive feeds the
-        # darwin stdenv bootstrap (allDeps isBuiltByBootstrapFilesCompiler
-        # assertion); overriding it with a foreign-built bash breaks the
-        # bootstrap chain.
-        #
-        # nixos-25.05 channel has bash 5.2 fully cached on cache.nixos.org —
-        # wholesale import is fast (fetches binary, ~2.5 MiB) and doesn't
-        # rely on the build env's bash working (which it doesn't, since
-        # that's the bug we're working around in the first place).
-        bashInteractive = pkgs-bash52.bashInteractive;
-      })
-  ];
+  # `nixpkgs.config` / `nixpkgs.overlays` live in `mkPkgs` in flake.nix, not
+  # here: we pass `pkgs` directly to `darwin.lib.darwinSystem`, and that path
+  # bypasses module-level nixpkgs configuration. Bake overlays / config at
+  # import time in flake.nix; keep this module free of nixpkgs.* settings.
 
   # homebrew installation manager
   nix-homebrew = {

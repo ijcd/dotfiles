@@ -27,6 +27,7 @@ in
       "nikitabobko/tap" # for aerospace
       "raine/workmux" # for workmux (brews list references raine/workmux/workmux)
       "ijcd/tap" # for dev-ip (brews list references ijcd/tap/dev-ip)
+      "neurosnap/tap" # for zmx (session persistence wrapper for claude sessions)
     ];
 
     brews = [
@@ -70,6 +71,7 @@ in
       "qpdf"             # structural PDF transforms (encrypt/linearize/split/merge)
       "weasyprint"       # HTML/CSS → PDF renderer; doc/PDF generators shell out to it
       "agent-browser"    # browser automation CLI for AI agents (agent-browser.dev; not in nixpkgs)
+      "neurosnap/tap/zmx" # session persistence for terminal processes — runclaude wraps claude in it
     ];
 
     # Universal cask set — installed on EVERY host, including the generic

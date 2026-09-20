@@ -16,6 +16,21 @@ let
   ];
 
   # ═══════════════════════════════════════════════════════════════════════════
+  # Local-dev TLDs — macOS resolver sends queries for each to dnsmasq (:53).
+  # See docs/decisions/0001-local-dev-dns-layers.md. Add a TLD → append here.
+  # Wildcard `*.<tld> → 127.0.0.1` not yet wired (see ADR §Future work);
+  # today, only hostnames listed in `devProjects` above resolve.
+  # ═══════════════════════════════════════════════════════════════════════════
+  localDevTlds = [ "test" ];
+
+  resolverEtc = builtins.listToAttrs (
+    builtins.map (tld: {
+      name = "resolver/${tld}";
+      value = { text = "nameserver 127.0.0.1\n"; };
+    }) localDevTlds
+  );
+
+  # ═══════════════════════════════════════════════════════════════════════════
   # Derived values (don't edit below unless changing behavior)
   # ═══════════════════════════════════════════════════════════════════════════
 
@@ -97,13 +112,12 @@ in
     addresses = devDomains;
   };
 
-  # Tell macOS to use dnsmasq for .test domains
-  environment.etc."resolver/test".text = "nameserver 127.0.0.1\n";
-
-  # ─────────────────────────────────────────────────────────────────────────────
-  # PF: NAT rules to fix loopback hairpin routing
-  # ─────────────────────────────────────────────────────────────────────────────
-  environment.etc."pf.anchors/loopback_dev".text = pfNatRules;
+  # /etc/resolver/<tld> entries — one per TLD in localDevTlds (see let block).
+  # Merged in-place with the pf.anchors entry so nix-darwin sees one attrset.
+  environment.etc = resolverEtc // {
+    # PF: NAT rules to fix loopback hairpin routing
+    "pf.anchors/loopback_dev".text = pfNatRules;
+  };
 
   # ─────────────────────────────────────────────────────────────────────────────
   # Launchd daemons (run at boot, no /nix dependency)
