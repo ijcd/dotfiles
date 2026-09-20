@@ -3,11 +3,11 @@
 # Catches evaluation-time errors (overlay bugs, module bugs, missing inputs)
 # in seconds instead of waiting for darwin-rebuild.
 #
-# Usage: nix-eval-check [host]   (default host: bearcat)
+# Usage: nix-eval-check [host]   (default: this machine, per LocalHostName)
 
 set -euo pipefail
 
-host="${1:-bearcat}"
+host="${1:-$(scutil --get LocalHostName 2>/dev/null || hostname -s)}"
 flake_dir="${HOME}/.config/nix"
 
 cd "$flake_dir"

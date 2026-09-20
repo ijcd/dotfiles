@@ -6,8 +6,10 @@
 
 set -euo pipefail
 
-HOST="bearcat"
-FLAKE_DIR="$(git rev-parse --show-toplevel)/dot_config/nix"
+ROOT="$(git rev-parse --show-toplevel)"
+FLAKE_DIR="$ROOT/dot_config/nix"
+source "$ROOT/hooks/lib.sh"
+HOST="$(gate_host "$FLAKE_DIR")"
 
 echo "▶ nix build --dry-run ${FLAKE_DIR}#darwinConfigurations.${HOST}.config.system.build.toplevel"
 

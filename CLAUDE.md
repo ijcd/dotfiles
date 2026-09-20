@@ -33,9 +33,12 @@ chezmoi managed           # list everything chezmoi controls
 chezmoi cd                # cd to source dir (this repo)
 ~/.config/nix/scripts/chezmoi-report.sh [PATH...]  # what's managed vs not
 
-# nix-darwin / Home Manager (host name = bearcat)
-darwin-rebuild switch --flake ~/.config/nix#bearcat
-nixhome-switch            # alias for the above (sudo wrapper)
+# nix-darwin / Home Manager
+# Named hosts: bearcat (x86_64, Intel desktop), blackbird (aarch64, Apple Silicon laptop).
+# Prefer the host-agnostic alias — it resolves the host from the machine, so it
+# can't rebuild the wrong one. Name a host explicitly only to target another machine.
+nixhome-switch            # sudo -H nix run nix-darwin -- switch --flake ~/.config/nix
+darwin-rebuild switch --flake ~/.config/nix#blackbird   # or #bearcat — explicit form
 nixhome-rebuild           # full workflow: diff → apply → switch → re-add lock
 nix flake update          # update inputs in flake.lock
 ~/.config/nix/scripts/nix-eval-check.sh [host]     # ad-hoc eval check against deployed config (no sudo, no build)
@@ -46,7 +49,7 @@ zimfw update              # update Zim modules
 zimfw compile             # recompile for speed
 ```
 
-Bootstrap on a fresh machine: see `dot_config/nix/README.md` (uses `sudo nix run nix-darwin/master#darwin-rebuild -- switch --flake .#bearcat`).
+Bootstrap on a fresh machine: run `~/.config/nix/scripts/bootstrap.sh` — it resolves the flake target itself (named host by `LocalHostName`, else the per-arch fallback), so a new machine needs no flake edit. See `dot_config/nix/README.md`.
 
 ## Architecture
 
@@ -70,7 +73,7 @@ The ignore file mixes two things: (1) repo-only directories (`archive/`, `plans/
 - `darwin/` — system-level modules, all imported by `darwin/default.nix`:
   - `homebrew.nix` (declarative brew bundle), `settings.nix` (macOS defaults), `local-dev.nix`, `postgres.nix`, `performance.nix`, `nix-store-fallback.nix`
 - `common/` — Home Manager (user-level) modules imported via `home-manager.users.${primaryUser}`: `packages.nix`, `git.nix`, `shell.nix`, `mise.nix`, `direnv.nix`, `emacs.nix`
-- `hosts/<hostname>/configuration.nix` — host-specific overrides. Currently only `bearcat` exists. Add a new host by creating `hosts/<name>/` and a new `darwinConfigurations.<name>` block in `flake.nix`.
+- `hosts/<hostname>/configuration.nix` — host-specific overrides. `bearcat` (x86_64-darwin) and `blackbird` (aarch64-darwin) exist; `flake.nix` also exposes per-arch fallback targets (`.#aarch64-darwin`, `.#x86_64-darwin`, `.#default`) for an unnamed machine. Add a host by creating `hosts/<name>/` and an entry in `namedHosts` in `flake.nix`.
 - `scripts/` — sourceable helper scripts (chezmoi/darwin reports)
 
 Where to add things:
@@ -116,5 +119,5 @@ lefthook install                         # activate precommit gates (nix eval + 
 - After editing a managed file, run `chezmoi diff` to confirm the change before `chezmoi apply`.
 - Adding a new file under an already-managed directory: name it with chezmoi prefixes for the perms/transforms you want, then `chezmoi apply`. No registration step.
 - Removing a managed file: delete from source AND run `chezmoi apply` (which will offer to remove the destination), or add it to `.chezmoiignore`.
-- Changes to `dot_config/nix/**` require `darwin-rebuild switch --flake ~/.config/nix#bearcat` to take effect, not `chezmoi apply`. (chezmoi materializes the flake source; nix-darwin acts on it.) Precommit (via `lefthook`) gates commits with `nix eval` + `nix build --dry-run` against the source flake — see "One-time setup per clone" above. `~/.config/nix/scripts/nix-eval-check.sh` is for ad-hoc checks against the *deployed* config (after apply), separate from the source-side precommit gates.
+- Changes to `dot_config/nix/**` require `nixhome-switch` (or `darwin-rebuild switch --flake ~/.config/nix#<host>`) to take effect, not `chezmoi apply`. (chezmoi materializes the flake source; nix-darwin acts on it.) Precommit (via `lefthook`) gates commits with `nix eval` + `nix build --dry-run` against the source flake — see "One-time setup per clone" above. `~/.config/nix/scripts/nix-eval-check.sh` is for ad-hoc checks against the *deployed* config (after apply), separate from the source-side precommit gates.
 - The user's global `~/.claude/CLAUDE.md` lives at `private_dot_claude/private_CLAUDE.md` in this repo. Edit there, then `chezmoi apply`.
