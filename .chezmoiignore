@@ -63,3 +63,6 @@
 !.claude/RTK.md
 !.claude/.rtk-version
 .claude.json*
+
+# Python bytecode from running test/kitty-tab-bar against dot_config/kitty/tab_bar.py
+__pycache__/
